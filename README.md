@@ -20,13 +20,12 @@ This IDE is built for:
 
 ## ✨ Key Features
 
-* **AI-Powered Design Assistant:** Get intelligent suggestions for components, connections, and layout optimizations.
-* **Intuitive Drag-and-Drop Interface:** A user-friendly, browser-based editor that feels familiar and easy to use.
-* **Schematic Capture:** Design and visualize your circuits logically before moving to the physical layout.
-* **PCB Layout:** Seamlessly transition from schematic to a printed circuit board design.
-* **Component Library:** Access a vast library of electronic components with datasheets and footprints.
-* **Real-time Validation:** Instant feedback on your design to catch errors early.
-
+* **AI Co-Engineer:** Delegate the entire design process, from component selection and schematic creation to final PCB layout, to your AI partner. Let the Co-Engineer handle the heavy lifting.
+* **The Figma for EDA Design:** We're building the modern, collaborative, and intuitive interface that electronics design deserves. Say goodbye to legacy software.
+* **Cursor for Hardware:** Design with the speed and intelligence of an AI-native workflow. Get smart suggestions, auto-completion for circuits, and real-time validation.
+* **Seamless Schematic & PCB Workflow:** Transition effortlessly from a logical schematic to a physical PCB layout within a unified environment.
+* **Vast Component Library:** Access a comprehensive and constantly growing library of components, complete with datasheets, footprints, and models.
+* **Instant Design Validation:** Catch errors and potential issues in real-time, ensuring your designs are correct and manufacturable from the start.
 ## 🛠️ Tech Stack
 
 This project leverages a modern, cross-platform technology stack for a robust and scalable application.
