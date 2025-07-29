@@ -3,7 +3,7 @@ interface IconProps {
   className?: string;
 }
 
-export function HomeIcon({ size = 16, className = "" }: IconProps) {
+export function SearchIcon({ size = 16, className = "" }: IconProps) {
   return (
     <svg
       width={size}
@@ -16,8 +16,8 @@ export function HomeIcon({ size = 16, className = "" }: IconProps) {
       strokeLinejoin="round"
       className={className}
     >
-      <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-      <polyline points="9,22 9,12 15,12 15,22" />
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.35-4.35" />
     </svg>
   );
 }
