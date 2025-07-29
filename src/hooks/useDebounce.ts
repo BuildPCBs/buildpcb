@@ -28,7 +28,7 @@ export function useDebouncedCallback<T extends (...args: any[]) => any>(
   delay: number
 ): T {
   const callbackRef = useRef(callback);
-  const debouncedFn = useRef<T | undefined>();
+  const debouncedFn = useRef<T | undefined>(undefined);
 
   useEffect(() => {
     callbackRef.current = callback;
