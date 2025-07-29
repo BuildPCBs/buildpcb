@@ -1,0 +1,133 @@
+/* BuildPCB.ai Responsive Global Styles */
+
+/* Ensure proper base font size scaling and full height layout */
+html {
+  font-size: clamp(14px, 1.25vw, 18px);
+  box-sizing: border-box;
+  min-height: 100%;
+  width: 100%;
+  background: #ffffff;
+}
+
+body {
+  min-height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  background: #ffffff;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: inherit;
+}
+
+/* Responsive container queries for better layout control */
+@container (min-width: 1280px) {
+  .responsive-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(400px, 30vw), 1fr));
+  }
+}
+
+@container (max-width: 1279px) {
+  .responsive-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(300px, 45vw), 1fr));
+  }
+}
+
+/* Ensure smooth transitions for responsive changes */
+.responsive-element {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Container query support for panels */
+.responsive-panel {
+  container-type: inline-size;
+}
+
+@container (min-width: 1400px) {
+  .responsive-panel {
+    padding: clamp(1rem, 2vw, 2rem);
+  }
+}
+
+@container (max-width: 1399px) {
+  .responsive-panel {
+    padding: clamp(0.75rem, 1.5vw, 1.5rem);
+  }
+}
+
+/* Typography scaling */
+.responsive-text-sm {
+  font-size: clamp(0.75rem, 1.1vw, 0.875rem);
+}
+
+.responsive-text-base {
+  font-size: clamp(0.875rem, 1.25vw, 1rem);
+}
+
+.responsive-text-lg {
+  font-size: clamp(1rem, 1.5vw, 1.125rem);
+}
+
+/* Responsive spacing utilities */
+.responsive-spacing-xs {
+  padding: clamp(0.25rem, 0.5vw, 0.5rem);
+}
+
+.responsive-spacing-sm {
+  padding: clamp(0.5rem, 1vw, 0.75rem);
+}
+
+.responsive-spacing-md {
+  padding: clamp(0.75rem, 1.5vw, 1.25rem);
+}
+
+.responsive-spacing-lg {
+  padding: clamp(1rem, 2vw, 1.5rem);
+}
+
+/* Responsive button sizing */
+.responsive-button {
+  padding: clamp(0.5rem, 1vw, 0.75rem) clamp(1rem, 2vw, 1.5rem);
+  font-size: clamp(0.875rem, 1.1vw, 1rem);
+  border-radius: clamp(0.375rem, 0.8vw, 0.5rem);
+}
+
+/* Responsive icon sizing */
+.responsive-icon-sm {
+  width: clamp(1rem, 1.5vw, 1.25rem);
+  height: clamp(1rem, 1.5vw, 1.25rem);
+}
+
+.responsive-icon-md {
+  width: clamp(1.25rem, 2vw, 1.5rem);
+  height: clamp(1.25rem, 2vw, 1.5rem);
+}
+
+/* Media queries for extreme cases */
+@media (max-width: 640px) {
+  html {
+    font-size: 14px;
+  }
+}
+
+@media (min-width: 1920px) {
+  html {
+    font-size: 18px;
+  }
+}
+
+@media (min-width: 2560px) {
+  html {
+    font-size: 20px;
+  }
+}
+
+/* Ensure proper scaling on high-DPI displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  html {
+    font-size: clamp(15px, 1.3vw, 19px);
+  }
+}

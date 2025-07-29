@@ -3,6 +3,7 @@ import { useRouter } from "next/navigation";
 import { HomeIcon, SearchIcon, WindowIcon } from "@/components/icons";
 import { ProjectItem } from "@/components/ui/ProjectItem";
 import { useClickOutside } from "@/hooks/useClickOutside";
+import { r, responsive, responsiveFontSize } from "@/lib/responsive";
 
 const mockProjects = [
   "USB LED Layout",
@@ -43,28 +44,35 @@ export function SchemaPanel() {
   // Determine panel state and styles
   const getPanelStyles = () => {
     if (isFullyExpanded) {
-      // State 3: Fully expanded (your original big design)
+      // State 3: Fully expanded - responsive design
       return {
-        width: "280px",
-        height: "auto",
-        borderRadius: "24px",
-        padding: "16px",
+        width: responsive(280),
+        minWidth: responsive(250),
+        maxWidth: "25vw",
+        ...r({
+          borderRadius: 24,
+          padding: 16,
+        }),
       };
     } else if (isHovered) {
-      // State 2: Hover preview (your original smaller design - unchanged)
+      // State 2: Hover preview - responsive design
       return {
-        width: "200px",
-        height: "auto",
-        borderRadius: "24px",
-        padding: "16px",
+        width: responsive(200),
+        minWidth: responsive(180),
+        ...r({
+          borderRadius: 24,
+          padding: 16,
+        }),
       };
     } else {
-      // State 1: Very small rounded (new minimal state)
+      // State 1: Very small rounded - responsive design
       return {
-        width: "60px",
-        height: "60px",
-        borderRadius: "30px",
-        padding: "8px",
+        ...r({
+          width: 60,
+          height: 60,
+          borderRadius: 30,
+          padding: 8,
+        }),
       };
     }
   };
@@ -74,90 +82,109 @@ export function SchemaPanel() {
       ref={panelRef}
       className="absolute bg-white border border-[#ddd] transition-all duration-300 ease-in-out overflow-hidden cursor-pointer"
       style={{
-        top: "38px",
-        left: "31px",
+        top: responsive(38),
+        left: responsive(31),
         ...getPanelStyles(),
       }}
       onMouseEnter={() => !isFullyExpanded && setIsHovered(true)}
       onMouseLeave={() => !isFullyExpanded && setIsHovered(false)}
       onClick={() => !isFullyExpanded && toggleFullExpand()}
     >
-      {/* Very small state - just show a compact icon */}
-      {!isHovered && !isFullyExpanded && (
-        <div className="flex items-center justify-center w-full h-full">
-          <WindowIcon size={20} className="text-[#969696]" />
-        </div>
-      )}
+      {/* Inner container with 2px spacing from panel edges */}
+      <div style={{ padding: responsive(2), height: "100%" }}>
+        {/* Very small state - just show a compact icon */}
+        {!isHovered && !isFullyExpanded && (
+          <div className="flex items-center justify-center w-full h-full">
+            <WindowIcon size={20} className="text-[#969696]" />
+          </div>
+        )}
 
-      {/* Hover state OR Fully expanded - show your original design */}
-      {(isHovered || isFullyExpanded) && (
-        <>
-          {/* Top Header with Icons - your original design */}
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-3">
+        {/* Hover state OR Fully expanded - show your original design */}
+        {(isHovered || isFullyExpanded) && (
+          <>
+            {/* Top Header with Icons - responsive design */}
+            <div
+              className="flex items-center justify-between"
+              style={{ marginBottom: responsive(8) }}
+            >
+              <div
+                className="flex items-center"
+                style={{ gap: responsive(12) }}
+              >
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleHomeClick();
+                  }}
+                  className="flex items-center hover:bg-gray-100 rounded transition-colors"
+                  style={{ padding: responsive(4) }}
+                >
+                  <HomeIcon size={16} className="text-[#969696]" />
+                </button>
+                <SearchIcon size={16} className="text-[#969696]" />
+              </div>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleHomeClick();
+                  toggleFullExpand();
                 }}
-                className="flex items-center hover:bg-gray-100 p-1 rounded transition-colors"
+                className="flex items-center hover:bg-gray-100 rounded transition-colors"
+                style={{ padding: responsive(4) }}
               >
-                <HomeIcon size={16} className="text-[#969696]" />
+                <WindowIcon size={16} className="text-[#969696]" />
               </button>
-              <SearchIcon size={16} className="text-[#969696]" />
             </div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleFullExpand();
+
+            {/* Fixed spacing between icons and content - responsive */}
+            <div style={{ marginBottom: responsive(32) }}></div>
+
+            {/* Schema Title - responsive design */}
+            <div
+              className={`transition-all duration-300 ease-in-out ${
+                !isFullyExpanded ? "max-h-0 opacity-0" : "opacity-100"
+              } overflow-hidden`}
+              style={{
+                maxHeight: isFullyExpanded ? responsive(40) : 0,
+                marginBottom: responsive(8),
               }}
-              className="flex items-center hover:bg-gray-100 p-1 rounded transition-colors"
             >
-              <WindowIcon size={16} className="text-[#969696]" />
-            </button>
-          </div>
-
-          {/* Fixed spacing between icons and content - your original design */}
-          <div className="mb-8"></div>
-
-          {/* Schema Title - your original design */}
-          <div
-            className={`transition-all duration-300 ease-in-out ${
-              !isFullyExpanded ? "max-h-0 opacity-0" : "max-h-10 opacity-100"
-            } overflow-hidden`}
-          >
-            <h2 className="text-xs font-medium text-gray-900 uppercase tracking-wider mb-2">
-              SCHEMAS
-            </h2>
-          </div>
-
-          {/* Project List - your original design */}
-          <div
-            className={`transition-all duration-300 ease-in-out ${
-              !isFullyExpanded ? "max-h-12" : "max-h-96"
-            } overflow-hidden`}
-          >
-            <div className="space-y-1">
-              {!isFullyExpanded ? (
-                <ProjectItem
-                  name={mockProjects[0]}
-                  onClick={() => console.log(`Opening ${mockProjects[0]}`)}
-                  isCollapsed={true}
-                />
-              ) : (
-                mockProjects.map((project, index) => (
-                  <ProjectItem
-                    key={index}
-                    name={project}
-                    onClick={() => console.log(`Opening ${project}`)}
-                    isCollapsed={false}
-                  />
-                ))
-              )}
+              <h2
+                className="font-medium text-gray-900 uppercase tracking-wider"
+                style={{ fontSize: responsiveFontSize(12) }}
+              >
+                SCHEMAS
+              </h2>
             </div>
-          </div>
-        </>
-      )}
+
+            {/* Project List - your original design */}
+            <div
+              className={`transition-all duration-300 ease-in-out ${
+                !isFullyExpanded ? "max-h-12" : "max-h-96"
+              } overflow-hidden`}
+            >
+              <div className="space-y-1">
+                {!isFullyExpanded ? (
+                  <ProjectItem
+                    name={mockProjects[0]}
+                    onClick={() => console.log(`Opening ${mockProjects[0]}`)}
+                    isCollapsed={true}
+                  />
+                ) : (
+                  mockProjects.map((project, index) => (
+                    <ProjectItem
+                      key={index}
+                      name={project}
+                      onClick={() => console.log(`Opening ${project}`)}
+                      isCollapsed={false}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </div>{" "}
+      {/* Close inner container with 4px spacing */}
     </div>
   );
 }
