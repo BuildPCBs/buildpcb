@@ -8,7 +8,7 @@ export const siteConfig = {
   twitterCreator: "@buildpcb",
   keywords: [
     "PCB design",
-    "circuit design", 
+    "circuit design",
     "electronics",
     "AI",
     "CAD",
@@ -16,19 +16,21 @@ export const siteConfig = {
     "electronic design automation",
     "schematic design",
     "PCB layout",
-    "circuit simulation"
+    "circuit simulation",
   ],
 };
 
 export const pages = {
   home: {
     title: "IDE - Circuit Design Studio",
-    description: "Professional PCB design environment with AI-powered tools. Design, simulate, and validate electronic circuits with our advanced IDE featuring real-time collaboration and intelligent design assistance.",
+    description:
+      "Professional PCB design environment with AI-powered tools. Design, simulate, and validate electronic circuits with our advanced IDE featuring real-time collaboration and intelligent design assistance.",
     path: "/",
   },
   dashboard: {
     title: "Dashboard",
-    description: "Manage your PCB projects, view recent designs, and collaborate with your team. Access all your electronic circuit designs in one place.",
+    description:
+      "Manage your PCB projects, view recent designs, and collaborate with your team. Access all your electronic circuit designs in one place.",
     path: "/dashboard",
   },
 };

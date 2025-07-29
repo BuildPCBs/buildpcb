@@ -1,4 +1,4 @@
-import { responsiveFontSize } from '@/lib/responsive';
+import { responsiveFontSize } from "@/lib/responsive";
 
 export function DeviceRestriction() {
   return (
@@ -6,20 +6,20 @@ export function DeviceRestriction() {
       <div className="text-center space-y-6 max-w-md">
         <div style={{ fontSize: responsiveFontSize(64) }}>💻</div>
         <div className="space-y-3">
-          <h1 
+          <h1
             className="font-bold text-gray-900"
             style={{ fontSize: responsiveFontSize(32) }}
           >
             Desktop Required
           </h1>
-          <p 
+          <p
             className="text-gray-600 leading-relaxed"
             style={{ fontSize: responsiveFontSize(16) }}
           >
             BuildPCB.ai IDE requires a desktop or laptop computer with a minimum
             screen width for optimal circuit design experience.
           </p>
-          <p 
+          <p
             className="text-gray-500"
             style={{ fontSize: responsiveFontSize(14) }}
           >

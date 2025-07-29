@@ -63,44 +63,48 @@ const Dashboard = () => {
               className="flex items-center justify-between"
               style={{ marginBottom: responsive(16) }}
             >
-            <div className="flex items-center" style={{ gap: responsive(12) }}>
-              <UserIcon size={16} className="text-[#969696]" />
-              <span
-                className="font-medium text-gray-900"
-                style={{ fontSize: responsiveFontSize(14) }}
+              <div
+                className="flex items-center"
+                style={{ gap: responsive(12) }}
               >
-                User Name
-              </span>
+                <UserIcon size={16} className="text-[#969696]" />
+                <span
+                  className="font-medium text-gray-900"
+                  style={{ fontSize: responsiveFontSize(14) }}
+                >
+                  User Name
+                </span>
+              </div>
+              <NotificationIcon size={16} className="text-[#969696]" />
             </div>
-            <NotificationIcon size={16} className="text-[#969696]" />
-          </div>
 
-          {/* Search Box */}
-          <div className="relative">
-            <div
-              className="absolute top-1/2 transform -translate-y-1/2"
-              style={{ left: responsive(12) }}
-            >
-              <SearchIcon size={16} className="text-[#e3e3e3]" />
+            {/* Search Box */}
+            <div className="relative">
+              <div
+                className="absolute top-1/2 transform -translate-y-1/2"
+                style={{ left: responsive(12) }}
+              >
+                <SearchIcon size={16} className="text-[#e3e3e3]" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search"
+                className="w-full bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                style={{
+                  paddingLeft: responsive(40),
+                  paddingRight: responsive(16),
+                  paddingTop: responsive(8),
+                  paddingBottom: responsive(8),
+                  fontSize: responsiveFontSize(14),
+                  ...r({
+                    borderWidth: 0.3,
+                    borderRadius: 12,
+                  }),
+                }}
+              />
             </div>
-            <input
-              type="text"
-              placeholder="Search"
-              className="w-full bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              style={{
-                paddingLeft: responsive(40),
-                paddingRight: responsive(16),
-                paddingTop: responsive(8),
-                paddingBottom: responsive(8),
-                fontSize: responsiveFontSize(14),
-                ...r({
-                  borderWidth: 0.3,
-                  borderRadius: 12,
-                }),
-              }}
-            />
-          </div>
-          </div> {/* Close inner container with 4px spacing */}
+          </div>{" "}
+          {/* Close inner container with 4px spacing */}
         </div>
 
         {/* Main Content Area */}
@@ -205,66 +209,67 @@ const Dashboard = () => {
                       marginTop: responsive(5), // Positive spacing from image
                     }}
                   >
-                  {/* User Icons - Fixed size container */}
-                  <div
-                    className="flex items-center"
-                    style={{
-                      marginLeft: responsive(-4), // Slight negative margin for better alignment
-                      height: responsive(50), // Match text container height
-                    }}
-                  >
+                    {/* User Icons - Fixed size container */}
                     <div
-                      className="bg-[#d0d0d0] border border-[#969696] rounded-full flex items-center justify-center"
+                      className="flex items-center"
                       style={{
-                        width: responsive(24),
-                        height: responsive(24),
-                        ...r({ borderWidth: 0.68 }),
+                        marginLeft: responsive(-4), // Slight negative margin for better alignment
+                        height: responsive(50), // Match text container height
                       }}
                     >
-                      <UserIcon size={12} className="text-[#969696]" />
-                    </div>
-                    {project.collaborators === 2 && (
                       <div
-                        className="bg-[#e0e0e0] border border-[#969696] rounded-full flex items-center justify-center"
+                        className="bg-[#d0d0d0] border border-[#969696] rounded-full flex items-center justify-center"
                         style={{
                           width: responsive(24),
                           height: responsive(24),
-                          marginLeft: responsive(-8),
                           ...r({ borderWidth: 0.68 }),
                         }}
                       >
                         <UserIcon size={12} className="text-[#969696]" />
                       </div>
-                    )}
-                  </div>
+                      {project.collaborators === 2 && (
+                        <div
+                          className="bg-[#e0e0e0] border border-[#969696] rounded-full flex items-center justify-center"
+                          style={{
+                            width: responsive(24),
+                            height: responsive(24),
+                            marginLeft: responsive(-8),
+                            ...r({ borderWidth: 0.68 }),
+                          }}
+                        >
+                          <UserIcon size={12} className="text-[#969696]" />
+                        </div>
+                      )}
+                    </div>
 
-                  {/* Text Content - Fixed height container */}
-                  <div
-                    className="flex-1 flex flex-col justify-center"
-                    style={{ height: responsive(50) }} // Match avatar height
-                  >
-                    <h3
-                      className="font-medium text-[#666666] leading-tight"
-                      style={{
-                        fontSize: responsiveFontSize(14),
-                        marginBottom: responsive(2), // Minimal spacing
-                        lineHeight: 1.2,
-                      }}
+                    {/* Text Content - Fixed height container */}
+                    <div
+                      className="flex-1 flex flex-col justify-center"
+                      style={{ height: responsive(50) }} // Match avatar height
                     >
-                      {project.name}
-                    </h3>
-                    <p
-                      className="text-[#999999] leading-tight"
-                      style={{
-                        fontSize: responsiveFontSize(12),
-                        lineHeight: 1.2,
-                      }}
-                    >
-                      Edited {project.lastModified}
-                    </p>
+                      <h3
+                        className="font-medium text-[#666666] leading-tight"
+                        style={{
+                          fontSize: responsiveFontSize(14),
+                          marginBottom: responsive(2), // Minimal spacing
+                          lineHeight: 1.2,
+                        }}
+                      >
+                        {project.name}
+                      </h3>
+                      <p
+                        className="text-[#999999] leading-tight"
+                        style={{
+                          fontSize: responsiveFontSize(12),
+                          lineHeight: 1.2,
+                        }}
+                      >
+                        Edited {project.lastModified}
+                      </p>
+                    </div>
                   </div>
-                </div>
-                </div> {/* Close inner container with 4px spacing */}
+                </div>{" "}
+                {/* Close inner container with 4px spacing */}
               </div>
             ))}
           </div>

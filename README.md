@@ -6,7 +6,7 @@
 
 **🚀 AI-Powered PCB Design IDE**
 
-*The future of electronic circuit design - intuitive, intelligent, and collaborative*
+_The future of electronic circuit design - intuitive, intelligent, and collaborative_
 
 [![Live Demo](https://img.shields.io/badge/🌐_Live_Demo-ide.buildpcbs.com-blue?style=for-the-badge)](https://ide.buildpcbs.com)
 [![Website](https://img.shields.io/badge/🏠_Website-buildpcbs.com-green?style=for-the-badge)](https://buildpcbs.com)
@@ -14,7 +14,7 @@
 
 ---
 
-*"The Figma for Electronics Design - Where AI meets PCB Creation"*
+_"The Figma for Electronics Design - Where AI meets PCB Creation"_
 
 </div>
 
@@ -23,11 +23,13 @@
 BuildPCB.ai revolutionizes electronic circuit design by combining the intuitive user experience of modern design tools with the power of artificial intelligence. Think **Canva meets EasyEDA, powered by AI** - we're building the next generation of PCB design software that makes electronics accessible to everyone.
 
 ### 🎯 **Our Mission**
+
 Transform the way people design electronic circuits by eliminating the complexity of traditional EDA tools while maintaining professional-grade capabilities.
 
 ### 👥 **Built For**
+
 - 🔰 **Beginners** learning electronics fundamentals
-- 🛠️ **Makers & Hobbyists** building creative projects  
+- 🛠️ **Makers & Hobbyists** building creative projects
 - ⚡ **Engineers** needing rapid prototyping
 - 🏫 **Educators** teaching circuit design
 - 🚀 **Startups** developing hardware products
@@ -35,24 +37,28 @@ Transform the way people design electronic circuits by eliminating the complexit
 ## ✨ Key Features
 
 ### 🤖 **AI Co-Engineer**
+
 - **Complete Design Automation**: From component selection to final PCB layout
 - **Intelligent Suggestions**: Real-time design recommendations and optimizations
 - **Error Prevention**: AI-powered validation catches issues before they become problems
 - **Smart Routing**: Automatic trace routing with design rule compliance
 
 ### 🎨 **Modern Design Experience**
+
 - **Figma-like Interface**: Intuitive, collaborative design environment
 - **Real-time Collaboration**: Work together on designs simultaneously
 - **Responsive Design**: Works seamlessly across desktop, tablet, and mobile
 - **Dark/Light Themes**: Customizable interface for any preference
 
 ### ⚡ **Powerful Workflow**
+
 - **Seamless Schematic-to-PCB**: Unified workflow from concept to manufacturing
 - **Component Library**: 100,000+ components with real-time availability
 - **Design Validation**: Live DRC (Design Rule Check) and ERC (Electrical Rule Check)
 - **Export Options**: Gerber, Pick & Place, BOM, and more
 
 ### 🔧 **Professional Tools**
+
 - **Advanced Routing**: Differential pairs, length matching, impedance control
 - **3D Visualization**: Real-time 3D preview of your PCB
 - **Simulation Integration**: SPICE simulation built-in
@@ -62,15 +68,15 @@ Transform the way people design electronic circuits by eliminating the complexit
 
 <div align="center">
 
-| Layer | Technology | Purpose |
-|-------|------------|---------|
-| **Frontend** | ![Next.js](https://img.shields.io/badge/Next.js-black?logo=next.js) ![React](https://img.shields.io/badge/React-61DAFB?logo=react&logoColor=black) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white) | Modern, responsive web interface |
-| **Styling** | ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?logo=tailwind-css&logoColor=white) | Utility-first CSS framework |
-| **State Management** | ![Zustand](https://img.shields.io/badge/Zustand-2C3E50) | Lightweight state management |
-| **Graphics** | ![Canvas API](https://img.shields.io/badge/Canvas_API-FF6B6B) ![WebGL](https://img.shields.io/badge/WebGL-990000) | High-performance rendering |
-| **Backend** | ![Node.js](https://img.shields.io/badge/Node.js-339933?logo=node.js&logoColor=white) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-336791?logo=postgresql&logoColor=white) | Scalable server infrastructure |
-| **AI/ML** | ![OpenAI](https://img.shields.io/badge/OpenAI-412991) ![TensorFlow](https://img.shields.io/badge/TensorFlow-FF6F00?logo=tensorflow&logoColor=white) | AI-powered design assistance |
-| **Deployment** | ![Vercel](https://img.shields.io/badge/Vercel-000000?logo=vercel&logoColor=white) ![AWS](https://img.shields.io/badge/AWS-232F3E?logo=amazon-aws&logoColor=white) | Global CDN and cloud infrastructure |
+| Layer                | Technology                                                                                                                                                                                                                                       | Purpose                             |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------- |
+| **Frontend**         | ![Next.js](https://img.shields.io/badge/Next.js-black?logo=next.js) ![React](https://img.shields.io/badge/React-61DAFB?logo=react&logoColor=black) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white) | Modern, responsive web interface    |
+| **Styling**          | ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?logo=tailwind-css&logoColor=white)                                                                                                                                              | Utility-first CSS framework         |
+| **State Management** | ![Zustand](https://img.shields.io/badge/Zustand-2C3E50)                                                                                                                                                                                          | Lightweight state management        |
+| **Graphics**         | ![Canvas API](https://img.shields.io/badge/Canvas_API-FF6B6B) ![WebGL](https://img.shields.io/badge/WebGL-990000)                                                                                                                                | High-performance rendering          |
+| **Backend**          | ![Node.js](https://img.shields.io/badge/Node.js-339933?logo=node.js&logoColor=white) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-336791?logo=postgresql&logoColor=white)                                                               | Scalable server infrastructure      |
+| **AI/ML**            | ![OpenAI](https://img.shields.io/badge/OpenAI-412991) ![TensorFlow](https://img.shields.io/badge/TensorFlow-FF6F00?logo=tensorflow&logoColor=white)                                                                                              | AI-powered design assistance        |
+| **Deployment**       | ![Vercel](https://img.shields.io/badge/Vercel-000000?logo=vercel&logoColor=white) ![AWS](https://img.shields.io/badge/AWS-232F3E?logo=amazon-aws&logoColor=white)                                                                                | Global CDN and cloud infrastructure |
 
 </div>
 
@@ -88,39 +94,44 @@ npm install -g pnpm
 ### Installation
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/Mbdulrohim/buildpcb.git
    cd buildpcb
    ```
 
 2. **Install dependencies**
+
    ```bash
    pnpm install
    ```
 
 3. **Set up environment variables**
+
    ```bash
    cp .env.example .env.local
    ```
-   
+
    Edit `.env.local` with your configuration:
+
    ```env
    # Application
    NEXT_PUBLIC_SITE_URL=http://localhost:3000
    NEXT_PUBLIC_API_URL=https://api.buildpcbs.com
-   
+
    # Authentication
    NEXTAUTH_SECRET=your-secret-key
    NEXTAUTH_URL=http://localhost:3000
-   
+
    # Database
    DATABASE_URL=postgresql://user:password@localhost:5432/buildpcb
-   
+
    # AI Services
    OPENAI_API_KEY=your-openai-key
    ```
 
 4. **Run the development server**
+
    ```bash
    pnpm dev
    ```
@@ -183,19 +194,19 @@ buildpcb/
 
 ```typescript
 // Example: Initialize a new PCB project
-import { PCBProject } from '@/core/pcb-project';
+import { PCBProject } from "@/core/pcb-project";
 
 const project = new PCBProject({
   name: "Arduino Shield",
   dimensions: { width: 68.58, height: 53.34 }, // mm
-  layers: 2
+  layers: 2,
 });
 
 // Add components with AI assistance
 project.addComponent({
   type: "microcontroller",
   package: "DIP-28",
-  value: "ATMEGA328P"
+  value: "ATMEGA328P",
 });
 
 // Auto-route with AI
@@ -203,8 +214,8 @@ await project.autoRoute({
   strategy: "ai-optimized",
   constraints: {
     minTraceWidth: 0.2, // mm
-    viaSize: 0.6 // mm
-  }
+    viaSize: 0.6, // mm
+  },
 });
 ```
 
@@ -257,6 +268,7 @@ pnpm build
 ## 📊 Roadmap
 
 ### 🏃‍♂️ **Phase 1: Core Features** (Current)
+
 - [x] Responsive UI framework
 - [x] Basic schematic editor
 - [x] Component library integration
@@ -264,18 +276,21 @@ pnpm build
 - [ ] Design rule checking
 
 ### 🚀 **Phase 2: AI Integration**
+
 - [ ] AI-powered component placement
 - [ ] Intelligent auto-routing
 - [ ] Design optimization suggestions
 - [ ] Natural language design interface
 
 ### 🌟 **Phase 3: Advanced Features**
+
 - [ ] Real-time collaboration
 - [ ] 3D visualization
 - [ ] SPICE simulation
 - [ ] Manufacturing integration
 
 ### 🔮 **Future Vision**
+
 - [ ] Mobile app (React Native)
 - [ ] Plugin marketplace
 - [ ] Educational content platform
@@ -300,15 +315,18 @@ pnpm build
 <div align="center">
 
 ### 🌐 **Official Links**
+
 [![Website](https://img.shields.io/badge/🏠_Website-buildpcbs.com-blue?style=for-the-badge)](https://buildpcbs.com)
 [![IDE](https://img.shields.io/badge/💻_Try_IDE-ide.buildpcbs.com-green?style=for-the-badge)](https://ide.buildpcbs.com)
 
 ### 👨‍💻 **Developer**
+
 [![GitHub](https://img.shields.io/badge/GitHub-@Mbdulrohim-black?style=for-the-badge&logo=github)](https://github.com/Mbdulrohim)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-blue?style=for-the-badge&logo=linkedin)](https://linkedin.com/in/mbdulrohim)
 [![Twitter](https://img.shields.io/badge/Twitter-@buildpcb-1DA1F2?style=for-the-badge&logo=twitter&logoColor=white)](https://twitter.com/buildpcb)
 
 ### 💬 **Community & Support**
+
 [![Discord](https://img.shields.io/badge/Discord-Join_Server-7289DA?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/buildpcb)
 [![Slack](https://img.shields.io/badge/Slack-Join_Workspace-4A154B?style=for-the-badge&logo=slack)](https://buildpcb.slack.com)
 [![Email](https://img.shields.io/badge/Email-Support-red?style=for-the-badge&logo=gmail&logoColor=white)](mailto:support@buildpcbs.com)
@@ -320,17 +338,19 @@ pnpm build
 This project is **proprietary software** owned and licensed by **BuildPCB.ai Team**. All rights reserved.
 
 ### 📋 **License Terms**
+
 - This software is not open source
 - Commercial use requires proper licensing from BuildPCB.ai
 - Redistribution and modification are not permitted without authorization
 - For licensing inquiries, contact: [licensing@buildpcbs.com](mailto:licensing@buildpcbs.com)
 
 ### 🔒 **Intellectual Property**
+
 All code, designs, algorithms, and documentation are the exclusive property of BuildPCB.ai and are protected by applicable copyright and intellectual property laws.
 
 ## 🙏 Acknowledgments
 
-- **Electronics Engineers** providing valuable feedback and guidance  
+- **Electronics Engineers** providing valuable feedback and guidance
 - **Beta Users** helping us improve the platform with real-world testing
 - **Technology Partners** enabling our advanced features
 - **BuildPCB.ai Team** for their dedication to innovation in electronics design
@@ -341,7 +361,7 @@ All code, designs, algorithms, and documentation are the exclusive property of B
 
 **Built with ❤️ by the [@BuildPCB.ai Team](https://github.com/Mbdulrohim)**
 
-*Making electronics design accessible to everyone*
+_Making electronics design accessible to everyone_
 
 ⭐ **Star this repo if you found it helpful!** ⭐
 

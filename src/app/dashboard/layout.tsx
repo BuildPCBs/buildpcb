@@ -6,7 +6,12 @@ export const metadata: Metadata = generatePageMetadata({
   title: pages.dashboard.title,
   description: pages.dashboard.description,
   path: pages.dashboard.path,
-  keywords: ["PCB dashboard", "circuit design projects", "electronics collaboration", "PCB management"],
+  keywords: [
+    "PCB dashboard",
+    "circuit design projects",
+    "electronics collaboration",
+    "PCB management",
+  ],
   images: {
     og: "/dashboard-preview.png",
     twitter: "/dashboard-twitter-preview.png",

@@ -17,12 +17,14 @@ interface ResponsiveContextValue {
   responsive: (value: number) => string; // Smart responsive conversion
 }
 
-const ResponsiveContext = createContext<ResponsiveContextValue | undefined>(undefined);
+const ResponsiveContext = createContext<ResponsiveContextValue | undefined>(
+  undefined
+);
 
 export const useResponsive = () => {
   const context = useContext(ResponsiveContext);
   if (!context) {
-    throw new Error('useResponsive must be used within a ResponsiveContainer');
+    throw new Error("useResponsive must be used within a ResponsiveContainer");
   }
   return context;
 };
@@ -32,7 +34,6 @@ export function ResponsiveContainer({
   designWidth = 1280,
   designHeight = 832,
 }: ResponsiveContainerProps) {
-  
   const contextValue: ResponsiveContextValue = {
     designWidth,
     designHeight,
@@ -49,9 +50,7 @@ export function ResponsiveContainer({
 
   return (
     <ResponsiveContext.Provider value={contextValue}>
-      <div className="w-full bg-white">
-        {children}
-      </div>
+      <div className="w-full bg-white">{children}</div>
     </ResponsiveContext.Provider>
   );
 }

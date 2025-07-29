@@ -23,18 +23,28 @@ export const toRem = (value: number) => `${value / 16}rem`;
  */
 export const responsive = (value: number) => {
   if (value <= 2) return toRem(value); // Very small values (borders) stay in rem
-  if (value <= 8) return `clamp(${toRem(value * 0.8)}, ${toVW(value)}, ${toRem(value * 1.2)})`; // Small spacing
-  if (value <= 32) return `clamp(${toRem(value * 0.75)}, ${toVW(value)}, ${toRem(value * 1.5)})`; // Medium spacing
+  if (value <= 8)
+    return `clamp(${toRem(value * 0.8)}, ${toVW(value)}, ${toRem(
+      value * 1.2
+    )})`; // Small spacing
+  if (value <= 32)
+    return `clamp(${toRem(value * 0.75)}, ${toVW(value)}, ${toRem(
+      value * 1.5
+    )})`; // Medium spacing
   return `clamp(${toRem(value * 0.6)}, ${toVW(value)}, ${toVW(value * 1.3)})`; // Large dimensions
 };
 
 /**
  * Responsive size conversion with min/max constraints
  */
-export const responsiveSize = (value: number, minRem?: number, maxVw?: number) => {
+export const responsiveSize = (
+  value: number,
+  minRem?: number,
+  maxVw?: number
+) => {
   const vwValue = toVW(value);
   const remValue = toRem(value);
-  
+
   if (minRem && maxVw) {
     return `clamp(${toRem(minRem)}, ${vwValue}, ${toVW(maxVw)})`;
   }
@@ -47,25 +57,30 @@ export const responsiveSize = (value: number, minRem?: number, maxVw?: number) =
 /**
  * Creates responsive style objects with fluid scaling
  */
-export const createResponsiveStyles = (styles: Record<string, number | string>) => {
+export const createResponsiveStyles = (
+  styles: Record<string, number | string>
+) => {
   const responsiveStyles: Record<string, string> = {};
-  
+
   for (const [key, value] of Object.entries(styles)) {
-    if (typeof value === 'number') {
+    if (typeof value === "number") {
       // Handle different CSS properties appropriately
-      if (key.includes('Width') || key === 'width') {
+      if (key.includes("Width") || key === "width") {
         responsiveStyles[key] = responsiveSize(value, 2); // Min 2rem width
-      } else if (key.includes('Height') || key === 'height') {
-        responsiveStyles[key] = key === 'height' ? `max(${toRem(value)}, ${toVH(value)})` : responsive(value);
-      } else if (key.includes('padding') || key.includes('margin')) {
+      } else if (key.includes("Height") || key === "height") {
+        responsiveStyles[key] =
+          key === "height"
+            ? `max(${toRem(value)}, ${toVH(value)})`
+            : responsive(value);
+      } else if (key.includes("padding") || key.includes("margin")) {
         responsiveStyles[key] = responsive(value);
-      } else if (key.includes('border') && key.includes('Radius')) {
+      } else if (key.includes("border") && key.includes("Radius")) {
         responsiveStyles[key] = `max(${toRem(value)}, ${toVW(value)})`;
-      } else if (key.includes('border') && key.includes('Width')) {
+      } else if (key.includes("border") && key.includes("Width")) {
         responsiveStyles[key] = toRem(value); // Border widths stay in rem
-      } else if (key === 'top' || key === 'bottom') {
+      } else if (key === "top" || key === "bottom") {
         responsiveStyles[key] = `max(${toRem(value)}, ${toVH(value)})`;
-      } else if (key === 'left' || key === 'right') {
+      } else if (key === "left" || key === "right") {
         responsiveStyles[key] = `max(${toRem(value)}, ${toVW(value)})`;
       } else {
         responsiveStyles[key] = responsive(value);
@@ -74,7 +89,7 @@ export const createResponsiveStyles = (styles: Record<string, number | string>) 
       responsiveStyles[key] = value;
     }
   }
-  
+
   return responsiveStyles;
 };
 
@@ -94,13 +109,16 @@ export interface ResponsiveStyleConfig {
   borderWidth?: number;
 }
 
-export const r = (config: ResponsiveStyleConfig) => createResponsiveStyles(config as Record<string, number | string>);
+export const r = (config: ResponsiveStyleConfig) =>
+  createResponsiveStyles(config as Record<string, number | string>);
 
 /**
  * Font size responsive utilities with better scaling
  */
 export const responsiveFontSize = (designPx: number) => {
-  return `clamp(${toRem(designPx * 0.85)}, ${toVW(designPx)}, ${toRem(designPx * 1.15)})`;
+  return `clamp(${toRem(designPx * 0.85)}, ${toVW(designPx)}, ${toRem(
+    designPx * 1.15
+  )})`;
 };
 
 /**
@@ -112,6 +130,6 @@ export const spacing = {
   md: responsive(16),
   lg: responsive(24),
   xl: responsive(32),
-  '2xl': responsive(48),
-  '3xl': responsive(64),
+  "2xl": responsive(48),
+  "3xl": responsive(64),
 };
