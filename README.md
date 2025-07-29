@@ -224,24 +224,21 @@ const design = await aiAssistant.createDesign(`
 `);
 ```
 
-## 🤝 Contributing
+## 👥 Team & Development
 
-We welcome contributions from the community! Whether you're fixing bugs, adding features, or improving documentation, your help is appreciated.
+BuildPCB.ai is developed by a dedicated team of engineers and designers passionate about revolutionizing electronics design.
 
-### Development Workflow
+### 🛠️ **Development Standards**
 
-1. **Fork** the repository
-2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
-3. **Commit** your changes (`git commit -m 'Add amazing feature'`)
-4. **Push** to the branch (`git push origin feature/amazing-feature`)
-5. **Open** a Pull Request
+Our codebase maintains high quality standards:
 
-### Code Style
+- **TypeScript** for type safety and better developer experience
+- **ESLint + Prettier** for consistent code formatting
+- **Conventional Commits** for clear commit history
+- **Jest + Testing Library** for comprehensive testing
+- **Continuous Integration** for automated quality checks
 
-- **TypeScript** for type safety
-- **ESLint + Prettier** for code formatting
-- **Conventional Commits** for commit messages
-- **Jest + Testing Library** for testing
+### 🔧 **Internal Development Workflow**
 
 ```bash
 # Run tests
@@ -252,6 +249,9 @@ pnpm lint
 
 # Format code
 pnpm format
+
+# Build for production
+pnpm build
 ```
 
 ## 📊 Roadmap
@@ -308,31 +308,43 @@ pnpm format
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-blue?style=for-the-badge&logo=linkedin)](https://linkedin.com/in/mbdulrohim)
 [![Twitter](https://img.shields.io/badge/Twitter-@buildpcb-1DA1F2?style=for-the-badge&logo=twitter&logoColor=white)](https://twitter.com/buildpcb)
 
-### 💬 **Community**
+### 💬 **Community & Support**
 [![Discord](https://img.shields.io/badge/Discord-Join_Server-7289DA?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/buildpcb)
 [![Slack](https://img.shields.io/badge/Slack-Join_Workspace-4A154B?style=for-the-badge&logo=slack)](https://buildpcb.slack.com)
+[![Email](https://img.shields.io/badge/Email-Support-red?style=for-the-badge&logo=gmail&logoColor=white)](mailto:support@buildpcbs.com)
 
 </div>
 
-## 📄 License
+## 📄 License & Terms
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+This project is **proprietary software** owned and licensed by **BuildPCB.ai Team**. All rights reserved.
+
+### 📋 **License Terms**
+- This software is not open source
+- Commercial use requires proper licensing from BuildPCB.ai
+- Redistribution and modification are not permitted without authorization
+- For licensing inquiries, contact: [licensing@buildpcbs.com](mailto:licensing@buildpcbs.com)
+
+### 🔒 **Intellectual Property**
+All code, designs, algorithms, and documentation are the exclusive property of BuildPCB.ai and are protected by applicable copyright and intellectual property laws.
 
 ## 🙏 Acknowledgments
 
-- **Open Source Community** for amazing libraries and tools
-- **Electronics Engineers** providing feedback and guidance  
-- **Beta Users** helping us improve the platform
-- **Contributors** making this project better every day
+- **Electronics Engineers** providing valuable feedback and guidance  
+- **Beta Users** helping us improve the platform with real-world testing
+- **Technology Partners** enabling our advanced features
+- **BuildPCB.ai Team** for their dedication to innovation in electronics design
 
 ---
 
 <div align="center">
 
-**Built with ❤️ by [@Mbdulrohim](https://github.com/Mbdulrohim)**
+**Built with ❤️ by the [@BuildPCB.ai Team](https://github.com/Mbdulrohim)**
 
 *Making electronics design accessible to everyone*
 
 ⭐ **Star this repo if you found it helpful!** ⭐
+
+**© 2025 BuildPCB.ai - All Rights Reserved**
 
 </div>
