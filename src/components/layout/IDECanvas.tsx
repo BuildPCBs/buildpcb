@@ -1,4 +1,6 @@
 import { SchemaPanel } from "./SchemaPanel";
+import { TopToolbar } from "./TopToolbar";
+import { AIPromptPanel } from "./AIPromptPanel";
 import { DeviceRestriction } from "./DeviceRestriction";
 import { Canvas } from "@/canvas";
 import { useOverrideBrowserControls } from "@/hooks/useOverrideBrowserControls";
@@ -21,6 +23,12 @@ export function IDECanvas() {
 
         {/* Schema Panel positioned absolutely on top of canvas */}
         <SchemaPanel />
+
+        {/* Top Toolbar positioned absolutely on top of canvas */}
+        <TopToolbar />
+
+        {/* AI Prompt Panel positioned absolutely on top of canvas */}
+        <AIPromptPanel />
       </div>
     </>
   );

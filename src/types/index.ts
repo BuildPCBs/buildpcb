@@ -38,6 +38,20 @@ export interface Component {
   partNumber?: string;
   price?: number;
   availability: "in-stock" | "out-of-stock" | "discontinued";
+  image?: string;
+}
+
+export interface Schema {
+  id: string;
+  name: string;
+  description?: string;
+  components: Component[];
+  connections: Connection[];
+  thumbnail?: string;
+  category?: string;
+  tags?: string[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Circuit {

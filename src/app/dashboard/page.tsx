@@ -3,10 +3,13 @@
 import React, { useState } from "react";
 import { UserIcon, NotificationIcon, SearchIcon } from "@/components/icons";
 import { ResponsiveContainer } from "@/components/layout/ResponsiveContainer";
+import { AuthGuard, AuthButton } from "@/components/auth";
+import { useAuth } from "@/hooks/useAuth";
 import { r, responsive, responsiveFontSize } from "@/lib/responsive";
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState("recently-viewed");
+  const { isAuthenticated, logout } = useAuth();
 
   const mockProjects = [
     {
@@ -72,10 +75,20 @@ const Dashboard = () => {
                   className="font-medium text-gray-900"
                   style={{ fontSize: responsiveFontSize(14) }}
                 >
-                  User Name
+                  {isAuthenticated ? "Authenticated User" : "Guest"}
                 </span>
               </div>
-              <NotificationIcon size={16} className="text-[#969696]" />
+              <div className="flex items-center gap-2">
+                <NotificationIcon size={16} className="text-[#969696]" />
+                {isAuthenticated && (
+                  <button
+                    onClick={logout}
+                    className="text-xs text-gray-600 hover:text-gray-800 transition-colors"
+                  >
+                    Logout
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Search Box */}
@@ -279,4 +292,10 @@ const Dashboard = () => {
   );
 };
 
-export default Dashboard;
+export default function DashboardPage() {
+  return (
+    <AuthGuard>
+      <Dashboard />
+    </AuthGuard>
+  );
+}
