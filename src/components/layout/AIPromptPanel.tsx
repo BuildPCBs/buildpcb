@@ -38,7 +38,7 @@ export function AIPromptPanel({ className = "" }: AIPromptPanelProps) {
   };
 
   return (
-    <div className={className}>
+    <div className={`relative ${className}`}>
       {/* Thinking Indicator */}
       <ThinkingIndicator isVisible={isThinking} />
 
