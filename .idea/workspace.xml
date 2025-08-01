@@ -5,10 +5,17 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="372b2826-5811-4556-b3b2-af8fbe461aed" name="Changes" comment="update README.md with enhanced feature descriptions and improve workspace.xml configuration">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pnpm-lock.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/pnpm-lock.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/canvas/useCanvasViewport.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/canvas/useCanvasViewport.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/dashboard/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/dashboard/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/canvas/FabricCanvas.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/canvas/FabricCanvas.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/canvas/IDEFabricCanvas.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/canvas/IDEFabricCanvas.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/canvas/canvas-command-manager.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/canvas/canvas-command-manager.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/canvas/hooks/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/canvas/hooks/index.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/canvas/hooks/useCanvasHotkeys.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/canvas/hooks/useCanvasHotkeys.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/canvas/ui/ContextMenu.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/canvas/ui/ContextMenu.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/auth/AuthOverlay.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/auth/AuthOverlay.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/layout/ActivityAnalyticsPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/layout/ActivityAnalyticsPanel.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/layout/SchemaPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/layout/SchemaPanel.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/components/layout/TopToolbar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/layout/TopToolbar.tsx" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -58,6 +65,7 @@
     "node.js.selected.package.eslint": "(autodetect)",
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
+    "npm.Next.js: server-side.executor": "Run",
     "ts.external.directory.path": "/Users/MAC/Projects/buildpcb/node_modules/typescript/lib",
     "vue.rearranger.settings.migration": "true"
   }
@@ -94,6 +102,7 @@
       <updated>1753529378869</updated>
       <workItem from="1753529379981" duration="25325000" />
       <workItem from="1754038002834" duration="143000" />
+      <workItem from="1754038147368" duration="4048000" />
     </task>
     <task id="LOCAL-00001" summary="initialize project with Next.js, Tailwind CSS, and essential configuration files">
       <option name="closed" value="true" />

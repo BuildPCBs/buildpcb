@@ -113,7 +113,7 @@ interface ComponentItemProps {
 function ComponentItem({ component, onClick }: ComponentItemProps) {
   return (
     <div
-      className="bg-white border border-gray-200 rounded-lg p-2 hover:border-blue-300 hover:shadow-sm transition-all duration-200 cursor-pointer group flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+      className="bg-white border border-gray-200 rounded-lg p-2 hover:border-[#0038DF] hover:shadow-sm transition-all duration-200 cursor-pointer group flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-[#0038DF] focus:border-[#0038DF]"
       onClick={onClick}
       tabIndex={0}
       onKeyDown={(e) => {
@@ -123,7 +123,7 @@ function ComponentItem({ component, onClick }: ComponentItemProps) {
         }
       }}
     >
-      <div className="w-6 h-6 bg-gray-50 rounded flex items-center justify-center group-hover:bg-blue-50 transition-colors flex-shrink-0">
+      <div className="w-6 h-6 bg-gray-50 rounded flex items-center justify-center group-hover:bg-[#0038DF]/10 transition-colors flex-shrink-0">
         <img
           src={component.image}
           alt={component.name}
@@ -154,7 +154,7 @@ interface SchemaItemProps {
 function SchemaItem({ schema, onClick }: SchemaItemProps) {
   return (
     <div
-      className="bg-white border border-gray-200 rounded-lg p-2 hover:border-blue-300 hover:shadow-sm transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+      className="bg-white border border-gray-200 rounded-lg p-2 hover:border-[#0038DF] hover:shadow-sm transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#0038DF] focus:border-[#0038DF]"
       onClick={onClick}
       tabIndex={0}
       onKeyDown={(e) => {
@@ -361,7 +361,7 @@ export function SchemaPanel() {
           style={{ borderRadius: "inherit" }}
         >
           <div
-            className="absolute bg-blue-400 rounded-full transition-all duration-500 ease-out"
+            className="absolute bg-[#0038DF] rounded-full transition-all duration-500 ease-out"
             style={rippleStyle}
           />
         </div>
@@ -372,7 +372,7 @@ export function SchemaPanel() {
         {/* Very small state - just show a compact icon */}
         {!isHovered && !isFullyExpanded && (
           <div className="flex items-center justify-center w-full h-full">
-            <WindowIcon size={20} className="text-blue-500" />
+            <WindowIcon size={20} className="text-[#0038DF]" />
           </div>
         )}
 
@@ -393,10 +393,10 @@ export function SchemaPanel() {
                     e.stopPropagation();
                     handleHomeClick();
                   }}
-                  className="flex items-center hover:bg-blue-50 rounded transition-colors button-ripple"
+                  className="flex items-center hover:bg-[#0038DF]/10 rounded transition-colors button-ripple"
                   style={{ padding: responsive(4) }}
                 >
-                  <HomeIcon size={16} className="text-blue-600" />
+                  <HomeIcon size={16} className="text-[#0038DF]" />
                 </button>
 
                 {!isSearching ? (
@@ -407,10 +407,10 @@ export function SchemaPanel() {
                         setIsSearching(true);
                       }
                     }}
-                    className="flex items-center hover:bg-blue-50 rounded transition-colors button-ripple"
+                    className="flex items-center hover:bg-[#0038DF]/10 rounded transition-colors button-ripple"
                     style={{ padding: responsive(4) }}
                   >
-                    <SearchIcon size={16} className="text-blue-600" />
+                    <SearchIcon size={16} className="text-[#0038DF]" />
                   </button>
                 ) : (
                   <div className="flex-1 max-w-32">
@@ -419,7 +419,7 @@ export function SchemaPanel() {
                       placeholder="Search..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full px-2 py-1 text-xs border border-blue-200 rounded focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200"
+                      className="w-full px-2 py-1 text-xs border border-[#0038DF]/30 rounded focus:outline-none focus:border-[#0038DF] focus:ring-1 focus:ring-[#0038DF]/20"
                       autoFocus
                       onBlur={() => {
                         if (!searchQuery) {
@@ -435,10 +435,10 @@ export function SchemaPanel() {
                   e.stopPropagation();
                   toggleFullExpand();
                 }}
-                className="flex items-center hover:bg-blue-50 rounded transition-colors button-ripple"
+                className="flex items-center hover:bg-[#0038DF]/10 rounded transition-colors button-ripple"
                 style={{ padding: responsive(4) }}
               >
-                <WindowIcon size={16} className="text-blue-600" />
+                <WindowIcon size={16} className="text-[#0038DF]" />
               </button>
             </div>
 
@@ -452,8 +452,8 @@ export function SchemaPanel() {
                   onClick={() => setActiveTab("components")}
                   className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-all duration-200 ${
                     activeTab === "components"
-                      ? "bg-white text-blue-600 shadow-sm"
-                      : "text-gray-600 hover:text-blue-600 hover:bg-gray-50"
+                      ? "bg-white text-[#0038DF] shadow-sm"
+                      : "text-gray-600 hover:text-[#0038DF] hover:bg-gray-50"
                   }`}
                 >
                   Components
@@ -462,8 +462,8 @@ export function SchemaPanel() {
                   onClick={() => setActiveTab("schemas")}
                   className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-all duration-200 ${
                     activeTab === "schemas"
-                      ? "bg-white text-blue-600 shadow-sm"
-                      : "text-gray-600 hover:text-blue-600 hover:bg-gray-50"
+                      ? "bg-white text-[#0038DF] shadow-sm"
+                      : "text-gray-600 hover:text-[#0038DF] hover:bg-gray-50"
                   }`}
                 >
                   Schemas
@@ -521,7 +521,7 @@ export function SchemaPanel() {
             {/* Simplified view for hover state */}
             {isHovered && !isFullyExpanded && (
               <div className="space-y-2">
-                <div className="text-xs font-medium text-blue-700 uppercase tracking-wider">
+                <div className="text-xs font-medium text-[#0038DF] uppercase tracking-wider">
                   Schema Panel
                 </div>
                 <div className="text-xs text-gray-600">Click to expand</div>

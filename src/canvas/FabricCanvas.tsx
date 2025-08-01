@@ -87,7 +87,7 @@ export function FabricCanvas({
       <div className="absolute top-2 left-2 z-10 flex gap-2">
         <button
           onClick={handleResetZoom}
-          className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm"
+          className="px-3 py-1 bg-[#0038DF] text-white rounded hover:bg-[#002BB5] text-sm"
         >
           Reset Zoom
         </button>

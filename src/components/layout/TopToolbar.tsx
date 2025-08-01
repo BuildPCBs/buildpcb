@@ -66,7 +66,7 @@ export function TopToolbar({ className = "" }: TopToolbarProps) {
           {/* User Icon */}
           <button
             onClick={handleUserClick}
-            className="flex items-center justify-center border border-gray-300 hover:border-blue-400 hover:bg-blue-50 transition-colors"
+            className="flex items-center justify-center border border-gray-300 hover:border-[#0038DF] hover:bg-[#0038DF]/10 transition-colors"
             style={{
               ...r({
                 width: 24,
@@ -83,7 +83,7 @@ export function TopToolbar({ className = "" }: TopToolbarProps) {
           {/* Chart Icon */}
           <button
             onClick={handleChartClick}
-            className="flex items-center justify-center border border-gray-400 hover:border-blue-500 hover:bg-blue-50 transition-colors"
+            className="flex items-center justify-center border border-gray-400 hover:border-[#0038DF] hover:bg-[#0038DF]/10 transition-colors"
             style={{
               ...r({
                 width: 24,
@@ -118,7 +118,7 @@ export function TopToolbar({ className = "" }: TopToolbarProps) {
         {/* Right Side Export Button */}
         <button
           onClick={handleExport}
-          className="flex items-center justify-center text-white hover:bg-blue-700 transition-colors"
+          className="flex items-center justify-center text-white hover:bg-[#002BB5] transition-colors"
           style={{
             ...r({
               width: 83,
@@ -152,7 +152,7 @@ export function TopToolbar({ className = "" }: TopToolbarProps) {
         <CloudIcon
           size={20}
           className={`${
-            isSaving ? "text-blue-500 animate-pulse" : "text-gray-400"
+            isSaving ? "text-[#0038DF] animate-pulse" : "text-gray-400"
           } transition-colors`}
           isAnimating={isSaving}
         />
@@ -160,7 +160,7 @@ export function TopToolbar({ className = "" }: TopToolbarProps) {
         {/* Saving Text */}
         <span
           className={`font-medium ${
-            isSaving ? "text-blue-600" : "text-gray-500"
+            isSaving ? "text-[#0038DF]" : "text-gray-500"
           } transition-colors`}
           style={{
             fontSize: responsive(8),

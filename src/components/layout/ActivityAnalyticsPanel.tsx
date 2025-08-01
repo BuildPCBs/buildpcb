@@ -165,7 +165,7 @@ export function ActivityAnalyticsPanel({
         <div className="relative">
           <button
             onClick={() => setShowMonthSelector(!showMonthSelector)}
-            className="flex items-center bg-gray-100 border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-colors"
+            className="flex items-center bg-gray-100 border border-gray-200 hover:border-[#0038DF] hover:bg-[#0038DF]/10 transition-colors"
             style={{
               ...r({
                 width: 78,

@@ -121,9 +121,40 @@ export const builtInCanvasCommands = {
           top: 9,
         });
 
-        // Group the resistor parts
+        // Create invisible pin objects at connection points
+        const leftPin = new fabric.Circle({
+          radius: 4,
+          fill: "transparent",
+          stroke: "#0038DF",
+          strokeWidth: 0, // Initially invisible
+          left: -50,
+          top: 10,
+          originX: "center",
+          originY: "center",
+          selectable: false,
+          evented: false,
+          pin: true, // Special property to identify pins
+          pinType: "left", // Identifier for this specific pin
+        } as any);
+
+        const rightPin = new fabric.Circle({
+          radius: 4,
+          fill: "transparent",
+          stroke: "#0038DF",
+          strokeWidth: 0, // Initially invisible
+          left: 70,
+          top: 10,
+          originX: "center",
+          originY: "center",
+          selectable: false,
+          evented: false,
+          pin: true, // Special property to identify pins
+          pinType: "right", // Identifier for this specific pin
+        } as any);
+
+        // Group the resistor parts including pins
         const resistorGroup = new fabric.Group(
-          [leftLead, resistorBody, rightLead],
+          [leftLead, resistorBody, rightLead, leftPin, rightPin],
           {
             left: params?.x ?? canvas.getWidth() / 2,
             top: params?.y ?? canvas.getHeight() / 2,
@@ -133,7 +164,8 @@ export const builtInCanvasCommands = {
             evented: true,
             hoverCursor: "move",
             moveCursor: "move",
-          }
+            componentType: "resistor", // Identify as component
+          } as any
         );
 
         // Add to canvas

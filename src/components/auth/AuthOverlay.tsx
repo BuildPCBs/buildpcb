@@ -79,7 +79,7 @@ function EmailEntryForm({ onSuccess }: Pick<AuthFormProps, "onSuccess">) {
             placeholder="enter your mail"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="border border-[#DDDDDD] rounded-lg focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 transition-colors"
+            className="border border-[#DDDDDD] rounded-lg focus:outline-none focus:border-[#0038DF] focus:ring-1 focus:ring-[#0038DF]/20 transition-colors"
             style={{
               ...r({
                 width: 289,
@@ -98,7 +98,7 @@ function EmailEntryForm({ onSuccess }: Pick<AuthFormProps, "onSuccess">) {
           <button
             type="submit"
             disabled={!email.trim() || isLoading}
-            className="mt-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            className="mt-4 bg-[#0038DF] text-white rounded-lg hover:bg-[#002BB5] disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
             style={{
               ...r({
                 width: 289,
@@ -127,7 +127,7 @@ function EmailEntryForm({ onSuccess }: Pick<AuthFormProps, "onSuccess">) {
           }}
         >
           By creating an account, you agree to our{" "}
-          <span className="text-blue-600">Terms</span>.
+          <span className="text-[#0038DF]">Terms</span>.
         </p>
       </div>
     </div>
@@ -238,7 +238,7 @@ function CodeVerificationForm({ onBack, onSuccess }: AuthFormProps) {
                     handleCodeChange(index, e.target.value.replace(/\D/g, ""))
                   }
                   onKeyDown={(e) => handleKeyDown(index, e)}
-                  className="text-center border focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 text-gray-900 transition-colors"
+                  className="text-center border focus:outline-none focus:border-[#0038DF] focus:ring-1 focus:ring-[#0038DF]/20 text-gray-900 transition-colors"
                   style={{
                     fontSize: responsive(16),
                     width: responsive(36),
@@ -272,7 +272,7 @@ function CodeVerificationForm({ onBack, onSuccess }: AuthFormProps) {
                     )
                   }
                   onKeyDown={(e) => handleKeyDown(index + 3, e)}
-                  className="text-center border focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-200 text-gray-900 transition-colors"
+                  className="text-center border focus:outline-none focus:border-[#0038DF] focus:ring-1 focus:ring-[#0038DF]/20 text-gray-900 transition-colors"
                   style={{
                     fontSize: responsive(16),
                     width: responsive(36),
@@ -291,7 +291,7 @@ function CodeVerificationForm({ onBack, onSuccess }: AuthFormProps) {
           <button
             type="submit"
             disabled={code.join("").length !== 6 || isLoading}
-            className="mt-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            className="mt-4 bg-[#0038DF] text-white rounded-lg hover:bg-[#002BB5] disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
             style={{
               ...r({
                 width: 272,
@@ -334,7 +334,7 @@ function CodeVerificationForm({ onBack, onSuccess }: AuthFormProps) {
           }}
         >
           By creating an account, you agree to our{" "}
-          <span className="text-blue-600">Terms</span>.
+          <span className="text-[#0038DF]">Terms</span>.
         </p>
       </div>
     </div>

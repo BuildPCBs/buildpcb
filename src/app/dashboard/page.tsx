@@ -102,7 +102,7 @@ const Dashboard = () => {
               <input
                 type="text"
                 placeholder="Search"
-                className="w-full bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0038DF] focus:border-transparent"
                 style={{
                   paddingLeft: responsive(40),
                   paddingRight: responsive(16),
