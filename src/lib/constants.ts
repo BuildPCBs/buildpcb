@@ -19,6 +19,14 @@ export const TOAST_DURATION = {
   long: 7000,
 } as const;
 
+// Brand Colors
+export const BRAND_COLORS = {
+  primary: "#0038DF",
+  primaryHover: "#002BB5",
+  primaryLight: "#3366FF",
+  primaryDark: "#001E99",
+} as const;
+
 // API Constants
 export const API_ENDPOINTS = {
   auth: {

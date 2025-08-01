@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { DotsIcon, MicIcon } from "@/components/icons";
 import { r, responsive } from "@/lib/responsive";
+import { BRAND_COLORS } from "@/lib/constants";
 import { Send } from "lucide-react";
 
 interface PromptEntryProps {
@@ -28,6 +29,15 @@ export function PromptEntry({
     e.preventDefault();
     if (prompt.trim() && !isThinking) {
       onSubmit?.(prompt.trim());
+      onSendClick?.(); // Also trigger send button click
+      setPrompt(""); // Clear after submit
+    }
+  };
+
+  const handleSendClick = () => {
+    if (prompt.trim() && !isThinking) {
+      onSubmit?.(prompt.trim());
+      onSendClick?.();
       setPrompt(""); // Clear after submit
     }
   };
@@ -106,7 +116,7 @@ export function PromptEntry({
               type="button"
               onClick={onMicClick}
               disabled={isThinking}
-              className="flex items-center justify-center bg-white border hover:border-blue-400 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center justify-center bg-white border hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
                 ...r({
                   width: 32,
@@ -115,6 +125,16 @@ export function PromptEntry({
                 }),
                 borderColor: "#DDDDDD",
                 borderWidth: responsive(1),
+              }}
+              onMouseEnter={(e) => {
+                if (!isThinking) {
+                  e.currentTarget.style.borderColor = BRAND_COLORS.primary;
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isThinking) {
+                  e.currentTarget.style.borderColor = "#DDDDDD";
+                }
               }}
             >
               <MicIcon size={16} className="text-gray-600" />
@@ -125,7 +145,7 @@ export function PromptEntry({
               type="button"
               onClick={onDotsClick}
               disabled={isThinking}
-              className="flex items-center justify-center bg-white border hover:border-blue-400 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center justify-center bg-white border hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
                 ...r({
                   width: 32,
@@ -135,6 +155,16 @@ export function PromptEntry({
                 borderColor: "#DDDDDD",
                 borderWidth: responsive(1),
               }}
+              onMouseEnter={(e) => {
+                if (!isThinking) {
+                  e.currentTarget.style.borderColor = BRAND_COLORS.primary;
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isThinking) {
+                  e.currentTarget.style.borderColor = "#DDDDDD";
+                }
+              }}
             >
               <DotsIcon size={16} className="text-gray-600" />
             </button>
@@ -143,17 +173,28 @@ export function PromptEntry({
           {/* Send Button - Changed from Microphone, blue bg with white icon */}
           <button
             type="button"
-            onClick={onSendClick}
-            disabled={isThinking}
-            className="flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-600"
+            onClick={handleSendClick}
+            disabled={isThinking || !prompt.trim()}
+            className="flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               ...r({
                 width: 32,
                 height: 32,
                 borderRadius: 99, // Fully circular
               }),
-              backgroundColor: "#3B82F6", // Blue background
+              backgroundColor: prompt.trim() && !isThinking ? BRAND_COLORS.primary : "#CCCCCC", // Blue when enabled, gray when disabled
               border: "none",
+              cursor: prompt.trim() && !isThinking ? "pointer" : "not-allowed",
+            }}
+            onMouseEnter={(e) => {
+              if (prompt.trim() && !isThinking) {
+                e.currentTarget.style.backgroundColor = BRAND_COLORS.primaryHover; // Darker blue on hover
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (prompt.trim() && !isThinking) {
+                e.currentTarget.style.backgroundColor = BRAND_COLORS.primary; // Back to original blue
+              }
             }}
           >
             <Send size={16} className="text-white" />
