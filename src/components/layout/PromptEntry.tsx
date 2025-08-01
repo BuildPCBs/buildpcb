@@ -40,13 +40,13 @@ export function PromptEntry({
 
   return (
     <div
-      className={`fixed ${className}`}
+      className={`absolute ${className}`}
       style={{
         ...r({
           width: 338,
           height: 97,
           borderRadius: 12,
-          top: 708,
+          bottom: 32, // Changed from top to bottom positioning
         }),
         right: responsive(32), // Same right margin as toolbar
         zIndex: 10,
@@ -58,7 +58,7 @@ export function PromptEntry({
         style={{
           borderRadius: responsive(12),
           borderWidth: responsive(1),
-          backgroundColor: "#F8F8F81F", // Translucent light gray
+          backgroundColor: "#FFFFFF", // White background as requested
         }}
       >
         {/* Prompt Text Area */}
@@ -74,23 +74,78 @@ export function PromptEntry({
               backgroundColor: "transparent",
               color: "#999999",
               fontSize: responsive(12),
-              padding: `${responsive(12)} ${responsive(50)} ${responsive(
+              padding: `${responsive(12)} ${responsive(12)} ${responsive(
                 45
-              )} ${responsive(12)}`, // Extra right padding for mic icon
+              )} ${responsive(12)}`, // Reduced right padding since mic moved to bottom
               borderRadius: responsive(12),
               border: "none",
             }}
           />
+        </form>
 
-          {/* Microphone Icon - Positioned at far right */}
+        {/* Action Buttons - Positioned at bottom with microphone on the right */}
+        <div
+          className="absolute flex items-center justify-between"
+          style={{
+            bottom: responsive(13),
+            left: responsive(13),
+            right: responsive(13),
+            width: `calc(100% - ${responsive(26)})`, // Account for left and right padding
+          }}
+        >
+          {/* Left side buttons */}
+          <div
+            className="flex items-center"
+            style={{
+              gap: responsive(10),
+            }}
+          >
+            {/* Plus Button */}
+            <button
+              type="button"
+              onClick={onPlusClick}
+              disabled={isThinking}
+              className="flex items-center justify-center bg-white border hover:border-blue-400 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                ...r({
+                  width: 32,
+                  height: 32,
+                  borderRadius: 99, // Fully circular
+                }),
+                borderColor: "#DDDDDD",
+                borderWidth: responsive(1),
+              }}
+            >
+              <PlusIcon size={16} className="text-gray-600" />
+            </button>
+
+            {/* Dots Button */}
+            <button
+              type="button"
+              onClick={onDotsClick}
+              disabled={isThinking}
+              className="flex items-center justify-center bg-white border hover:border-blue-400 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                ...r({
+                  width: 32,
+                  height: 32,
+                  borderRadius: 99, // Fully circular
+                }),
+                borderColor: "#DDDDDD",
+                borderWidth: responsive(1),
+              }}
+            >
+              <DotsIcon size={16} className="text-gray-600" />
+            </button>
+          </div>
+
+          {/* Microphone Button - Aligned to the right */}
           <button
             type="button"
             onClick={onMicClick}
             disabled={isThinking}
-            className="absolute flex items-center justify-center bg-white border hover:border-blue-400 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center justify-center bg-white border hover:border-blue-400 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
-              top: responsive(13),
-              right: responsive(13),
               ...r({
                 width: 32,
                 height: 32,
@@ -101,54 +156,6 @@ export function PromptEntry({
             }}
           >
             <MicIcon size={16} className="text-gray-600" />
-          </button>
-        </form>
-
-        {/* Action Buttons - Positioned at bottom */}
-        <div
-          className="absolute flex items-center"
-          style={{
-            bottom: responsive(13),
-            left: responsive(13),
-            gap: responsive(10),
-          }}
-        >
-          {/* Plus Button */}
-          <button
-            type="button"
-            onClick={onPlusClick}
-            disabled={isThinking}
-            className="flex items-center justify-center bg-white border hover:border-blue-400 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{
-              ...r({
-                width: 32,
-                height: 32,
-                borderRadius: 99, // Fully circular
-              }),
-              borderColor: "#DDDDDD",
-              borderWidth: responsive(1),
-            }}
-          >
-            <PlusIcon size={16} className="text-gray-600" />
-          </button>
-
-          {/* Dots Button */}
-          <button
-            type="button"
-            onClick={onDotsClick}
-            disabled={isThinking}
-            className="flex items-center justify-center bg-white border hover:border-blue-400 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{
-              ...r({
-                width: 32,
-                height: 32,
-                borderRadius: 99, // Fully circular
-              }),
-              borderColor: "#DDDDDD",
-              borderWidth: responsive(1),
-            }}
-          >
-            <DotsIcon size={16} className="text-gray-600" />
           </button>
         </div>
       </div>

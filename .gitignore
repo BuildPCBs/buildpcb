@@ -13,6 +13,33 @@ schema.txt
 
 # testing
 /coverage
+test-results/
+playwright-report/
+test-output/
+*.test.js.map
+*.spec.js.map
+__tests__/
+test/
+tests/
+*.test.ts
+*.test.tsx
+*.test.js
+*.test.jsx
+*.spec.ts
+*.spec.tsx
+*.spec.js
+*.spec.jsx
+*.test.*
+*.spec.*
+test.*
+*test*
+jest.config.*
+vitest.config.*
+cypress/
+e2e/
+__snapshots__/
+.nyc_output
+.jest-cache
 
 # next.js
 /.next/

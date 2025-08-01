@@ -131,3 +131,26 @@ body {
     font-size: clamp(15px, 1.3vw, 19px);
   }
 }
+
+/* Responsive layout utilities for flexible height management */
+.canvas-container {
+  min-height: 0; /* Allow canvas to shrink below its natural size */
+}
+
+/* Ensure proper flexbox behavior for vertical layouts */
+.flex-shrink-0 {
+  flex-shrink: 0;
+}
+
+.min-h-0 {
+  min-height: 0;
+}
+
+/* Responsive height adjustments for smaller screens */
+@media (max-height: 600px) {
+  .responsive-ai-prompt {
+    position: relative;
+    bottom: auto;
+    margin-top: 1rem;
+  }
+}

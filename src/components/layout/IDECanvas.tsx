@@ -1,3 +1,5 @@
+"use client";
+
 import { SchemaPanel } from "./SchemaPanel";
 import { TopToolbar } from "./TopToolbar";
 import { AIPromptPanel } from "./AIPromptPanel";
@@ -15,20 +17,28 @@ export function IDECanvas() {
       <DeviceRestriction />
 
       {/* Main IDE - only visible on large screens */}
-      <div className="hidden lg:block relative w-full h-screen bg-gray-100 overflow-hidden">
-        {/* Interactive Canvas Background */}
-        <div className="absolute inset-0">
-          <Canvas />
+      <div className="hidden lg:flex flex-col relative w-full h-screen bg-gray-100 overflow-hidden">
+        {/* Canvas Container - Flexible and can shrink */}
+        <div className="flex-1 min-h-0 relative">
+          {/* Interactive Canvas Background */}
+          <div
+            className="absolute inset-0 canvas-container"
+            data-scrollable="false"
+          >
+            <Canvas className="w-full h-full" />
+          </div>
+
+          {/* Schema Panel positioned absolutely on top of canvas */}
+          <SchemaPanel />
+
+          {/* Top Toolbar positioned absolutely on top of canvas */}
+          <TopToolbar />
         </div>
 
-        {/* Schema Panel positioned absolutely on top of canvas */}
-        <SchemaPanel />
-
-        {/* Top Toolbar positioned absolutely on top of canvas */}
-        <TopToolbar />
-
-        {/* AI Prompt Panel positioned absolutely on top of canvas */}
-        <AIPromptPanel />
+        {/* AI Prompt Panel - Fixed at bottom, always visible */}
+        <div className="flex-shrink-0 relative">
+          <AIPromptPanel />
+        </div>
       </div>
     </>
   );

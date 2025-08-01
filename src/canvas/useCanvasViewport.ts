@@ -1,4 +1,7 @@
-import { useState, useRef, useEffect } from "react";
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import * as fabric from "fabric";
 
 export interface ViewportState {
   x: number;
@@ -24,6 +27,7 @@ const DEFAULT_GRID_CONFIG: GridConfig = {
   minorLineWidth: 0.5,
 };
 
+// Original hook for HTML Canvas (used by existing Canvas component)
 export function useCanvasViewport(initialViewport?: Partial<ViewportState>) {
   const [viewport, setViewport] = useState<ViewportState>({
     x: 0,
@@ -67,6 +71,108 @@ export function useCanvasViewport(initialViewport?: Partial<ViewportState>) {
     zoom,
     resetView,
     setViewport,
+  };
+}
+
+// Constants for Fabric.js zoom behavior
+const ZOOM_FACTOR = 1.1;
+const MIN_ZOOM = 0.1;
+const MAX_ZOOM = 10;
+
+// New hook specifically for Fabric.js Canvas with mouse wheel zooming
+export function useFabricCanvasViewport(canvas?: fabric.Canvas) {
+  const handleMouseWheel = useCallback(
+    (opt: fabric.TEvent<WheelEvent>) => {
+      if (!canvas) return;
+
+      const delta = opt.e.deltaY;
+      const pointer = canvas.getPointer(opt.e);
+
+      // Prevent default browser scrolling
+      opt.e.preventDefault();
+      opt.e.stopPropagation();
+
+      // Calculate zoom direction and new zoom level
+      const zoom = canvas.getZoom();
+      let newZoom: number;
+
+      if (delta > 0) {
+        // Scrolling down - zoom out
+        newZoom = zoom / ZOOM_FACTOR;
+      } else {
+        // Scrolling up - zoom in
+        newZoom = zoom * ZOOM_FACTOR;
+      }
+
+      // Apply zoom limits
+      newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom));
+
+      // Zoom to the mouse cursor position
+      canvas.zoomToPoint(new fabric.Point(pointer.x, pointer.y), newZoom);
+
+      // Request a re-render
+      canvas.requestRenderAll();
+    },
+    [canvas]
+  );
+
+  useEffect(() => {
+    if (!canvas) return;
+
+    // Add mouse wheel event listener
+    canvas.on("mouse:wheel", handleMouseWheel);
+
+    // Cleanup event listener on unmount
+    return () => {
+      canvas.off("mouse:wheel", handleMouseWheel);
+    };
+  }, [canvas, handleMouseWheel]);
+
+  // Return utility functions for canvas control
+  return {
+    getCurrentZoom: () => canvas?.getZoom() || 1,
+    setZoom: (zoom: number) => {
+      if (!canvas) return;
+      const clampedZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
+      canvas.setZoom(clampedZoom);
+      canvas.requestRenderAll();
+    },
+    resetZoom: () => {
+      if (!canvas) return;
+      canvas.setZoom(1);
+      canvas.requestRenderAll();
+    },
+    zoomToFit: () => {
+      if (!canvas) return;
+      const objects = canvas.getObjects();
+      if (objects.length === 0) return;
+
+      canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+      const group = new fabric.Group(objects);
+      const boundingRect = group.getBoundingRect();
+
+      const canvasWidth = canvas.getWidth();
+      const canvasHeight = canvas.getHeight();
+
+      const scaleX = canvasWidth / boundingRect.width;
+      const scaleY = canvasHeight / boundingRect.height;
+      const scale = Math.min(scaleX, scaleY) * 0.8; // 80% to add some padding
+
+      const finalScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, scale));
+
+      const centerX = boundingRect.left + boundingRect.width / 2;
+      const centerY = boundingRect.top + boundingRect.height / 2;
+
+      canvas.setZoom(finalScale);
+      canvas.absolutePan(
+        new fabric.Point(
+          canvasWidth / 2 - centerX * finalScale,
+          canvasHeight / 2 - centerY * finalScale
+        )
+      );
+
+      canvas.requestRenderAll();
+    },
   };
 }
 

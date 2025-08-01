@@ -80,13 +80,34 @@ export function useOverrideBrowserControls() {
       }
     };
 
-    // Disable mouse wheel default behaviors
+    // Disable mouse wheel default behaviors - but allow canvas components to handle their own
     const handleWheel = (e: WheelEvent) => {
-      // Prevent browser zoom with Ctrl/Cmd + wheel
+      const target = e.target as HTMLElement;
+
+      // Allow canvas elements and their containers to handle their own wheel events
+      if (
+        target.tagName === "CANVAS" ||
+        target.closest(".canvas-container") ||
+        target.closest('[data-scrollable="false"]')
+      ) {
+        return; // Don't interfere with canvas wheel events
+      }
+
+      // Prevent browser zoom with Ctrl/Cmd + wheel on non-canvas elements
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
       }
-      // Let our canvas handle all wheel events
+
+      // Prevent page scrolling on non-scrollable elements
+      const scrollableElement =
+        target.closest('[data-scrollable="true"]') ||
+        target.closest(".overflow-auto") ||
+        target.closest(".overflow-y-auto") ||
+        target.closest(".overflow-x-auto");
+
+      if (!scrollableElement) {
+        e.preventDefault();
+      }
     };
 
     // Add all event listeners

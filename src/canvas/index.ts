@@ -1,5 +1,11 @@
 export { Canvas } from "./Canvas";
+export { FabricCanvas } from "./FabricCanvas";
+export { IDEFabricCanvas } from "./IDEFabricCanvas";
 export { useCanvasInteraction } from "./useCanvasInteraction";
-export { useCanvasViewport, drawGrid } from "./useCanvasViewport";
+export {
+  useCanvasViewport,
+  useFabricCanvasViewport,
+  drawGrid,
+} from "./useCanvasViewport";
 export type { MouseState, CanvasInteraction } from "./useCanvasInteraction";
 export type { ViewportState, GridConfig } from "./useCanvasViewport";
