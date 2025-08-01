@@ -22,9 +22,9 @@ export function AIPromptPanel({ className = "" }: AIPromptPanelProps) {
     }, 3000);
   };
 
-  const handlePlusClick = () => {
-    console.log("Plus button clicked - Add component");
-    // Add component functionality here
+  const handleMicClick = () => {
+    console.log("Microphone button clicked - Voice input");
+    // Voice input functionality here
   };
 
   const handleDotsClick = () => {
@@ -32,9 +32,9 @@ export function AIPromptPanel({ className = "" }: AIPromptPanelProps) {
     // More options functionality here
   };
 
-  const handleMicClick = () => {
-    console.log("Microphone button clicked - Voice input");
-    // Voice input functionality here
+  const handleSendClick = () => {
+    console.log("Send button clicked - Process input");
+    // Send/process functionality here
   };
 
   return (
@@ -45,9 +45,9 @@ export function AIPromptPanel({ className = "" }: AIPromptPanelProps) {
       {/* Prompt Entry */}
       <PromptEntry
         onSubmit={handlePromptSubmit}
-        onPlusClick={handlePlusClick}
-        onDotsClick={handleDotsClick}
         onMicClick={handleMicClick}
+        onDotsClick={handleDotsClick}
+        onSendClick={handleSendClick}
         isThinking={isThinking}
       />
     </div>

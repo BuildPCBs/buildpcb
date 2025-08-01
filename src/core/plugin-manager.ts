@@ -27,7 +27,7 @@ export interface PluginContext {
 
 export interface PluginAPI {
   // Core systems
-  commands: typeof import("./command-manager").commandManager;
+  // commands: typeof import("./command-manager").commandManager;
   events: typeof import("./event-manager").eventManager;
   state: typeof import("./state-manager").stateManager;
   keyboard: typeof import("./keyboard").keyboardManager;
@@ -289,7 +289,7 @@ class PluginManager {
   private createPluginAPI(pluginId: string): PluginAPI {
     return {
       // Core systems (these would be imported from actual managers)
-      commands: {} as any,
+      // commands: {} as any,
       events: {} as any,
       state: {} as any,
       keyboard: {} as any,

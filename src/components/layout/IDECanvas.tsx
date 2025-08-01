@@ -4,7 +4,7 @@ import { SchemaPanel } from "./SchemaPanel";
 import { TopToolbar } from "./TopToolbar";
 import { AIPromptPanel } from "./AIPromptPanel";
 import { DeviceRestriction } from "./DeviceRestriction";
-import { Canvas } from "@/canvas";
+import { IDEFabricCanvas } from "@/canvas";
 import { useOverrideBrowserControls } from "@/hooks/useOverrideBrowserControls";
 
 export function IDECanvas() {
@@ -25,7 +25,7 @@ export function IDECanvas() {
             className="absolute inset-0 canvas-container"
             data-scrollable="false"
           >
-            <Canvas className="w-full h-full" />
+            <IDEFabricCanvas className="w-full h-full" />
           </div>
 
           {/* Schema Panel positioned absolutely on top of canvas */}

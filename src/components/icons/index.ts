@@ -10,4 +10,5 @@ export { ExportIcon } from "./ExportIcon";
 export { PlusIcon } from "./PlusIcon";
 export { DotsIcon } from "./DotsIcon";
 export { MicIcon } from "./MicIcon";
+export { SendIcon } from "./SendIcon";
 export { ChevronDownIcon } from "./ChevronDownIcon";

@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useState } from "react";
 import * as fabric from "fabric";
+import { useCanvasPan } from "./hooks";
 
 interface CanvasProps {
   width?: number;
@@ -16,6 +17,9 @@ export function Canvas({
 }: CanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [fabricCanvas, setFabricCanvas] = useState<fabric.Canvas | null>(null);
+
+  // Use our custom hook for drag-to-pan functionality
+  const { isPanMode, isDragging } = useCanvasPan(fabricCanvas || undefined);
 
   useEffect(() => {
     if (!canvasRef.current) return;

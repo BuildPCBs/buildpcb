@@ -1,23 +1,24 @@
 "use client";
 
 import { useState } from "react";
-import { PlusIcon, DotsIcon, MicIcon } from "@/components/icons";
+import { DotsIcon, MicIcon } from "@/components/icons";
 import { r, responsive } from "@/lib/responsive";
+import { Send } from "lucide-react";
 
 interface PromptEntryProps {
   onSubmit?: (prompt: string) => void;
-  onPlusClick?: () => void;
+  onMicClick?: () => void; // Previously onPlusClick, now microphone
   onDotsClick?: () => void;
-  onMicClick?: () => void;
+  onSendClick?: () => void; // Previously onMicClick, now send button
   isThinking?: boolean;
   className?: string;
 }
 
 export function PromptEntry({
   onSubmit,
-  onPlusClick,
-  onDotsClick,
   onMicClick,
+  onDotsClick,
+  onSendClick,
   isThinking = false,
   className = "",
 }: PromptEntryProps) {
@@ -100,10 +101,10 @@ export function PromptEntry({
               gap: responsive(10),
             }}
           >
-            {/* Plus Button */}
+            {/* Microphone Button - Changed from Plus to Mic */}
             <button
               type="button"
-              onClick={onPlusClick}
+              onClick={onMicClick}
               disabled={isThinking}
               className="flex items-center justify-center bg-white border hover:border-blue-400 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
@@ -116,7 +117,7 @@ export function PromptEntry({
                 borderWidth: responsive(1),
               }}
             >
-              <PlusIcon size={16} className="text-gray-600" />
+              <MicIcon size={16} className="text-gray-600" />
             </button>
 
             {/* Dots Button */}
@@ -139,23 +140,23 @@ export function PromptEntry({
             </button>
           </div>
 
-          {/* Microphone Button - Aligned to the right */}
+          {/* Send Button - Changed from Microphone, blue bg with white icon */}
           <button
             type="button"
-            onClick={onMicClick}
+            onClick={onSendClick}
             disabled={isThinking}
-            className="flex items-center justify-center bg-white border hover:border-blue-400 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-600"
             style={{
               ...r({
                 width: 32,
                 height: 32,
                 borderRadius: 99, // Fully circular
               }),
-              borderColor: "#DDDDDD",
-              borderWidth: responsive(1),
+              backgroundColor: "#3B82F6", // Blue background
+              border: "none",
             }}
           >
-            <MicIcon size={16} className="text-gray-600" />
+            <Send size={16} className="text-white" />
           </button>
         </div>
       </div>

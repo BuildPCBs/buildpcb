@@ -6,7 +6,7 @@
 import { initializeKeyboardShortcuts, keyboardManager } from "./keyboard";
 import { initializeErrorHandling, errorManager } from "./error-manager";
 import { eventManager, IDE_EVENTS } from "./event-manager";
-import { initializeCommandSystem, commandManager } from "./command-manager";
+// import { coreCommandManager } from "./command-manager";
 import { initializeState, stateManager, STATE_PATHS } from "./state-manager";
 import { fileSystemManager } from "./file-system";
 import { pluginManager } from "./plugin-manager";
@@ -94,7 +94,7 @@ class IDECore {
 
       // Clear caches
       fileSystemManager.clearCache();
-      commandManager.clearHistory();
+      // commandManager.clearHistory();
       stateManager.clearHistory();
 
       this.initialized = false;
@@ -114,7 +114,7 @@ class IDECore {
       systems: {
         keyboard: keyboardManager,
         error: errorManager.getErrorStats(),
-        commands: commandManager.getAllCommands().length,
+        commands: 0, // commandManager.getAllCommands().length,
         state: stateManager.getState(),
         files: fileSystemManager.getCacheStats(),
         plugins: {
@@ -152,7 +152,7 @@ class IDECore {
     }
 
     // Initialize command system
-    initializeCommandSystem();
+    // initializeCommandSystem();
     console.log("✓ Command system initialized");
   }
 
@@ -258,28 +258,27 @@ class IDECore {
 
   private setupKeyboardIntegration(): void {
     // Connect keyboard shortcuts to commands
-    const commands = commandManager.getAllCommands();
-
-    commands.forEach((command) => {
-      if (command.keybinding) {
-        keyboardManager.registerShortcut({
-          id: command.id,
-          keys: command.keybinding,
-          description: command.description,
-          category: command.category,
-          action: () => {
-            commandManager.executeCommand(command.id).catch((error) => {
-              errorManager.reportError({
-                message: `Failed to execute command: ${command.name}`,
-                details: error.message,
-                category: "system" as any,
-                severity: "medium" as any,
-              });
-            });
-          },
-        });
-      }
-    });
+    // const commands = commandManager.getAllCommands();
+    // commands.forEach((command) => {
+    //   if (command.keybinding) {
+    //     keyboardManager.registerShortcut({
+    //       id: command.id,
+    //       keys: command.keybinding,
+    //       description: command.description,
+    //       category: command.category,
+    //       action: () => {
+    //         commandManager.executeCommand(command.id).catch((error) => {
+    //           errorManager.reportError({
+    //             message: `Failed to execute command: ${command.name}`,
+    //             details: error.message,
+    //             category: "system" as any,
+    //             severity: "medium" as any,
+    //           });
+    //         });
+    //       },
+    //     });
+    //   }
+    // });
   }
 
   private async loadUserPreferences(): Promise<void> {
@@ -319,14 +318,14 @@ export {
   keyboardManager,
   errorManager,
   eventManager,
-  commandManager,
+  // commandManager,
   stateManager,
   fileSystemManager,
   pluginManager,
 };
 
 // Export events and constants
-export { COMMAND_CATEGORIES } from "./command-manager";
+// export { COMMAND_CATEGORIES } from "./command-manager";
 export { IDE_EVENTS } from "./event-manager";
 export { STATE_PATHS } from "./state-manager";
 export { ErrorSeverity, ErrorCategory } from "./error-manager";
