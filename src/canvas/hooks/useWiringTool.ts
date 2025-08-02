@@ -1,24 +1,17 @@
 /**
- * Professional-Grade Wiring Tool
- * Implements a state machine approach with orthogonal wire routing
- * Mimics behavior of modern PCB design software
+ * Definitive Wiring Tool - Built from scratch for reliability
+ * Fixes: invisible wire preview, inconsistent state, corner drawing
  */
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import * as fabric from "fabric";
 
-// Wire tool state machine
-type WireState = 'idle' | 'drawing' | 'finishing';
-
-interface WirePoint {
-  x: number;
-  y: number;
-}
-
-interface WireDraftState {
+// Simple, reliable state management
+interface WiringState {
+  isDrawingWire: boolean;
+  currentLine: fabric.Polyline | null;
   startPin: fabric.Object | null;
-  waypoints: WirePoint[];
-  ghostWire: fabric.Polyline | null;
+  wirePoints: fabric.Point[]; // Array of fixed waypoints
 }
 
 interface UseWiringToolProps {
@@ -27,10 +20,13 @@ interface UseWiringToolProps {
 }
 
 interface UseWiringToolReturn {
-  wireState: WireState;
   isWireMode: boolean;
+  isDrawingWire: boolean;
+  wireState: string; // For UI compatibility: 'idle' | 'drawing'
   toggleWireMode: () => void;
   exitWireMode: () => void;
+  // PART 2: Expose wire-component connection functions
+  updateConnectedWires: (component: fabric.Group) => void;
 }
 
 export function useWiringTool({
@@ -38,110 +34,66 @@ export function useWiringTool({
   enabled = true,
 }: UseWiringToolProps): UseWiringToolReturn {
   const [isWireMode, setIsWireMode] = useState(false);
-  const [wireState, setWireState] = useState<WireState>('idle');
-  const [wireDraft, setWireDraft] = useState<WireDraftState>({
+  const [wiringState, setWiringState] = useState<WiringState>({
+    isDrawingWire: false,
+    currentLine: null,
     startPin: null,
-    waypoints: [],
-    ghostWire: null,
+    wirePoints: [],
   });
-  
-  // Keep track of highlighted pin for visual feedback
+
+  // Pin highlighting state
   const [highlightedPin, setHighlightedPin] = useState<fabric.Object | null>(null);
   const originalPinState = useRef<Map<fabric.Object, any>>(new Map());
 
-  // Toggle wire drawing mode
-  const toggleWireMode = useCallback(() => {
-    if (isWireMode) {
-      exitWireMode();
-    } else {
-      setIsWireMode(true);
-      setWireState('idle');
-    }
-  }, [isWireMode]); // Removed exitWireMode from deps to avoid circular dependency
-
-  // Exit wire mode and clean up
-  const exitWireMode = useCallback(() => {
-    // Cancel any active wire drawing
-    if (wireDraft.ghostWire && canvas) {
-      canvas.remove(wireDraft.ghostWire);
-      canvas.renderAll();
-    }
-
-    // Clear highlighted pins
-    if (highlightedPin && canvas) {
-      clearPinHighlight(highlightedPin);
-    }
-
-    // Reset all state
-    setIsWireMode(false);
-    setWireState('idle');
-    setWireDraft({
-      startPin: null,
-      waypoints: [],
-      ghostWire: null,
-    });
-    setHighlightedPin(null);
-  }, [canvas, wireDraft.ghostWire, highlightedPin]);
-
-  // Find pin at specific coordinates
+  // Find pin at coordinates with tolerance
   const findPinAtPoint = useCallback((point: fabric.Point): fabric.Object | null => {
     if (!canvas) return null;
 
     const objects = canvas.getObjects();
-    
     for (const obj of objects) {
       if ((obj as any).componentType && obj.type === "group") {
         const group = obj as fabric.Group;
         const groupObjects = group.getObjects();
-        
+
         for (const groupObj of groupObjects) {
           if ((groupObj as any).pin) {
-            // Convert group-relative coordinates to canvas coordinates
             const pinPoint = fabric.util.transformPoint(
               new fabric.Point(groupObj.left || 0, groupObj.top || 0),
               group.calcTransformMatrix()
             );
-            
-            const distance = point.distanceFrom(pinPoint);
-            if (distance <= 8) { // 8px tolerance for pin detection
+            if (point.distanceFrom(pinPoint) <= 8) {
               return groupObj;
             }
           }
         }
       }
     }
-    
     return null;
   }, [canvas]);
 
-  // Get world coordinates of a pin
-  const getPinWorldCoordinates = useCallback((pin: fabric.Object): WirePoint => {
+  // Get pin world coordinates
+  const getPinWorldCoordinates = useCallback((pin: fabric.Object): fabric.Point => {
     const identityMatrix = [1, 0, 0, 1, 0, 0] as fabric.TMat2D;
-    const pinPoint = fabric.util.transformPoint(
+    return fabric.util.transformPoint(
       new fabric.Point(pin.left || 0, pin.top || 0),
       pin.group?.calcTransformMatrix() || identityMatrix
     );
-    return { x: pinPoint.x, y: pinPoint.y };
   }, []);
 
-  // Highlight pin when hovering
+  // Highlight pin
   const highlightPin = useCallback((pin: fabric.Object) => {
     if (highlightedPin === pin) return;
-    
+
     // Clear previous highlight
     if (highlightedPin) {
       const originalState = originalPinState.current.get(highlightedPin);
       if (originalState) {
-        highlightedPin.set({
-          strokeWidth: originalState.strokeWidth,
-          fill: originalState.fill,
-          radius: originalState.radius,
-        });
+        highlightedPin.set(originalState);
         originalPinState.current.delete(highlightedPin);
       }
     }
 
-    // Store original state
+    // Store original state and apply highlight
     if (!originalPinState.current.has(pin)) {
       originalPinState.current.set(pin, {
         strokeWidth: pin.strokeWidth,
@@ -150,158 +102,342 @@ export function useWiringTool({
       });
     }
 
-    // Apply highlight
     pin.set({
       strokeWidth: 3,
-      fill: "rgba(0, 56, 223, 0.5)",
-      radius: (originalPinState.current.get(pin)?.radius || 4) * 1.2,
+      fill: "rgba(0, 56, 223, 0.7)",
+      radius: (originalPinState.current.get(pin)?.radius || 4) * 1.3,
     });
 
     setHighlightedPin(pin);
-    
-    if (canvas) {
-      canvas.renderAll();
-    }
+    canvas?.renderAll();
   }, [highlightedPin, canvas]);
 
   // Clear pin highlight
-  const clearPinHighlight = useCallback((pin: fabric.Object) => {
-    const originalState = originalPinState.current.get(pin);
-    if (originalState) {
-      pin.set({
-        strokeWidth: originalState.strokeWidth,
-        fill: originalState.fill,
-        radius: originalState.radius,
-      });
-      originalPinState.current.delete(pin);
-    }
-    
-    if (canvas) {
-      canvas.renderAll();
-    }
-  }, [canvas]);
-
-  // Calculate orthogonal next point based on cursor position
-  const calculateOrthogonalPoint = useCallback((
-    lastPoint: WirePoint, 
-    currentPoint: WirePoint
-  ): WirePoint => {
-    const deltaX = Math.abs(currentPoint.x - lastPoint.x);
-    const deltaY = Math.abs(currentPoint.y - lastPoint.y);
-
-    // Decide direction based on which delta is larger
-    if (deltaX > deltaY) {
-      // Horizontal line - fix Y coordinate
-      return { x: currentPoint.x, y: lastPoint.y };
-    } else {
-      // Vertical line - fix X coordinate
-      return { x: lastPoint.x, y: currentPoint.y };
-    }
-  }, []);
-
-  // Create or update ghost wire
-  const updateGhostWire = useCallback((points: WirePoint[]) => {
-    if (!canvas) return;
-
-    // Remove existing ghost wire
-    if (wireDraft.ghostWire) {
-      canvas.remove(wireDraft.ghostWire);
-    }
-
-    // Create new ghost wire if we have at least 2 points
-    if (points.length >= 2) {
-      const fabricPoints = points.map(p => new fabric.Point(p.x, p.y));
-      
-      const ghostWire = new fabric.Polyline(fabricPoints, {
-        fill: 'transparent',
-        stroke: '#0038DF',
-        strokeWidth: 2,
-        strokeDashArray: [5, 5], // Dashed line for ghost wire
-        selectable: false,
-        evented: false,
-        opacity: 0.7,
-      });
-
-      canvas.add(ghostWire);
-      canvas.renderAll();
-
-      setWireDraft(prev => ({ ...prev, ghostWire }));
-    }
-  }, [canvas, wireDraft.ghostWire]);
-
-  // Complete the wire by creating final polyline
-  const completeWire = useCallback((endPin: fabric.Object) => {
-    if (!canvas || !wireDraft.startPin) return;
-
-    const endPoint = getPinWorldCoordinates(endPin);
-    const allPoints = [
-      getPinWorldCoordinates(wireDraft.startPin),
-      ...wireDraft.waypoints,
-      endPoint
-    ];
-
-    // Remove ghost wire
-    if (wireDraft.ghostWire) {
-      canvas.remove(wireDraft.ghostWire);
-    }
-
-    // Create final wire as solid polyline
-    const fabricPoints = allPoints.map(p => new fabric.Point(p.x, p.y));
-    const finalWire = new fabric.Polyline(fabricPoints, {
-      fill: 'transparent',
-      stroke: '#0038DF',
-      strokeWidth: 2,
-      strokeLineCap: 'round',
-      strokeLineJoin: 'round',
-      selectable: true,
-      evented: true,
-      wireType: 'connection',
-      startPin: wireDraft.startPin,
-      endPin: endPin,
-    } as any);
-
-    canvas.add(finalWire);
-    canvas.renderAll();
-
-    // Clear highlighted pin
+  const clearPinHighlight = useCallback(() => {
     if (highlightedPin) {
       const originalState = originalPinState.current.get(highlightedPin);
       if (originalState) {
-        highlightedPin.set({
-          strokeWidth: originalState.strokeWidth,
-          fill: originalState.fill,
-          radius: originalState.radius,
-        });
+        highlightedPin.set(originalState);
         originalPinState.current.delete(highlightedPin);
       }
+      setHighlightedPin(null);
+      canvas?.renderAll();
+    }
+  }, [highlightedPin, canvas]);
+
+  // Calculate orthogonal point for 90-degree routing
+  const calculateOrthogonalPoint = useCallback(
+    (lastPoint: fabric.Point, currentPoint: fabric.Point): fabric.Point => {
+      const deltaX = Math.abs(currentPoint.x - lastPoint.x);
+      const deltaY = Math.abs(currentPoint.y - lastPoint.y);
+
+      // Decide direction based on which delta is larger
+      if (deltaX > deltaY) {
+        // Horizontal line - fix Y coordinate
+        return new fabric.Point(currentPoint.x, lastPoint.y);
+      } else {
+        // Vertical line - fix X coordinate
+        return new fabric.Point(lastPoint.x, currentPoint.y);
+      }
+    },
+    []
+  );
+
+  // CRITICAL: Reset the tool to clean state
+  const resetWiringState = useCallback(() => {
+    console.log("🔄 Resetting wiring tool to clean state");
+    
+    // Remove current line if exists
+    if (wiringState.currentLine && canvas) {
+      canvas.remove(wiringState.currentLine);
+      canvas.renderAll();
     }
 
-    // Reset to idle state
-    setWireState('idle');
-    setWireDraft({
+    // Clear highlights
+    clearPinHighlight();
+
+    // Reset state variables - THIS IS THE CRITICAL FIX
+    setWiringState({
+      isDrawingWire: false,
+      currentLine: null,
       startPin: null,
-      waypoints: [],
-      ghostWire: null,
+      wirePoints: [],
     });
-    setHighlightedPin(null);
 
-    console.log('Wire completed successfully');
-  }, [canvas, wireDraft.startPin, wireDraft.waypoints, wireDraft.ghostWire, getPinWorldCoordinates, highlightedPin]);
+    console.log("✅ Tool reset complete - ready for next wire");
+  }, [wiringState.currentLine, canvas, clearPinHighlight]);
 
-  // Show/hide pins when entering/exiting wire mode
+  // Start drawing a wire from a pin
+  const startWireFromPin = useCallback((pin: fabric.Object, clickPoint: fabric.Point) => {
+    if (!canvas) return;
+
+    console.log("🎯 Starting wire from pin");
+    
+    const pinCoords = getPinWorldCoordinates(pin);
+    const orthogonalPoint = calculateOrthogonalPoint(pinCoords, clickPoint);
+
+    // Create visible POLYLINE immediately with pin coordinates as start
+    const initialPoints = [pinCoords, orthogonalPoint];
+    const newLine = new fabric.Polyline(initialPoints, {
+      fill: "transparent",
+      stroke: "#0038DF",
+      strokeWidth: 2,
+      strokeLineCap: "round",
+      strokeLineJoin: "round",
+      selectable: false,
+      evented: false,
+      excludeFromExport: true,
+      clipPath: undefined,     // CRITICAL: Disable clipping
+      objectCaching: false,    // CRITICAL: Prevent visual glitches
+    });
+
+    // Add to canvas immediately for instant visibility
+    canvas.add(newLine);
+    canvas.renderAll(); // Force immediate render
+
+    // Update state
+    setWiringState({
+      isDrawingWire: true,
+      currentLine: newLine,
+      startPin: pin,
+      wirePoints: [pinCoords], // Store fixed waypoints
+    });
+
+    console.log("✅ Wire preview created and visible - now following cursor");
+  }, [canvas, getPinWorldCoordinates, calculateOrthogonalPoint]);
+
+  // Update wire preview during mouse move - THE CRITICAL LIVE PREVIEW FIX
+  const updateWirePreview = useCallback((mousePoint: fabric.Point) => {
+    if (!wiringState.currentLine || !canvas || wiringState.wirePoints.length === 0) return;
+
+    // Get the last fixed waypoint
+    const lastWaypoint = wiringState.wirePoints[wiringState.wirePoints.length - 1];
+    
+    // Calculate orthogonal point from last waypoint to current mouse position
+    const orthogonalPoint = calculateOrthogonalPoint(lastWaypoint, mousePoint);
+
+    // Create new points array: all fixed waypoints + current orthogonal preview point
+    const newPoints = [...wiringState.wirePoints, orthogonalPoint];
+    
+    // Update polyline points
+    wiringState.currentLine.set({ points: newPoints });
+    
+    // CRITICAL: Force canvas update for live preview
+    canvas.renderAll();
+  }, [wiringState.currentLine, wiringState.wirePoints, canvas, calculateOrthogonalPoint]);
+
+  // Add corner point when clicking on empty space - THE CORNER CREATION LOGIC
+  const addCornerPoint = useCallback((clickPoint: fabric.Point) => {
+    if (!wiringState.currentLine || !canvas || wiringState.wirePoints.length === 0) return;
+
+    console.log("📐 Adding corner point");
+
+    // Get the last waypoint
+    const lastWaypoint = wiringState.wirePoints[wiringState.wirePoints.length - 1];
+    
+    // Calculate orthogonal point from last waypoint to click location
+    const orthogonalPoint = calculateOrthogonalPoint(lastWaypoint, clickPoint);
+
+    // Add this point as a new fixed waypoint
+    const newWirePoints = [...wiringState.wirePoints, orthogonalPoint];
+    
+    // Update state with new waypoint
+    setWiringState(prev => ({
+      ...prev,
+      wirePoints: newWirePoints,
+    }));
+
+    console.log("✅ Corner added at", orthogonalPoint.x, orthogonalPoint.y, "- preview continues");
+  }, [wiringState.currentLine, wiringState.wirePoints, canvas, calculateOrthogonalPoint]);
+
+  // Complete wire at end pin
+  const completeWireAtPin = useCallback((endPin: fabric.Object) => {
+    if (!wiringState.currentLine || !wiringState.startPin || !canvas) return;
+
+    console.log("🎯 Completing wire at end pin");
+
+    const endPinCoords = getPinWorldCoordinates(endPin);
+    
+    // Get the last waypoint for orthogonal calculation
+    const lastWaypoint = wiringState.wirePoints[wiringState.wirePoints.length - 1];
+    const orthogonalEndPoint = calculateOrthogonalPoint(lastWaypoint, endPinCoords);
+
+    // Create final points array: all waypoints + orthogonal segment + end pin
+    const finalPoints = [...wiringState.wirePoints, orthogonalEndPoint, endPinCoords];
+
+    // Get component IDs and pin indices for wire memory
+    const startComponent = wiringState.startPin.group;
+    const endComponent = endPin.group;
+    const startComponentId = (startComponent as any)?.id || `component_${Date.now()}_start`;
+    const endComponentId = (endComponent as any)?.id || `component_${Date.now()}_end`;
+    
+    // Find pin indices within their respective components
+    const startPinIndex = startComponent?.getObjects().indexOf(wiringState.startPin) || 0;
+    const endPinIndex = endComponent?.getObjects().indexOf(endPin) || 0;
+
+    // Update the current polyline to final state with connection memory
+    wiringState.currentLine.set({
+      points: finalPoints,
+      selectable: true,
+      evented: true,
+      wireType: "connection",
+      startPin: wiringState.startPin,
+      endPin: endPin,
+      // PART 1: Wire Memory - Store connection information
+      startComponentId: startComponentId,
+      endComponentId: endComponentId,
+      startPinIndex: startPinIndex,
+      endPinIndex: endPinIndex,
+      startComponent: startComponent,
+      endComponent: endComponent,
+      clipPath: undefined,     // CRITICAL: Disable clipping for final wire
+      objectCaching: false,    // CRITICAL: Prevent visual glitches
+    } as any);
+
+    canvas.renderAll();
+
+    console.log("✅ Wire completed successfully with", finalPoints.length, "points");
+    console.log("🔗 Wire memory stored:", {
+      startComponentId,
+      endComponentId,
+      startPinIndex,
+      endPinIndex
+    });
+
+    // CRITICAL: Reset for next wire (but don't remove the completed line)
+    setWiringState({
+      isDrawingWire: false,
+      currentLine: null,
+      startPin: null,
+      wirePoints: [],
+    });
+
+    // Clear highlights
+    clearPinHighlight();
+
+    console.log("✅ Tool reset complete - ready for next wire");
+  }, [wiringState.currentLine, wiringState.startPin, wiringState.wirePoints, canvas, getPinWorldCoordinates, calculateOrthogonalPoint, clearPinHighlight]);
+
+  // Toggle wire mode
+  const toggleWireMode = useCallback(() => {
+    if (isWireMode) {
+      exitWireMode();
+    } else {
+      console.log("🔧 Entering wire mode");
+      setIsWireMode(true);
+      resetWiringState(); // Ensure clean state
+    }
+  }, [isWireMode]);
+
+  // Exit wire mode
+  const exitWireMode = useCallback(() => {
+    console.log("🚪 Exiting wire mode");
+    resetWiringState();
+    setIsWireMode(false);
+  }, [resetWiringState]);
+
+  // PART 2: Update connected wires when a component moves
+  const updateConnectedWires = useCallback((movingComponent: fabric.Group) => {
+    if (!canvas) return;
+
+    console.log("🔄 Updating wires connected to moving component");
+
+    // Get component ID
+    const componentId = (movingComponent as any)?.id;
+    if (!componentId) return;
+
+    // Find all wires connected to this component
+    const allObjects = canvas.getObjects();
+    const connectedWires = allObjects.filter(obj => {
+      if ((obj as any).wireType !== "connection") return false;
+      const wire = obj as any;
+      return wire.startComponentId === componentId || wire.endComponentId === componentId;
+    });
+
+    console.log(`📍 Found ${connectedWires.length} wires connected to component ${componentId}`);
+
+    // Update each connected wire
+    connectedWires.forEach((wireObj) => {
+      const wire = wireObj as fabric.Polyline & any;
+      
+      try {
+        // Get current pin coordinates
+        let startPinCoords: fabric.Point;
+        let endPinCoords: fabric.Point;
+
+        if (wire.startComponentId === componentId) {
+          // Start component moved - recalculate start pin position
+          const startPin = wire.startComponent?.getObjects()[wire.startPinIndex];
+          if (startPin) {
+            startPinCoords = getPinWorldCoordinates(startPin);
+          } else {
+            startPinCoords = new fabric.Point(wire.points[0].x, wire.points[0].y);
+          }
+          // End pin stays the same
+          const endPin = wire.endComponent?.getObjects()[wire.endPinIndex];
+          if (endPin) {
+            endPinCoords = getPinWorldCoordinates(endPin);
+          } else {
+            const lastPoint = wire.points[wire.points.length - 1];
+            endPinCoords = new fabric.Point(lastPoint.x, lastPoint.y);
+          }
+        } else {
+          // End component moved - recalculate end pin position
+          const startPin = wire.startComponent?.getObjects()[wire.startPinIndex];
+          if (startPin) {
+            startPinCoords = getPinWorldCoordinates(startPin);
+          } else {
+            startPinCoords = new fabric.Point(wire.points[0].x, wire.points[0].y);
+          }
+          // Recalculate end pin
+          const endPin = wire.endComponent?.getObjects()[wire.endPinIndex];
+          if (endPin) {
+            endPinCoords = getPinWorldCoordinates(endPin);
+          } else {
+            const lastPoint = wire.points[wire.points.length - 1];
+            endPinCoords = new fabric.Point(lastPoint.x, lastPoint.y);
+          }
+        }
+
+        // Reconstruct wire path maintaining middle waypoints
+        const currentPoints = wire.points || [];
+        let newPoints: fabric.Point[];
+
+        if (currentPoints.length <= 2) {
+          // Simple two-point wire
+          newPoints = [startPinCoords, endPinCoords];
+        } else {
+          // Multi-point wire - keep middle waypoints, update endpoints
+          const middlePoints = currentPoints.slice(1, -1);
+          newPoints = [startPinCoords, ...middlePoints, endPinCoords];
+        }
+
+        // Update wire geometry
+        wire.set({ points: newPoints });
+        
+        console.log(`🔗 Updated wire with ${newPoints.length} points`);
+
+      } catch (error) {
+        console.warn("⚠️ Error updating wire:", error);
+      }
+    });
+
+    // Force canvas redraw
+    canvas.renderAll();
+  }, [canvas, getPinWorldCoordinates]);
+
+  // Show/hide pins in wire mode
   useEffect(() => {
     if (!canvas) return;
 
     const objects = canvas.getObjects();
-    
     objects.forEach((obj) => {
       if ((obj as any).componentType && obj.type === "group") {
         const group = obj as fabric.Group;
         const groupObjects = group.getObjects();
-        
+
         groupObjects.forEach((groupObj) => {
           if ((groupObj as any).pin) {
-            // Show pins in wire mode, hide otherwise
             groupObj.set({
               strokeWidth: isWireMode ? 2 : 0,
               fill: isWireMode ? "rgba(0, 56, 223, 0.3)" : "transparent",
@@ -310,7 +446,7 @@ export function useWiringTool({
         });
       }
     });
-    
+
     canvas.renderAll();
   }, [canvas, isWireMode]);
 
@@ -318,10 +454,12 @@ export function useWiringTool({
   useEffect(() => {
     if (!canvas || !enabled || !isWireMode) return;
 
+    console.log("🎮 Setting up wire mode event handlers");
+
     // Configure canvas for wire mode
     canvas.selection = false;
     canvas.defaultCursor = "crosshair";
-    
+
     // Disable component interaction in wire mode
     canvas.forEachObject((obj) => {
       if ((obj as any).componentType) {
@@ -336,35 +474,15 @@ export function useWiringTool({
       const pin = findPinAtPoint(currentPoint);
 
       // Handle pin highlighting
-      if (pin && pin !== wireDraft.startPin) {
+      if (pin && pin !== wiringState.startPin) {
         highlightPin(pin);
-        setWireState('finishing');
       } else {
-        if (highlightedPin) {
-          clearPinHighlight(highlightedPin);
-          setHighlightedPin(null);
-        }
-        if (wireState === 'finishing' && wireDraft.startPin) {
-          setWireState('drawing');
-        }
+        clearPinHighlight();
       }
 
-      // Update ghost wire during drawing
-      if (wireState === 'drawing' && wireDraft.startPin) {
-        const startPoint = getPinWorldCoordinates(wireDraft.startPin);
-        const lastPoint = wireDraft.waypoints.length > 0 
-          ? wireDraft.waypoints[wireDraft.waypoints.length - 1]
-          : startPoint;
-
-        const orthogonalPoint = calculateOrthogonalPoint(lastPoint, { x: pointer.x, y: pointer.y });
-        
-        const allPoints = [
-          startPoint,
-          ...wireDraft.waypoints,
-          orthogonalPoint
-        ];
-
-        updateGhostWire(allPoints);
+      // PART 1 FIX: Update live wire preview
+      if (wiringState.isDrawingWire) {
+        updateWirePreview(currentPoint);
       }
     };
 
@@ -373,52 +491,31 @@ export function useWiringTool({
       const currentPoint = new fabric.Point(pointer.x, pointer.y);
       const pin = findPinAtPoint(currentPoint);
 
-      if (wireState === 'idle' && pin) {
-        // Start new wire
-        setWireState('drawing');
-        setWireDraft(prev => ({
-          ...prev,
-          startPin: pin,
-          waypoints: [],
-          ghostWire: null,
-        }));
-        console.log('Started new wire from pin');
-        
-      } else if (wireState === 'drawing') {
-        if (pin && pin !== wireDraft.startPin) {
+      if (!wiringState.isDrawingWire && pin) {
+        // Start new wire from pin
+        startWireFromPin(pin, currentPoint);
+      } else if (wiringState.isDrawingWire) {
+        if (pin && pin !== wiringState.startPin) {
           // Complete wire at end pin
-          completeWire(pin);
+          completeWireAtPin(pin);
         } else {
-          // Add waypoint
-          const startPoint = getPinWorldCoordinates(wireDraft.startPin!);
-          const lastPoint = wireDraft.waypoints.length > 0 
-            ? wireDraft.waypoints[wireDraft.waypoints.length - 1]
-            : startPoint;
-
-          const orthogonalPoint = calculateOrthogonalPoint(lastPoint, { x: pointer.x, y: pointer.y });
-          
-          setWireDraft(prev => ({
-            ...prev,
-            waypoints: [...prev.waypoints, orthogonalPoint],
-          }));
-          
-          console.log('Added waypoint at', orthogonalPoint);
+          // CORNER CREATION: Add waypoint on empty canvas click
+          addCornerPoint(currentPoint);
         }
-      } else if (wireState === 'finishing' && pin) {
-        // Complete wire
-        completeWire(pin);
       }
     };
 
     // Attach event listeners
-    canvas.on('mouse:move', handleMouseMove);
-    canvas.on('mouse:down', handleMouseDown);
+    canvas.on("mouse:move", handleMouseMove);
+    canvas.on("mouse:down", handleMouseDown);
 
     return () => {
+      console.log("🧹 Cleaning up wire mode event handlers");
+      
       // Restore canvas state
       canvas.selection = true;
       canvas.defaultCursor = "default";
-      
+
       // Restore component interaction
       canvas.forEachObject((obj) => {
         if ((obj as any).componentType) {
@@ -428,23 +525,21 @@ export function useWiringTool({
       });
 
       // Remove event listeners
-      canvas.off('mouse:move', handleMouseMove);
-      canvas.off('mouse:down', handleMouseDown);
+      canvas.off("mouse:move", handleMouseMove);
+      canvas.off("mouse:down", handleMouseDown);
     };
   }, [
-    canvas, 
-    enabled, 
-    isWireMode, 
-    wireState, 
-    wireDraft, 
-    highlightedPin,
+    canvas,
+    enabled,
+    isWireMode,
+    wiringState,
     findPinAtPoint,
     highlightPin,
     clearPinHighlight,
-    getPinWorldCoordinates,
-    calculateOrthogonalPoint,
-    updateGhostWire,
-    completeWire
+    updateWirePreview,
+    startWireFromPin,
+    completeWireAtPin,
+    addCornerPoint,
   ]);
 
   // Keyboard event handlers
@@ -453,7 +548,10 @@ export function useWiringTool({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't trigger in input fields
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
         return;
       }
 
@@ -462,54 +560,29 @@ export function useWiringTool({
         toggleWireMode();
       } else if (e.key === "Escape") {
         e.preventDefault();
-        if (wireState === 'drawing') {
-          // Cancel current wire
-          if (wireDraft.ghostWire && canvas) {
-            canvas.remove(wireDraft.ghostWire);
-            canvas.renderAll();
-          }
-          setWireState('idle');
-          setWireDraft({
-            startPin: null,
-            waypoints: [],
-            ghostWire: null,
-          });
+        if (wiringState.isDrawingWire) {
+          // PART 2 FIX: Reset on cancel
+          console.log("❌ Wire cancelled by user");
+          resetWiringState();
         } else {
           exitWireMode();
         }
       }
     };
 
-    const handleContextMenu = (e: MouseEvent) => {
-      if (isWireMode && wireState === 'drawing') {
-        e.preventDefault();
-        // Cancel wire on right-click
-        if (wireDraft.ghostWire && canvas) {
-          canvas.remove(wireDraft.ghostWire);
-          canvas.renderAll();
-        }
-        setWireState('idle');
-        setWireDraft({
-          startPin: null,
-          waypoints: [],
-          ghostWire: null,
-        });
-      }
-    };
-
     document.addEventListener("keydown", handleKeyDown);
-    document.addEventListener("contextmenu", handleContextMenu);
 
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("contextmenu", handleContextMenu);
     };
-  }, [enabled, toggleWireMode, exitWireMode, wireState, wireDraft, canvas, isWireMode]);
+  }, [enabled, toggleWireMode, exitWireMode, wiringState.isDrawingWire, resetWiringState]);
 
   return {
-    wireState,
     isWireMode,
+    isDrawingWire: wiringState.isDrawingWire,
+    wireState: wiringState.isDrawingWire ? 'drawing' : 'idle', // For UI compatibility
     toggleWireMode,
     exitWireMode,
+    updateConnectedWires, // PART 2: Expose wire update function
   };
 }
