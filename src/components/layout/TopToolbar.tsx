@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { UserIcon, ChartIcon, CloudIcon } from "@/components/icons";
 import { ActivityAnalyticsPanel } from "./ActivityAnalyticsPanel";
 import { r, responsive } from "@/lib/responsive";
-import { canvasCommandManager } from "../../canvas/canvas-command-manager";
 
 interface TopToolbarProps {
   className?: string;
@@ -36,12 +35,6 @@ export function TopToolbar({ className = "" }: TopToolbarProps) {
   const handleChartClick = () => {
     console.log("Chart icon clicked");
     // Add chart functionality here
-  };
-
-  const handleAddResistor = () => {
-    console.log("Add Resistor button clicked!");
-    canvasCommandManager.executeCommand("add_resistor");
-    console.log("Canvas command executed: add_resistor");
   };
 
   return (
@@ -94,24 +87,6 @@ export function TopToolbar({ className = "" }: TopToolbarProps) {
             }}
           >
             <ChartIcon size={16} className="text-gray-700" />
-          </button>
-
-          {/* Add Resistor Button */}
-          <button
-            onClick={handleAddResistor}
-            className="flex items-center justify-center text-white hover:bg-green-600 transition-colors"
-            style={{
-              ...r({
-                width: 85,
-                height: 26,
-                borderRadius: 6,
-              }),
-              backgroundColor: "#28a745",
-              fontSize: responsive(8),
-              fontWeight: 500,
-            }}
-          >
-            Add Resistor
           </button>
         </div>
 

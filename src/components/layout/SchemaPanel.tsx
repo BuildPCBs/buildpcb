@@ -4,6 +4,7 @@ import { HomeIcon, SearchIcon, WindowIcon } from "@/components/icons";
 import { useClickOutside } from "@/hooks/useClickOutside";
 import { r, responsive, responsiveFontSize } from "@/lib/responsive";
 import { COMPONENT_CATEGORIES } from "@/lib/constants";
+import { canvasCommandManager } from "@/canvas/canvas-command-manager";
 
 // Mock component data - extended list to test scrolling
 const mockComponents = [
@@ -12,91 +13,112 @@ const mockComponents = [
     name: "Resistor",
     category: "Resistors",
     image: "/components/resistor.svg",
+    type: "resistor",
   },
   {
     id: "2",
     name: "Capacitor",
     category: "Capacitors",
     image: "/components/capacitor.svg",
+    type: "capacitor",
   },
-  { id: "3", name: "LED", category: "Diodes", image: "/components/led.svg" },
+  {
+    id: "3",
+    name: "LED",
+    category: "Diodes",
+    image: "/components/led.svg",
+    type: "led",
+  },
   {
     id: "4",
     name: "Transistor",
     category: "Transistors",
     image: "/components/transistor.svg",
+    type: "transistor",
   },
   {
     id: "5",
     name: "Arduino Uno",
     category: "ICs",
     image: "/components/arduino.svg",
+    type: "arduino",
   },
   {
     id: "6",
     name: "Temperature Sensor",
     category: "Sensors",
     image: "/components/sensor.svg",
+    type: "sensor",
   },
   {
     id: "7",
     name: "Switch",
     category: "Switches",
     image: "/components/switch.svg",
+    type: "switch",
   },
   {
     id: "8",
     name: "Connector",
     category: "Connectors",
     image: "/components/connector.svg",
+    type: "connector",
   },
   {
     id: "9",
     name: "Inductor",
     category: "Inductors",
     image: "/components/resistor.svg",
+    type: "inductor",
   },
   {
     id: "10",
     name: "Op-Amp",
     category: "ICs",
     image: "/components/arduino.svg",
+    type: "opamp",
   },
   {
     id: "11",
     name: "Battery",
     category: "Power",
     image: "/components/capacitor.svg",
+    type: "battery",
   },
   {
     id: "12",
     name: "Motor",
     category: "Other",
     image: "/components/switch.svg",
+    type: "motor",
   },
   {
     id: "13",
     name: "Diode",
     category: "Diodes",
     image: "/components/led.svg",
+    type: "diode",
   },
   {
     id: "14",
     name: "Voltage Regulator",
     category: "ICs",
     image: "/components/arduino.svg",
+    type: "voltage_regulator",
   },
   {
     id: "15",
     name: "Crystal Oscillator",
     category: "Other",
     image: "/components/resistor.svg",
+    type: "crystal",
   },
   {
     id: "16",
     name: "Push Button",
     category: "Switches",
     image: "/components/switch.svg",
+    type: "pushbutton",
   },
   {
     id: "17",
@@ -440,7 +462,10 @@ export function SchemaPanel() {
       )}
 
       {/* Inner container with 2px spacing from panel edges */}
-      <div style={{ padding: responsive(2), height: "100%" }} className="flex flex-col">
+      <div
+        style={{ padding: responsive(2), height: "100%" }}
+        className="flex flex-col"
+      >
         {/* Very small state - just show a compact icon */}
         {!isHovered && !isFullyExpanded && (
           <div className="flex items-center justify-center w-full h-full">
@@ -557,7 +582,14 @@ export function SchemaPanel() {
                     <ComponentItem
                       key={component.id}
                       component={component}
-                      onClick={() => console.log(`Selected ${component.name}`)}
+                      onClick={() => {
+                        console.log(`Adding ${component.name} to canvas`);
+                        canvasCommandManager.executeCommand("component:add", {
+                          type: component.type,
+                          svgPath: component.image,
+                          name: component.name,
+                        });
+                      }}
                     />
                   ))}
                 </div>
@@ -570,22 +602,30 @@ export function SchemaPanel() {
                 ref={scrollContainerRef}
                 className="flex-1 flex flex-col min-h-0"
                 data-scrollable="true"
-                style={{ height: '100%' }}
+                style={{ height: "100%" }}
               >
                 {activeTab === "components" ? (
                   <div
                     className="flex-1 overflow-y-auto schema-scroll"
                     data-scrollable="true"
-                    style={{ height: '0', minHeight: '100%' }}
+                    style={{ height: "0", minHeight: "100%" }}
                   >
                     <div className="space-y-1">
                       {mockComponents.map((component) => (
                         <ComponentItem
                           key={component.id}
                           component={component}
-                          onClick={() =>
-                            console.log(`Selected ${component.name}`)
-                          }
+                          onClick={() => {
+                            console.log(`Adding ${component.name} to canvas`);
+                            canvasCommandManager.executeCommand(
+                              "component:add",
+                              {
+                                type: component.type,
+                                svgPath: component.image,
+                                name: component.name,
+                              }
+                            );
+                          }}
                         />
                       ))}
                     </div>
@@ -594,7 +634,7 @@ export function SchemaPanel() {
                   <div
                     className="flex-1 overflow-y-auto schema-scroll"
                     data-scrollable="true"
-                    style={{ height: '0', minHeight: '100%' }}
+                    style={{ height: "0", minHeight: "100%" }}
                   >
                     <div className="space-y-2">
                       {mockSchemas.map((schema) => (

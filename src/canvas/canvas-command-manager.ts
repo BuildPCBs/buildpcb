@@ -28,7 +28,7 @@ class CanvasCommandManager {
       this.eventListeners.set(event, new Set());
     }
     this.eventListeners.get(event)!.add(callback);
-    
+
     // Return unsubscribe function
     return () => {
       const listeners = this.eventListeners.get(event);
@@ -41,7 +41,7 @@ class CanvasCommandManager {
   emit(event: string, ...args: any[]): void {
     const listeners = this.eventListeners.get(event);
     if (listeners) {
-      listeners.forEach(callback => {
+      listeners.forEach((callback) => {
         try {
           callback(...args);
         } catch (error) {
@@ -210,6 +210,257 @@ export const builtInCanvasCommands = {
         console.log("Resistor added to canvas");
       } catch (error) {
         console.error("Error creating resistor:", error);
+      }
+    },
+  } as CanvasCommand,
+
+  COMPONENT_ADD: {
+    id: "component:add",
+    name: "Add Component",
+    handler: async (
+      canvas: fabric.Canvas,
+      params?: {
+        type: string;
+        svgPath: string;
+        name: string;
+        x?: number;
+        y?: number;
+      }
+    ) => {
+      try {
+        if (!params) {
+          console.error("Component parameters are required");
+          return;
+        }
+
+        console.log(`Adding ${params.name} (${params.type}) to canvas`);
+
+        // Helper function to create pins for different component types
+        const createPinsForComponent = (type: string): fabric.Circle[] => {
+          const pins: fabric.Circle[] = [];
+
+          // Different pin configurations based on component type
+          switch (type) {
+            case "resistor":
+            case "capacitor":
+            case "inductor":
+              // Two-terminal components
+              pins.push(
+                new fabric.Circle({
+                  radius: 4,
+                  fill: "transparent",
+                  stroke: "#0038DF",
+                  strokeWidth: 0,
+                  left: -35,
+                  top: 0,
+                  originX: "center",
+                  originY: "center",
+                  selectable: false,
+                  evented: false,
+                  pin: true,
+                  pinType: "left",
+                } as any),
+                new fabric.Circle({
+                  radius: 4,
+                  fill: "transparent",
+                  stroke: "#0038DF",
+                  strokeWidth: 0,
+                  left: 35,
+                  top: 0,
+                  originX: "center",
+                  originY: "center",
+                  selectable: false,
+                  evented: false,
+                  pin: true,
+                  pinType: "right",
+                } as any)
+              );
+              break;
+            case "transistor":
+              // Three-terminal component
+              pins.push(
+                new fabric.Circle({
+                  radius: 4,
+                  fill: "transparent",
+                  stroke: "#0038DF",
+                  strokeWidth: 0,
+                  left: -30,
+                  top: -15,
+                  originX: "center",
+                  originY: "center",
+                  selectable: false,
+                  evented: false,
+                  pin: true,
+                  pinType: "base",
+                } as any),
+                new fabric.Circle({
+                  radius: 4,
+                  fill: "transparent",
+                  stroke: "#0038DF",
+                  strokeWidth: 0,
+                  left: 30,
+                  top: -15,
+                  originX: "center",
+                  originY: "center",
+                  selectable: false,
+                  evented: false,
+                  pin: true,
+                  pinType: "collector",
+                } as any),
+                new fabric.Circle({
+                  radius: 4,
+                  fill: "transparent",
+                  stroke: "#0038DF",
+                  strokeWidth: 0,
+                  left: 30,
+                  top: 15,
+                  originX: "center",
+                  originY: "center",
+                  selectable: false,
+                  evented: false,
+                  pin: true,
+                  pinType: "emitter",
+                } as any)
+              );
+              break;
+            default:
+              // Default two-pin configuration
+              pins.push(
+                new fabric.Circle({
+                  radius: 4,
+                  fill: "transparent",
+                  stroke: "#0038DF",
+                  strokeWidth: 0,
+                  left: -25,
+                  top: 0,
+                  originX: "center",
+                  originY: "center",
+                  selectable: false,
+                  evented: false,
+                  pin: true,
+                  pinType: "pin1",
+                } as any),
+                new fabric.Circle({
+                  radius: 4,
+                  fill: "transparent",
+                  stroke: "#0038DF",
+                  strokeWidth: 0,
+                  left: 25,
+                  top: 0,
+                  originX: "center",
+                  originY: "center",
+                  selectable: false,
+                  evented: false,
+                  pin: true,
+                  pinType: "pin2",
+                } as any)
+              );
+          }
+
+          return pins;
+        };
+
+        // Helper function to create fallback component when SVG fails
+        const createFallbackComponent = (params: {
+          type: string;
+          name: string;
+        }): fabric.Rect => {
+          return new fabric.Rect({
+            width: 60,
+            height: 30,
+            fill: "#E8E8E8",
+            stroke: "#333333",
+            strokeWidth: 2,
+            originX: "center",
+            originY: "center",
+          });
+        };
+
+        // Try to load SVG component from the provided path
+        try {
+          await new Promise<void>((resolve, reject) => {
+            fabric.loadSVGFromURL(params.svgPath, (objects, options) => {
+              try {
+                // Check if objects is an array
+                if (!Array.isArray(objects)) {
+                  throw new Error("Invalid SVG objects");
+                }
+
+                // Create the component symbol from loaded SVG
+                const componentSymbol = fabric.util.groupSVGElements(
+                  objects,
+                  options
+                );
+
+                // Scale the component to appropriate size (adjust as needed)
+                componentSymbol.scaleToWidth(60);
+                componentSymbol.scaleToHeight(40);
+
+                // Create pin objects based on component type
+                const pins = createPinsForComponent(params.type);
+
+                // Group the component symbol with its pins
+                const componentGroup = new fabric.Group(
+                  [componentSymbol, ...pins],
+                  {
+                    left: params.x ?? canvas.getWidth() / 2,
+                    top: params.y ?? canvas.getHeight() / 2,
+                    originX: "center",
+                    originY: "center",
+                    selectable: true,
+                    evented: true,
+                    hoverCursor: "move",
+                    moveCursor: "move",
+                    componentType: params.type,
+                    componentName: params.name,
+                    id: `${params.type}_${Date.now()}`, // Unique ID
+                  } as any
+                );
+
+                // Add to canvas
+                canvas.add(componentGroup);
+                canvas.renderAll();
+
+                console.log(`${params.name} added to canvas successfully`);
+                resolve();
+              } catch (error) {
+                reject(error);
+              }
+            });
+          });
+        } catch (error) {
+          // Fallback: Create a simple rectangle component
+          console.warn(
+            `Failed to load SVG for ${params.name}, creating fallback component`
+          );
+
+          const fallbackComponent = createFallbackComponent(params);
+          const pins = createPinsForComponent(params.type);
+
+          const componentGroup = new fabric.Group(
+            [fallbackComponent, ...pins],
+            {
+              left: params.x ?? canvas.getWidth() / 2,
+              top: params.y ?? canvas.getHeight() / 2,
+              originX: "center",
+              originY: "center",
+              selectable: true,
+              evented: true,
+              hoverCursor: "move",
+              moveCursor: "move",
+              componentType: params.type,
+              componentName: params.name,
+              id: `${params.type}_${Date.now()}`,
+            } as any
+          );
+
+          canvas.add(componentGroup);
+          canvas.renderAll();
+
+          console.log(`${params.name} fallback component added to canvas`);
+        }
+      } catch (error) {
+        console.error("Error creating component:", error);
       }
     },
   } as CanvasCommand,
