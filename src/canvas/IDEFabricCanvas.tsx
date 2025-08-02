@@ -20,7 +20,10 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [fabricCanvas, setFabricCanvas] = useState<fabric.Canvas | null>(null);
-  const [canvasDimensions, setCanvasDimensions] = useState({ width: 0, height: 0 });
+  const [canvasDimensions, setCanvasDimensions] = useState({
+    width: 0,
+    height: 0,
+  });
   const [areRulersVisible, setAreRulersVisible] = useState(false);
 
   // Context menu and clipboard state - Refactored per specification
@@ -51,8 +54,8 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
   // Helper function to create background grid pattern
   const createGridPattern = (canvas: fabric.Canvas, gridSize: number) => {
     // Create a temporary canvas for the pattern
-    const patternCanvas = document.createElement('canvas');
-    const patternCtx = patternCanvas.getContext('2d');
+    const patternCanvas = document.createElement("canvas");
+    const patternCtx = patternCanvas.getContext("2d");
     if (!patternCtx) return null;
 
     // Set pattern canvas size to grid size
@@ -60,24 +63,24 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
     patternCanvas.height = gridSize;
 
     // Draw grid lines
-    patternCtx.strokeStyle = '#E0E0E0';
+    patternCtx.strokeStyle = "#E0E0E0";
     patternCtx.lineWidth = 0.5;
     patternCtx.beginPath();
-    
+
     // Vertical line
     patternCtx.moveTo(gridSize, 0);
     patternCtx.lineTo(gridSize, gridSize);
-    
+
     // Horizontal line
     patternCtx.moveTo(0, gridSize);
     patternCtx.lineTo(gridSize, gridSize);
-    
+
     patternCtx.stroke();
 
     // Create Fabric.js pattern
     return new fabric.Pattern({
       source: patternCanvas,
-      repeat: 'repeat'
+      repeat: "repeat",
     });
   };
 
@@ -96,7 +99,7 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
     const canvas = new fabric.Canvas(canvasRef.current, {
       width: canvasWidth,
       height: canvasHeight,
-      backgroundColor: '#FFFFFF', // White background for better grid visibility
+      backgroundColor: "#FFFFFF", // White background for better grid visibility
     });
 
     // Create and apply grid pattern
@@ -133,7 +136,10 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
 
         // Only resize if dimensions actually changed
         if (canvasWidth > 0 && canvasHeight > 0) {
-          fabricCanvas.setDimensions({ width: canvasWidth, height: canvasHeight });
+          fabricCanvas.setDimensions({
+            width: canvasWidth,
+            height: canvasHeight,
+          });
           setCanvasDimensions({ width: canvasWidth, height: canvasHeight });
           fabricCanvas.renderAll();
 
@@ -160,7 +166,7 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
         const rect = containerRef.current.getBoundingClientRect();
         const canvasWidth = rect.width - rulerSize;
         const canvasHeight = rect.height - rulerSize;
-        
+
         if (canvasWidth > 0 && canvasHeight > 0) {
           fabricCanvas.setDimensions({
             width: canvasWidth,
@@ -183,7 +189,9 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
   useEffect(() => {
     if (!fabricCanvas) return;
 
-    console.log("🔗 Setting up component-wire follow logic, ruler visibility, snap-to-grid, and alignment guides");
+    console.log(
+      "🔗 Setting up component-wire follow logic, ruler visibility, snap-to-grid, and alignment guides"
+    );
 
     // Helper function to snap coordinate to grid
     const snapToGrid = (value: number, gridSize: number) => {
@@ -192,14 +200,21 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
 
     // Helper function to remove all alignment guides
     const removeAlignmentGuides = () => {
-      const guidesToRemove = fabricCanvas.getObjects().filter(obj => (obj as any).isAlignmentGuide);
-      guidesToRemove.forEach(guide => fabricCanvas.remove(guide));
+      const guidesToRemove = fabricCanvas
+        .getObjects()
+        .filter((obj) => (obj as any).isAlignmentGuide);
+      guidesToRemove.forEach((guide) => fabricCanvas.remove(guide));
     };
 
     // Helper function to create alignment guide line
-    const createAlignmentGuide = (x1: number, y1: number, x2: number, y2: number) => {
+    const createAlignmentGuide = (
+      x1: number,
+      y1: number,
+      x2: number,
+      y2: number
+    ) => {
       const line = new fabric.Line([x1, y1, x2, y2], {
-        stroke: '#FF0000',
+        stroke: "#FF0000",
         strokeWidth: 1,
         strokeDashArray: [5, 5],
         selectable: false,
@@ -220,14 +235,17 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
       const tolerance = 5; // Alignment tolerance in pixels
 
       // Get all other objects (excluding the moving object and existing guides)
-      const otherObjects = fabricCanvas.getObjects().filter(obj => 
-        obj !== movingObject && 
-        !(obj as any).isAlignmentGuide &&
-        obj.visible &&
-        obj.selectable
-      );
+      const otherObjects = fabricCanvas
+        .getObjects()
+        .filter(
+          (obj) =>
+            obj !== movingObject &&
+            !(obj as any).isAlignmentGuide &&
+            obj.visible &&
+            obj.selectable
+        );
 
-      otherObjects.forEach(obj => {
+      otherObjects.forEach((obj) => {
         const objBounds = obj.getBoundingRect();
         const objCenterX = objBounds.left + objBounds.width / 2;
         const objCenterY = objBounds.top + objBounds.height / 2;
@@ -236,10 +254,13 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
         // Left edges align
         if (Math.abs(movingBounds.left - objBounds.left) <= tolerance) {
           const guide = createAlignmentGuide(
-            objBounds.left, 
+            objBounds.left,
             Math.min(movingBounds.top, objBounds.top) - 20,
-            objBounds.left, 
-            Math.max(movingBounds.top + movingBounds.height, objBounds.top + objBounds.height) + 20
+            objBounds.left,
+            Math.max(
+              movingBounds.top + movingBounds.height,
+              objBounds.top + objBounds.height
+            ) + 20
           );
           fabricCanvas.add(guide);
         }
@@ -247,21 +268,33 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
         // Center X align
         if (Math.abs(movingCenterX - objCenterX) <= tolerance) {
           const guide = createAlignmentGuide(
-            objCenterX, 
+            objCenterX,
             Math.min(movingBounds.top, objBounds.top) - 20,
-            objCenterX, 
-            Math.max(movingBounds.top + movingBounds.height, objBounds.top + objBounds.height) + 20
+            objCenterX,
+            Math.max(
+              movingBounds.top + movingBounds.height,
+              objBounds.top + objBounds.height
+            ) + 20
           );
           fabricCanvas.add(guide);
         }
 
         // Right edges align
-        if (Math.abs((movingBounds.left + movingBounds.width) - (objBounds.left + objBounds.width)) <= tolerance) {
+        if (
+          Math.abs(
+            movingBounds.left +
+              movingBounds.width -
+              (objBounds.left + objBounds.width)
+          ) <= tolerance
+        ) {
           const guide = createAlignmentGuide(
-            objBounds.left + objBounds.width, 
+            objBounds.left + objBounds.width,
             Math.min(movingBounds.top, objBounds.top) - 20,
-            objBounds.left + objBounds.width, 
-            Math.max(movingBounds.top + movingBounds.height, objBounds.top + objBounds.height) + 20
+            objBounds.left + objBounds.width,
+            Math.max(
+              movingBounds.top + movingBounds.height,
+              objBounds.top + objBounds.height
+            ) + 20
           );
           fabricCanvas.add(guide);
         }
@@ -272,7 +305,10 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
           const guide = createAlignmentGuide(
             Math.min(movingBounds.left, objBounds.left) - 20,
             objBounds.top,
-            Math.max(movingBounds.left + movingBounds.width, objBounds.left + objBounds.width) + 20,
+            Math.max(
+              movingBounds.left + movingBounds.width,
+              objBounds.left + objBounds.width
+            ) + 20,
             objBounds.top
           );
           fabricCanvas.add(guide);
@@ -283,18 +319,30 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
           const guide = createAlignmentGuide(
             Math.min(movingBounds.left, objBounds.left) - 20,
             objCenterY,
-            Math.max(movingBounds.left + movingBounds.width, objBounds.left + objBounds.width) + 20,
+            Math.max(
+              movingBounds.left + movingBounds.width,
+              objBounds.left + objBounds.width
+            ) + 20,
             objCenterY
           );
           fabricCanvas.add(guide);
         }
 
         // Bottom edges align
-        if (Math.abs((movingBounds.top + movingBounds.height) - (objBounds.top + objBounds.height)) <= tolerance) {
+        if (
+          Math.abs(
+            movingBounds.top +
+              movingBounds.height -
+              (objBounds.top + objBounds.height)
+          ) <= tolerance
+        ) {
           const guide = createAlignmentGuide(
             Math.min(movingBounds.left, objBounds.left) - 20,
             objBounds.top + objBounds.height,
-            Math.max(movingBounds.left + movingBounds.width, objBounds.left + objBounds.width) + 20,
+            Math.max(
+              movingBounds.left + movingBounds.width,
+              objBounds.left + objBounds.width
+            ) + 20,
             objBounds.top + objBounds.height
           );
           fabricCanvas.add(guide);
@@ -306,18 +354,22 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
 
     const handleObjectMoving = (e: any) => {
       const movingObject = e.target;
-      
+
       // Show rulers when any object starts moving
       setAreRulersVisible(true);
 
       // PART 2: Snap-to-Grid Logic
-      if (movingObject && movingObject.left !== undefined && movingObject.top !== undefined) {
+      if (
+        movingObject &&
+        movingObject.left !== undefined &&
+        movingObject.top !== undefined
+      ) {
         const snappedLeft = snapToGrid(movingObject.left, gridSize);
         const snappedTop = snapToGrid(movingObject.top, gridSize);
-        
+
         movingObject.set({
           left: snappedLeft,
-          top: snappedTop
+          top: snappedTop,
         });
       }
 
@@ -325,9 +377,13 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
       if (movingObject) {
         checkAlignments(movingObject);
       }
-      
+
       // PART 2: Only track component movement (not wire movement) for wire following
-      if (movingObject && (movingObject as any).componentType && movingObject.type === "group") {
+      if (
+        movingObject &&
+        (movingObject as any).componentType &&
+        movingObject.type === "group"
+      ) {
         // This is a component being moved - update connected wires
         wiringTool.updateConnectedWires(movingObject);
       }
@@ -337,12 +393,16 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
 
     const handleObjectMoved = (e: any) => {
       const movedObject = e.target;
-      
+
       // Remove alignment guides when movement stops
       removeAlignmentGuides();
-      
+
       // Final position update for components only
-      if (movedObject && (movedObject as any).componentType && movedObject.type === "group") {
+      if (
+        movedObject &&
+        (movedObject as any).componentType &&
+        movedObject.type === "group"
+      ) {
         console.log("🎯 Component movement completed - final wire update");
         wiringTool.updateConnectedWires(movedObject);
       }
@@ -367,18 +427,18 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
     };
 
     // Attach all listeners
-    fabricCanvas.on('object:moving', handleObjectMoving);
-    fabricCanvas.on('object:modified', handleObjectMoved);
-    fabricCanvas.on('selection:created', handleSelectionCreated);
-    fabricCanvas.on('selection:updated', handleSelectionUpdated);
-    fabricCanvas.on('selection:cleared', handleSelectionCleared);
+    fabricCanvas.on("object:moving", handleObjectMoving);
+    fabricCanvas.on("object:modified", handleObjectMoved);
+    fabricCanvas.on("selection:created", handleSelectionCreated);
+    fabricCanvas.on("selection:updated", handleSelectionUpdated);
+    fabricCanvas.on("selection:cleared", handleSelectionCleared);
 
     return () => {
-      fabricCanvas.off('object:moving', handleObjectMoving);
-      fabricCanvas.off('object:modified', handleObjectMoved);
-      fabricCanvas.off('selection:created', handleSelectionCreated);
-      fabricCanvas.off('selection:updated', handleSelectionUpdated);
-      fabricCanvas.off('selection:cleared', handleSelectionCleared);
+      fabricCanvas.off("object:moving", handleObjectMoving);
+      fabricCanvas.off("object:modified", handleObjectMoved);
+      fabricCanvas.off("selection:created", handleSelectionCreated);
+      fabricCanvas.off("selection:updated", handleSelectionUpdated);
+      fabricCanvas.off("selection:cleared", handleSelectionCleared);
     };
   }, [fabricCanvas, wiringTool]);
 
@@ -388,14 +448,18 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
 
     // Get active object from menu target or canvas active object
     const activeObject = menuState.target || fabricCanvas.getActiveObject();
-    
+
     // Only create blueprints for component groups
-    if (activeObject && (activeObject as any).componentType && activeObject.type === 'group') {
+    if (
+      activeObject &&
+      (activeObject as any).componentType &&
+      activeObject.type === "group"
+    ) {
       console.log("📋 Creating component blueprint for copy");
-      
+
       // Create a simple JavaScript blueprint object
       const blueprint = {
-        type: 'component',
+        type: "component",
         componentType: (activeObject as any).componentType, // e.g., 'resistor'
         position: {
           left: activeObject.left || 0,
@@ -426,7 +490,7 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
 
     // Check if clipboard contains a component blueprint
     const blueprint = clipboard as any;
-    if (blueprint.type === 'component' && blueprint.componentType) {
+    if (blueprint.type === "component" && blueprint.componentType) {
       console.log("🏗️ Building component from blueprint:", blueprint);
 
       // Calculate paste position
@@ -438,7 +502,10 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
         // Convert screen coordinates to canvas coordinates
         const rect = fabricCanvas.getElement().getBoundingClientRect();
         const pointer = new fabric.Point(pasteX - rect.left, pasteY - rect.top);
-        const canvasPointer = fabric.util.transformPoint(pointer, fabric.util.invertTransform(fabricCanvas.viewportTransform));
+        const canvasPointer = fabric.util.transformPoint(
+          pointer,
+          fabric.util.invertTransform(fabricCanvas.viewportTransform)
+        );
         targetX = canvasPointer.x;
         targetY = canvasPointer.y;
       } else {
@@ -451,9 +518,13 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
       fabricCanvas.discardActiveObject();
 
       // Component Creation Factory - Use the original creation functions
-      const createComponentFromBlueprint = (componentType: string, x: number, y: number) => {
+      const createComponentFromBlueprint = (
+        componentType: string,
+        x: number,
+        y: number
+      ) => {
         switch (componentType) {
-          case 'resistor':
+          case "resistor":
             canvasCommandManager.executeCommand("add_resistor", { x, y });
             break;
           // Future component types can be added here:
@@ -471,7 +542,9 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
       };
 
       // Create the component from blueprint
-      if (createComponentFromBlueprint(blueprint.componentType, targetX, targetY)) {
+      if (
+        createComponentFromBlueprint(blueprint.componentType, targetX, targetY)
+      ) {
         // Apply the original angle and properties after creation
         setTimeout(() => {
           const newComponent = fabricCanvas.getActiveObject();
@@ -480,21 +553,24 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
             if (blueprint.angle) {
               newComponent.set({ angle: blueprint.angle });
             }
-            
+
             // Apply any custom properties from the blueprint
             if (blueprint.properties) {
-              Object.keys(blueprint.properties).forEach(key => {
-                if (key !== 'componentId') { // Don't copy the original ID
+              Object.keys(blueprint.properties).forEach((key) => {
+                if (key !== "componentId") {
+                  // Don't copy the original ID
                   (newComponent as any)[key] = blueprint.properties[key];
                 }
               });
             }
-            
+
             fabricCanvas.renderAll();
           }
         }, 10); // Small delay to ensure component is fully created
 
-        console.log("✅ Component rebuilt from blueprint and pasted successfully!");
+        console.log(
+          "✅ Component rebuilt from blueprint and pasted successfully!"
+        );
       }
     } else {
       console.log("⚠️ Clipboard does not contain a valid component blueprint");
@@ -544,7 +620,7 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
           visible: true,
           x: e.clientX,
           y: e.clientY,
-          type: 'object',
+          type: "object",
           target: target,
         });
       } else {
@@ -554,7 +630,7 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
           visible: true,
           x: e.clientX,
           y: e.clientY,
-          type: 'canvas',
+          type: "canvas",
           target: null,
         });
       }
@@ -642,8 +718,8 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
           style={{
             top: areRulersVisible ? rulerSize : 0,
             left: areRulersVisible ? rulerSize : 0,
-            width: areRulersVisible ? canvasDimensions.width : '100%',
-            height: areRulersVisible ? canvasDimensions.height : '100%',
+            width: areRulersVisible ? canvasDimensions.width : "100%",
+            height: areRulersVisible ? canvasDimensions.height : "100%",
           }}
         >
           <canvas ref={canvasRef} />
@@ -659,10 +735,8 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
         onCopy={handleCopy}
         onPaste={() => handlePaste(menuState.x, menuState.y)}
         onDelete={handleDelete}
-        canPaste={clipboard !== null && (clipboard as any).type === 'component'}
-        onClose={() =>
-          setMenuState((prev) => ({ ...prev, visible: false }))
-        }
+        canPaste={clipboard !== null && (clipboard as any).type === "component"}
+        onClose={() => setMenuState((prev) => ({ ...prev, visible: false }))}
       />
 
       {/* Optional debug info */}
@@ -676,16 +750,19 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
       <div className="absolute bottom-2 left-2 bg-green-600 bg-opacity-90 text-white px-2 py-1 rounded text-xs">
         Grid: {gridSize}px • Snap-to-Grid Active
       </div>
-      
+
       {/* Wire mode indicator - Professional-grade wiring tool */}
       {wiringTool.isWireMode && (
         <div className="absolute top-2 right-2 bg-blue-600 bg-opacity-90 text-white px-3 py-2 rounded text-sm font-medium">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
             <span>
-              {wiringTool.wireState === 'idle' && 'Wire Mode - Click pin to start'}
-              {wiringTool.wireState === 'drawing' && 'Drawing - Click to add waypoint'}
-              {wiringTool.wireState === 'finishing' && 'Finishing - Click pin to complete'}
+              {wiringTool.wireState === "idle" &&
+                "Wire Mode - Click pin to start"}
+              {wiringTool.wireState === "drawing" &&
+                "Drawing - Click to add waypoint"}
+              {wiringTool.wireState === "finishing" &&
+                "Finishing - Click pin to complete"}
             </span>
           </div>
           <div className="text-xs opacity-80 mt-1">

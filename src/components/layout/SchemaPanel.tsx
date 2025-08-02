@@ -5,7 +5,7 @@ import { useClickOutside } from "@/hooks/useClickOutside";
 import { r, responsive, responsiveFontSize } from "@/lib/responsive";
 import { COMPONENT_CATEGORIES } from "@/lib/constants";
 
-// Mock component data
+// Mock component data - extended list to test scrolling
 const mockComponents = [
   {
     id: "1",
@@ -72,6 +72,78 @@ const mockComponents = [
     id: "12",
     name: "Motor",
     category: "Other",
+    image: "/components/switch.svg",
+  },
+  {
+    id: "13",
+    name: "Diode",
+    category: "Diodes",
+    image: "/components/led.svg",
+  },
+  {
+    id: "14",
+    name: "Voltage Regulator",
+    category: "ICs",
+    image: "/components/arduino.svg",
+  },
+  {
+    id: "15",
+    name: "Crystal Oscillator",
+    category: "Other",
+    image: "/components/resistor.svg",
+  },
+  {
+    id: "16",
+    name: "Push Button",
+    category: "Switches",
+    image: "/components/switch.svg",
+  },
+  {
+    id: "17",
+    name: "Potentiometer",
+    category: "Resistors",
+    image: "/components/resistor.svg",
+  },
+  {
+    id: "18",
+    name: "Relay",
+    category: "Other",
+    image: "/components/switch.svg",
+  },
+  {
+    id: "19",
+    name: "Fuse",
+    category: "Protection",
+    image: "/components/resistor.svg",
+  },
+  {
+    id: "20",
+    name: "Microcontroller",
+    category: "ICs",
+    image: "/components/arduino.svg",
+  },
+  {
+    id: "21",
+    name: "Display LCD",
+    category: "Display",
+    image: "/components/sensor.svg",
+  },
+  {
+    id: "22",
+    name: "Buzzer",
+    category: "Audio",
+    image: "/components/sensor.svg",
+  },
+  {
+    id: "23",
+    name: "Photo Resistor",
+    category: "Sensors",
+    image: "/components/sensor.svg",
+  },
+  {
+    id: "24",
+    name: "Servo Motor",
+    category: "Motors",
     image: "/components/switch.svg",
   },
 ];
@@ -368,7 +440,7 @@ export function SchemaPanel() {
       )}
 
       {/* Inner container with 2px spacing from panel edges */}
-      <div style={{ padding: responsive(2), height: "100%" }}>
+      <div style={{ padding: responsive(2), height: "100%" }} className="flex flex-col">
         {/* Very small state - just show a compact icon */}
         {!isHovered && !isFullyExpanded && (
           <div className="flex items-center justify-center w-full h-full">
@@ -378,7 +450,7 @@ export function SchemaPanel() {
 
         {/* Hover state OR Fully expanded - show your original design */}
         {(isHovered || isFullyExpanded) && (
-          <>
+          <div className="flex flex-col h-full">
             {/* Top Header with Icons - responsive design */}
             <div
               className="flex items-center justify-between"
@@ -477,7 +549,10 @@ export function SchemaPanel() {
                 <div className="text-xs text-gray-600 mb-2">
                   Found {filteredComponents.length} results
                 </div>
-                <div className="space-y-1 max-h-32 overflow-y-auto schema-scroll">
+                <div
+                  className="space-y-1 max-h-32 overflow-y-auto schema-scroll"
+                  data-scrollable="true"
+                >
                   {filteredComponents.map((component) => (
                     <ComponentItem
                       key={component.id}
@@ -491,28 +566,45 @@ export function SchemaPanel() {
 
             {/* Content based on active tab - only show when fully expanded and not searching */}
             {isFullyExpanded && !isSearching && (
-              <div ref={scrollContainerRef} className="flex-1 overflow-hidden">
+              <div
+                ref={scrollContainerRef}
+                className="flex-1 flex flex-col min-h-0"
+                data-scrollable="true"
+                style={{ height: '100%' }}
+              >
                 {activeTab === "components" ? (
-                  <div className="space-y-1 h-full overflow-y-auto schema-scroll">
-                    {mockComponents.map((component) => (
-                      <ComponentItem
-                        key={component.id}
-                        component={component}
-                        onClick={() =>
-                          console.log(`Selected ${component.name}`)
-                        }
-                      />
-                    ))}
+                  <div
+                    className="flex-1 overflow-y-auto schema-scroll"
+                    data-scrollable="true"
+                    style={{ height: '0', minHeight: '100%' }}
+                  >
+                    <div className="space-y-1">
+                      {mockComponents.map((component) => (
+                        <ComponentItem
+                          key={component.id}
+                          component={component}
+                          onClick={() =>
+                            console.log(`Selected ${component.name}`)
+                          }
+                        />
+                      ))}
+                    </div>
                   </div>
                 ) : (
-                  <div className="space-y-2 h-full overflow-y-auto schema-scroll">
-                    {mockSchemas.map((schema) => (
-                      <SchemaItem
-                        key={schema.id}
-                        schema={schema}
-                        onClick={() => console.log(`Selected ${schema.name}`)}
-                      />
-                    ))}
+                  <div
+                    className="flex-1 overflow-y-auto schema-scroll"
+                    data-scrollable="true"
+                    style={{ height: '0', minHeight: '100%' }}
+                  >
+                    <div className="space-y-2">
+                      {mockSchemas.map((schema) => (
+                        <SchemaItem
+                          key={schema.id}
+                          schema={schema}
+                          onClick={() => console.log(`Selected ${schema.name}`)}
+                        />
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -527,7 +619,7 @@ export function SchemaPanel() {
                 <div className="text-xs text-gray-600">Click to expand</div>
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
     </div>

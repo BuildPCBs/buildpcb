@@ -14,7 +14,7 @@ interface UseCanvasHotkeysProps {
 /**
  * Cross-platform keyboard shortcuts hook for canvas operations
  * Supports both Windows/Linux (Ctrl) and macOS (Cmd) keyboard shortcuts
- * 
+ *
  * Keyboard Shortcuts:
  * - Ctrl/Cmd + C: Copy selected objects
  * - Ctrl/Cmd + V: Paste copied objects
@@ -105,22 +105,22 @@ export function useCanvasHotkeys({
 
       // Get all currently active objects (returns array even for single selection)
       const activeObjects = canvas.getActiveObjects();
-      
+
       if (activeObjects.length > 0) {
         // Remove each selected object from the canvas
         activeObjects.forEach((obj) => {
           // Don't delete workspace objects
-          if ((obj as any).name !== 'workspace') {
+          if ((obj as any).name !== "workspace") {
             canvas.remove(obj);
           }
         });
 
         // Clear the selection box
         canvas.discardActiveObject();
-        
+
         // Update the view
         canvas.renderAll();
-        
+
         console.log(`Deleted ${activeObjects.length} object(s)`);
       }
     };
@@ -131,22 +131,22 @@ export function useCanvasHotkeys({
 
       // Get the currently active object or selection
       const activeObject = canvas.getActiveObject();
-      
+
       if (activeObject) {
         // Don't rotate workspace objects
-        if ((activeObject as any).name === 'workspace') {
+        if ((activeObject as any).name === "workspace") {
           return;
         }
 
         // Get current angle (default to 0 if not set)
         const currentAngle = activeObject.angle || 0;
-        
+
         // Rotate by 90 degrees
-        activeObject.set('angle', currentAngle + 90);
-        
+        activeObject.set("angle", currentAngle + 90);
+
         // Update the view
         canvas.renderAll();
-        
+
         console.log(`Rotated object to ${currentAngle + 90} degrees`);
       }
     };

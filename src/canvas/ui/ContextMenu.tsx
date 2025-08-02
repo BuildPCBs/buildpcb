@@ -6,7 +6,7 @@ interface ContextMenuProps {
   visible: boolean;
   top: number;
   left: number;
-  menuType: 'object' | 'canvas';
+  menuType: "object" | "canvas";
   onCopy: () => void;
   onPaste: () => void;
   onDelete: () => void;
@@ -41,7 +41,7 @@ export function ContextMenu({
         }}
       >
         {/* Object menu: Copy and Delete */}
-        {menuType === 'object' && (
+        {menuType === "object" && (
           <>
             <button
               className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
@@ -70,7 +70,7 @@ export function ContextMenu({
         )}
 
         {/* Canvas menu: Paste only */}
-        {menuType === 'canvas' && (
+        {menuType === "canvas" && (
           <button
             className={`w-full px-4 py-2 text-left text-sm flex items-center gap-2 ${
               canPaste
