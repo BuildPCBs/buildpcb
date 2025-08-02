@@ -381,10 +381,14 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
       // PART 2: Only track component movement (not wire movement) for wire following
       if (
         movingObject &&
-        (movingObject as any).componentType &&
+        ((movingObject as any).componentType ||
+          movingObject.type === "group") &&
         movingObject.type === "group"
       ) {
         // This is a component being moved - update connected wires
+        console.log(
+          "🔄 Component moving - updating connected wires in real-time"
+        );
         wiringTool.updateConnectedWires(movingObject);
       }
       // PART 3: No Follow Rule - If a wire is being moved, do nothing
@@ -400,7 +404,7 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
       // Final position update for components only
       if (
         movedObject &&
-        (movedObject as any).componentType &&
+        ((movedObject as any).componentType || movedObject.type === "group") &&
         movedObject.type === "group"
       ) {
         console.log("🎯 Component movement completed - final wire update");
@@ -442,159 +446,339 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
     };
   }, [fabricCanvas, wiringTool]);
 
-  // PART 1: The New handleCopy() - Save the Blueprint
-  const handleCopy = () => {
-    if (!fabricCanvas) return;
-
-    // Get active object from menu target or canvas active object
-    const activeObject = menuState.target || fabricCanvas.getActiveObject();
-
-    // Only create blueprints for component groups
-    if (
-      activeObject &&
-      (activeObject as any).componentType &&
-      activeObject.type === "group"
-    ) {
-      console.log("📋 Creating component blueprint for copy");
-
-      // Create a simple JavaScript blueprint object
-      const blueprint = {
-        type: "component",
-        componentType: (activeObject as any).componentType, // e.g., 'resistor'
-        position: {
-          left: activeObject.left || 0,
-          top: activeObject.top || 0,
-        },
-        angle: activeObject.angle || 0,
-        properties: {
-          // Extract any important properties from the Properties Panel
-          componentId: (activeObject as any).componentId,
-          metadata: (activeObject as any).metadata || {},
-          // Add any other custom properties here
-        },
-        // Store creation timestamp for unique IDs
-        timestamp: Date.now(),
-      };
-
-      // Save the blueprint to clipboard (NOT the Fabric.js object)
-      setClipboard(blueprint as any);
-      console.log("✅ Component blueprint saved to clipboard:", blueprint);
-    } else {
-      console.log("⚠️ Cannot copy: Selected object is not a component");
+  // PART 1: Master Action Functions with "LOUD" Logging - The Single Source of Truth
+  const handleGroup = () => {
+    console.log("--- ACTION START: handleGroup ---");
+    if (!fabricCanvas) {
+      console.log("--- ACTION FAILED: No canvas available ---");
+      return;
     }
+
+    const activeObject = fabricCanvas.getActiveObject();
+
+    // Check if we have multiple objects selected (activeSelection)
+    if (activeObject && activeObject.type === "activeSelection") {
+      console.log("--- Grouping existing activeSelection ---");
+
+      // Get the objects from the ActiveSelection
+      const objects = (activeObject as any)._objects || [];
+      if (objects.length < 2) {
+        console.log(
+          "--- ACTION FAILED: ActiveSelection has less than 2 objects ---"
+        );
+        return;
+      }
+
+      // Store original positions before removing from canvas
+      const objectsWithPositions = objects.map((obj: fabric.Object) => ({
+        object: obj,
+        originalLeft: obj.left,
+        originalTop: obj.top,
+      }));
+
+      // Remove objects from canvas temporarily
+      objects.forEach((obj: fabric.Object) => fabricCanvas.remove(obj));
+
+      // Create a new Group with these objects, preserving their relative positions
+      const group = new fabric.Group(objects);
+
+      // Set the group position to maintain the visual location
+      group.set({
+        left: activeObject.left,
+        top: activeObject.top,
+      });
+
+      // Add the group to canvas and select it
+      fabricCanvas.add(group);
+      fabricCanvas.setActiveObject(group);
+      fabricCanvas.renderAll();
+      console.log("--- ACTION SUCCESS: handleGroup (from activeSelection) ---");
+      return;
+    }
+
+    // Get all selectable objects on canvas
+    const allObjects = fabricCanvas
+      .getObjects()
+      .filter(
+        (obj) => obj.selectable && obj.visible && !(obj as any).isAlignmentGuide
+      );
+
+    if (allObjects.length < 2) {
+      console.log("--- ACTION FAILED: Need at least 2 objects to group ---");
+      return;
+    }
+
+    console.log(`--- Found ${allObjects.length} objects to group ---`);
+
+    // Calculate the bounding box of all objects
+    let minLeft = Infinity,
+      minTop = Infinity,
+      maxRight = -Infinity,
+      maxBottom = -Infinity;
+    allObjects.forEach((obj) => {
+      const bounds = obj.getBoundingRect();
+      if (bounds.left < minLeft) minLeft = bounds.left;
+      if (bounds.top < minTop) minTop = bounds.top;
+      if (bounds.left + bounds.width > maxRight)
+        maxRight = bounds.left + bounds.width;
+      if (bounds.top + bounds.height > maxBottom)
+        maxBottom = bounds.top + bounds.height;
+    });
+
+    // Remove all objects from canvas
+    allObjects.forEach((obj) => fabricCanvas.remove(obj));
+
+    // Create a Group with all objects
+    const group = new fabric.Group(allObjects);
+
+    // Set the group position to the calculated center
+    group.set({
+      left: minLeft + (maxRight - minLeft) / 2,
+      top: minTop + (maxBottom - minTop) / 2,
+    });
+
+    // Add the group to canvas and select it
+    fabricCanvas.add(group);
+    fabricCanvas.setActiveObject(group);
+    fabricCanvas.renderAll();
+
+    console.log("--- ACTION SUCCESS: handleGroup (created new group) ---");
+    // saveState(); // We can add this back later
   };
 
-  // PART 2: The New handlePaste() - Build from the Blueprint
-  const handlePaste = (pasteX?: number, pasteY?: number) => {
-    if (!fabricCanvas || !clipboard) return;
-
-    // Check if clipboard contains a component blueprint
-    const blueprint = clipboard as any;
-    if (blueprint.type === "component" && blueprint.componentType) {
-      console.log("🏗️ Building component from blueprint:", blueprint);
-
-      // Calculate paste position
-      let targetX: number;
-      let targetY: number;
-
-      if (pasteX !== undefined && pasteY !== undefined) {
-        // Paste at specific coordinates (from context menu right-click position)
-        // Convert screen coordinates to canvas coordinates
-        const rect = fabricCanvas.getElement().getBoundingClientRect();
-        const pointer = new fabric.Point(pasteX - rect.left, pasteY - rect.top);
-        const canvasPointer = fabric.util.transformPoint(
-          pointer,
-          fabric.util.invertTransform(fabricCanvas.viewportTransform)
-        );
-        targetX = canvasPointer.x;
-        targetY = canvasPointer.y;
-      } else {
-        // Paste with slight offset for keyboard paste
-        targetX = blueprint.position.left + 20;
-        targetY = blueprint.position.top + 20;
-      }
-
-      // Deselect anything currently selected
-      fabricCanvas.discardActiveObject();
-
-      // Component Creation Factory - Use the original creation functions
-      const createComponentFromBlueprint = (
-        componentType: string,
-        x: number,
-        y: number
-      ) => {
-        switch (componentType) {
-          case "resistor":
-            canvasCommandManager.executeCommand("add_resistor", { x, y });
-            break;
-          // Future component types can be added here:
-          // case 'capacitor':
-          //   canvasCommandManager.executeCommand("add_capacitor", { x, y });
-          //   break;
-          // case 'led':
-          //   canvasCommandManager.executeCommand("add_led", { x, y });
-          //   break;
-          default:
-            console.log("⚠️ Component type not supported yet:", componentType);
-            return false;
-        }
-        return true;
-      };
-
-      // Create the component from blueprint
-      if (
-        createComponentFromBlueprint(blueprint.componentType, targetX, targetY)
-      ) {
-        // Apply the original angle and properties after creation
-        setTimeout(() => {
-          const newComponent = fabricCanvas.getActiveObject();
-          if (newComponent) {
-            // Apply original rotation
-            if (blueprint.angle) {
-              newComponent.set({ angle: blueprint.angle });
-            }
-
-            // Apply any custom properties from the blueprint
-            if (blueprint.properties) {
-              Object.keys(blueprint.properties).forEach((key) => {
-                if (key !== "componentId") {
-                  // Don't copy the original ID
-                  (newComponent as any)[key] = blueprint.properties[key];
-                }
-              });
-            }
-
-            fabricCanvas.renderAll();
-          }
-        }, 10); // Small delay to ensure component is fully created
-
-        console.log(
-          "✅ Component rebuilt from blueprint and pasted successfully!"
-        );
-      }
-    } else {
-      console.log("⚠️ Clipboard does not contain a valid component blueprint");
+  const handleUngroup = async () => {
+    console.log("--- ACTION START: handleUngroup ---");
+    if (!fabricCanvas) {
+      console.log("--- ACTION FAILED: No canvas available ---");
+      return;
     }
+
+    const activeObject = fabricCanvas.getActiveObject();
+    if (!activeObject || activeObject.type !== "group") {
+      console.log("--- ACTION FAILED: Selected object is not a group ---");
+      return;
+    }
+
+    console.log("--- Ungrouping selected group ---");
+
+    const group = activeObject as fabric.Group;
+
+    // Get the objects from the group
+    const objects = group.getObjects();
+
+    // Get the group's current position and transforms
+    const groupMatrix = group.calcTransformMatrix();
+
+    // Remove the group from canvas
+    fabricCanvas.remove(group);
+
+    // Add each object back to canvas with correct absolute positioning
+    const addedObjects: fabric.Object[] = [];
+
+    // Process objects sequentially to avoid async issues
+    for (const obj of objects) {
+      try {
+        // Clone the object properly
+        const clonedObj = await obj.clone();
+
+        // Calculate the absolute position of the object
+        const objPoint = fabric.util.transformPoint(
+          { x: obj.left || 0, y: obj.top || 0 },
+          groupMatrix
+        );
+
+        // Set the object's absolute position
+        clonedObj.set({
+          left: objPoint.x,
+          top: objPoint.y,
+          // Preserve the object's own scale and rotation if any
+          scaleX: (obj.scaleX || 1) * (group.scaleX || 1),
+          scaleY: (obj.scaleY || 1) * (group.scaleY || 1),
+          angle: (obj.angle || 0) + (group.angle || 0),
+        });
+
+        fabricCanvas.add(clonedObj);
+        addedObjects.push(clonedObj);
+      } catch (error) {
+        console.error("Error cloning object during ungroup:", error);
+      }
+    }
+
+    // Select all ungrouped objects if more than one
+    if (addedObjects.length > 1) {
+      const selection = new fabric.ActiveSelection(addedObjects, {
+        canvas: fabricCanvas,
+      });
+      fabricCanvas.setActiveObject(selection);
+    } else if (addedObjects.length === 1) {
+      fabricCanvas.setActiveObject(addedObjects[0]);
+    }
+
+    fabricCanvas.renderAll();
+    console.log(
+      `--- ACTION SUCCESS: handleUngroup (ungrouped ${addedObjects.length} objects) ---`
+    );
+
+    // saveState(); // We can add this back later
   };
 
   const handleDelete = () => {
-    if (!fabricCanvas) return;
+    console.log("--- ACTION START: handleDelete ---");
+    if (!fabricCanvas) {
+      console.log("--- ACTION FAILED: No canvas available ---");
+      return;
+    }
 
     const activeObject = fabricCanvas.getActiveObject();
-    if (activeObject) {
-      fabricCanvas.remove(activeObject);
-      fabricCanvas.renderAll();
-      console.log("Object deleted");
+    if (!activeObject) {
+      console.log("--- ACTION FAILED: No object selected to delete ---");
+      return;
     }
+
+    // Handle multiple selected objects (activeSelection)
+    if (activeObject.type === "activeSelection") {
+      const objects = (activeObject as any)._objects || [];
+      objects.forEach((obj: fabric.Object) => fabricCanvas.remove(obj));
+      fabricCanvas.discardActiveObject();
+      fabricCanvas.renderAll();
+      console.log(
+        `--- ACTION SUCCESS: handleDelete (deleted ${objects.length} objects) ---`
+      );
+      return;
+    }
+
+    // Handle single object
+    fabricCanvas.remove(activeObject);
+    fabricCanvas.renderAll();
+    console.log("--- ACTION SUCCESS: handleDelete (deleted 1 object) ---");
+    // saveState(); // We can add this back later
   };
 
-  // Cross-platform keyboard shortcuts - Updated to handle new paste signature
+  const handleCopy = () => {
+    console.log("--- ACTION START: handleCopy ---");
+    if (!fabricCanvas) {
+      console.log("--- ACTION FAILED: No canvas available ---");
+      return;
+    }
+
+    const activeObject = fabricCanvas.getActiveObject();
+    if (!activeObject) {
+      console.log("--- ACTION FAILED: No object selected to copy ---");
+      return;
+    }
+
+    // Simple copy implementation
+    setClipboard(activeObject);
+    console.log("--- ACTION SUCCESS: handleCopy ---");
+  };
+
+  const handlePaste = () => {
+    console.log("--- ACTION START: handlePaste ---");
+    if (!fabricCanvas) {
+      console.log("--- ACTION FAILED: No canvas available ---");
+      return;
+    }
+
+    if (!clipboard) {
+      console.log("--- ACTION FAILED: Nothing to paste (clipboard empty) ---");
+      return;
+    }
+
+    // Simple paste implementation - clone the object
+    clipboard.clone().then((cloned: any) => {
+      cloned.set({
+        left: cloned.left + 20,
+        top: cloned.top + 20,
+      });
+      fabricCanvas.add(cloned);
+      fabricCanvas.setActiveObject(cloned);
+      fabricCanvas.renderAll();
+      console.log("--- ACTION SUCCESS: handlePaste ---");
+    });
+    // saveState(); // We can add this back later
+  };
+
+  const handleUndo = () => {
+    console.log("--- ACTION START: handleUndo ---");
+    console.log(
+      "--- ACTION PLACEHOLDER: Undo functionality to be implemented ---"
+    );
+    console.log("--- ACTION END: handleUndo ---");
+  };
+
+  const handleRedo = () => {
+    console.log("--- ACTION START: handleRedo ---");
+    console.log(
+      "--- ACTION PLACEHOLDER: Redo functionality to be implemented ---"
+    );
+    console.log("--- ACTION END: handleRedo ---");
+  };
+
+  // PART 3: The Connection (The Central Hub)
+  // PART 3: The Connection (The Central Hub) - TEMPORARILY DISABLED FOR DIRECT TESTING
+  // useEffect(() => {
+  //   if (!fabricCanvas) return;
+
+  //   console.log('Setting up centralized command handlers...');
+
+  //   const unsubscribeGroup = canvasCommandManager.on('action:group', () => {
+  //     console.log('Handler: "action:group" command received.');
+  //     handleGroup();
+  //   });
+
+  //   const unsubscribeUngroup = canvasCommandManager.on('action:ungroup', () => {
+  //     console.log('Handler: "action:ungroup" command received.');
+  //     handleUngroup();
+  //   });
+
+  //   const unsubscribeDelete = canvasCommandManager.on('action:delete', () => {
+  //     console.log('Handler: "action:delete" command received.');
+  //     handleDelete();
+  //   });
+
+  //   const unsubscribeCopy = canvasCommandManager.on('action:copy', () => {
+  //     console.log('Handler: "action:copy" command received.');
+  //     handleCopy();
+  //   });
+
+  //   const unsubscribePaste = canvasCommandManager.on('action:paste', () => {
+  //     console.log('Handler: "action:paste" command received.');
+  //     handlePaste();
+  //   });
+
+  //   const unsubscribeUndo = canvasCommandManager.on('action:undo', () => {
+  //     console.log('Handler: "action:undo" command received.');
+  //     handleUndo();
+  //   });
+
+  //   const unsubscribeRedo = canvasCommandManager.on('action:redo', () => {
+  //     console.log('Handler: "action:redo" command received.');
+  //     handleRedo();
+  //   });
+
+  //   // Cleanup function
+  //   return () => {
+  //     unsubscribeGroup();
+  //     unsubscribeUngroup();
+  //     unsubscribeDelete();
+  //     unsubscribeCopy();
+  //     unsubscribePaste();
+  //     unsubscribeUndo();
+  //     unsubscribeRedo();
+  //   };
+  // }, [fabricCanvas, handleGroup, handleUngroup, handleDelete, handleCopy, handlePaste, handleUndo, handleRedo]);
+
+  // Cross-platform keyboard shortcuts - PART 2: Direct Function Connection Test
   useCanvasHotkeys({
     canvas: fabricCanvas,
-    onCopy: handleCopy,
-    onPaste: () => handlePaste(), // No coordinates for keyboard paste
-    onDelete: handleDelete,
     enabled: !!fabricCanvas,
+    onGroup: handleGroup,
+    onUngroup: handleUngroup,
+    onDelete: handleDelete,
+    onCopy: handleCopy,
+    onPaste: handlePaste,
+    onUndo: handleUndo,
+    onRedo: handleRedo,
   });
 
   // Right-click context menu handler - Completely refactored per specification
@@ -726,17 +910,19 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
         </div>
       </div>
 
-      {/* Context Menu */}
+      {/* Context Menu - PART 2: Direct Function Connection Test */}
       <ContextMenu
         visible={menuState.visible}
         top={menuState.y}
         left={menuState.x}
         menuType={menuState.type}
-        onCopy={handleCopy}
-        onPaste={() => handlePaste(menuState.x, menuState.y)}
-        onDelete={handleDelete}
-        canPaste={clipboard !== null && (clipboard as any).type === "component"}
+        canPaste={clipboard !== null}
         onClose={() => setMenuState((prev) => ({ ...prev, visible: false }))}
+        onGroup={handleGroup}
+        onUngroup={handleUngroup}
+        onDelete={handleDelete}
+        onCopy={handleCopy}
+        onPaste={handlePaste}
       />
 
       {/* Optional debug info */}

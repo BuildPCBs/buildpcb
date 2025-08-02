@@ -15,10 +15,45 @@ class CanvasCommandManager {
   private commands: Map<string, CanvasCommand> = new Map();
   private canvas: fabric.Canvas | null = null;
   private isWorkspaceCreated: boolean = false;
+  private eventListeners: Map<string, Set<Function>> = new Map();
 
   setCanvas(canvas: fabric.Canvas | null) {
     this.canvas = canvas;
     this.isWorkspaceCreated = false; // Reset workspace state when canvas changes
+  }
+
+  // Event system methods
+  on(event: string, callback: Function): () => void {
+    if (!this.eventListeners.has(event)) {
+      this.eventListeners.set(event, new Set());
+    }
+    this.eventListeners.get(event)!.add(callback);
+    
+    // Return unsubscribe function
+    return () => {
+      const listeners = this.eventListeners.get(event);
+      if (listeners) {
+        listeners.delete(callback);
+      }
+    };
+  }
+
+  emit(event: string, ...args: any[]): void {
+    const listeners = this.eventListeners.get(event);
+    if (listeners) {
+      listeners.forEach(callback => {
+        try {
+          callback(...args);
+        } catch (error) {
+          console.error(`Error in event listener for ${event}:`, error);
+        }
+      });
+    }
+  }
+
+  execute(command: string, ...args: any[]): void {
+    console.log(`Executing command: ${command}`);
+    this.emit(command, ...args);
   }
 
   createWorkspace(canvas: fabric.Canvas) {

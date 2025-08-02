@@ -7,23 +7,32 @@ interface ContextMenuProps {
   top: number;
   left: number;
   menuType: "object" | "canvas";
-  onCopy: () => void;
-  onPaste: () => void;
-  onDelete: () => void;
   canPaste: boolean;
   onClose: () => void;
+  // PART 2: Direct function props for debugging
+  onGroup: () => void;
+  onUngroup: () => void;
+  onDelete: () => void;
+  onCopy: () => void;
+  onPaste: () => void;
 }
 
+/**
+ * PART 2: The "Triggers" - Context Menu (Direct Connection Test)
+ * This bypasses the command manager and calls functions directly
+ */
 export function ContextMenu({
   visible,
   top,
   left,
   menuType,
-  onCopy,
-  onPaste,
-  onDelete,
   canPaste,
   onClose,
+  onGroup,
+  onUngroup,
+  onDelete,
+  onCopy,
+  onPaste,
 }: ContextMenuProps) {
   if (!visible) return null;
 
@@ -40,12 +49,13 @@ export function ContextMenu({
           left: `${left}px`,
         }}
       >
-        {/* Object menu: Copy and Delete */}
+        {/* Object menu: Copy, Group, Ungroup, Delete */}
         {menuType === "object" && (
           <>
             <button
               className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
               onClick={() => {
+                console.log('TRIGGER: Context Menu "Copy" button clicked.');
                 onCopy();
                 onClose();
               }}
@@ -54,11 +64,36 @@ export function ContextMenu({
               Copy
             </button>
 
+            <button
+              className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+              onClick={() => {
+                console.log('TRIGGER: Context Menu "Group" button clicked.');
+                onGroup();
+                onClose();
+              }}
+            >
+              <span className="text-gray-500">⌘G</span>
+              Group
+            </button>
+
+            <button
+              className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
+              onClick={() => {
+                console.log('TRIGGER: Context Menu "Ungroup" button clicked.');
+                onUngroup();
+                onClose();
+              }}
+            >
+              <span className="text-gray-500">⌘⇧G</span>
+              Ungroup
+            </button>
+
             <hr className="my-1 border-gray-200" />
 
             <button
               className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
               onClick={() => {
+                console.log('TRIGGER: Context Menu "Delete" button clicked.');
                 onDelete();
                 onClose();
               }}
@@ -79,6 +114,7 @@ export function ContextMenu({
             }`}
             onClick={() => {
               if (canPaste) {
+                console.log('TRIGGER: Context Menu "Paste" button clicked.');
                 onPaste();
                 onClose();
               }
