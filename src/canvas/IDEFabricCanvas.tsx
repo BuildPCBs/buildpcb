@@ -1051,26 +1051,42 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
               `🔌 Found ${pinsFromSVG.length} pins and ${symbolParts.length} symbol parts`
             );
 
-            // 2. Group just the visual parts into a single symbol
+            // PART 1: THE COMPONENT "SANDWICH" 🥪
+            // Creating a permanent, inseparable group with three layers
+            
+            // BOTTOM BREAD: Original, invisible pin data (stores true location)
+            const invisiblePinData = pinsFromSVG.map((pin, index) => ({
+              originalX: pin.left! + (pin.width || 0) / 2,
+              originalY: pin.top! + (pin.height || 0) / 2,
+              pinId: `pin${index + 1}`,
+              pinNumber: index + 1,
+            }));
+
+            // THE FILLING: Main component symbol (the SVG shape)
             const svgSymbol = new fabric.Group(symbolParts, {
               originX: "center",
               originY: "center",
             });
 
-            // 3. Create interactive pins using the EXACT positions from the SVG
-            //    We no longer guess where the pins go. We read their positions.
+            // TOP BREAD: Visible, interactive pin circles (transparent green)
             const interactivePins = pinsFromSVG.map((pin, index) => {
               const interactivePin = new fabric.Circle({
-                radius: 4, // Make them slightly bigger and easier to click
-                fill: "rgba(0, 255, 0, 0.3)", // Transparent green for visibility
+                radius: 4,
+                fill: "rgba(0, 255, 0, 0.8)", // Bright green for visibility
+                stroke: "#059669",
+                strokeWidth: 1,
                 left: pin.left! + (pin.width || 0) / 2,
                 top: pin.top! + (pin.height || 0) / 2,
                 originX: "center",
                 originY: "center",
+                // PART 3: PIN VISIBILITY RULE - Start hidden
+                opacity: 0,
+                visible: false,
               });
 
               // Add the pin metadata that the wiring tool expects
               interactivePin.set("pin", true);
+              interactivePin.set("pinData", invisiblePinData[index]);
               interactivePin.set("data", {
                 type: "pin",
                 componentId: `component_${Date.now()}`,
@@ -1082,8 +1098,9 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
               return interactivePin;
             });
 
-            // 4. Create the final group with the symbol and the REAL pins
-            const finalComponent = new fabric.Group(
+            // THE GOLDEN RULE: Lock all three layers together into ONE inseparable group
+            // This is the COMPONENT SANDWICH - it moves as one unit forever
+            const componentSandwich = new fabric.Group(
               [svgSymbol, ...interactivePins],
               {
                 left: componentInfo.x || canvas.getVpCenter().x,
@@ -1100,21 +1117,23 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
               }
             );
 
-            // Add component metadata that the wiring tool expects
-            finalComponent.set("componentType", componentInfo.type);
-            finalComponent.set("data", {
+            // Store the invisible pin data and component metadata
+            componentSandwich.set("componentType", componentInfo.type);
+            componentSandwich.set("invisiblePinData", invisiblePinData);
+            componentSandwich.set("data", {
               type: "component",
               componentType: componentInfo.type,
               componentName: componentInfo.name,
               pins: interactivePins.map((_, index) => `pin${index + 1}`),
+              isComponentSandwich: true, // Mark this as a proper sandwich
             });
 
-            // 5. Add the final, perfect component to the canvas
-            canvas.add(finalComponent);
+            // 5. Add the COMPONENT SANDWICH to the canvas - physically impossible to separate
+            canvas.add(componentSandwich);
             canvas.renderAll();
 
             console.log(
-              `🎉 INTELLIGENT: Added ${componentInfo.name} with ${interactivePins.length} intelligent pins!`
+              `🥪 COMPONENT SANDWICH: Added ${componentInfo.name} with ${interactivePins.length} permanently attached pins!`
             );
           })
           .catch((error) => {

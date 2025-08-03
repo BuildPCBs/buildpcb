@@ -14,6 +14,10 @@ interface WiringState {
   wirePoints: fabric.Point[]; // Array of fixed waypoints
 }
 
+// PART 2: TRAFFIC LIGHT STATE MANAGEMENT
+// The wiring tool has EXACTLY three states: Red → Yellow → Green → Red
+type TrafficLightState = "RED" | "YELLOW" | "GREEN";
+
 interface UseWiringToolProps {
   canvas: fabric.Canvas | null;
   enabled?: boolean;
@@ -23,6 +27,7 @@ interface UseWiringToolReturn {
   isWireMode: boolean;
   isDrawingWire: boolean;
   wireState: string; // For UI compatibility: 'idle' | 'drawing'
+  trafficLightState: TrafficLightState; // NEW: Traffic light state
   toggleWireMode: () => void;
   exitWireMode: () => void;
   // PART 2: Expose wire-component connection functions
@@ -37,6 +42,12 @@ export function useWiringTool({
   const [isDrawing, setIsDrawing] = useState(false);
   const [startPin, setStartPin] = useState<fabric.Object | null>(null);
   const [currentLine, setCurrentLine] = useState<fabric.Polyline | null>(null);
+
+  // PART 2: THE WIRING TOOL "BRAIN" - Traffic Light State Management
+  // 🔴 RED = Idle (ready to start wire)
+  // 🟡 YELLOW = Drawing (wire in progress)  
+  // 🟢 GREEN = Finishing (completing the wire)
+  const [trafficLightState, setTrafficLightState] = useState<TrafficLightState>("RED");
 
   // Additional state for compatibility
   const [isWireMode, setIsWireMode] = useState(false);
@@ -299,8 +310,13 @@ export function useWiringTool({
   );
 
   // PART 2: Create the "Reset" Function (The Most Important Step)
+  // Updated with Traffic Light State Management
   const resetWiringTool = useCallback(() => {
     console.log("🔄 DEFINITIVE RESET: Resetting wiring tool to clean state");
+
+    // TRAFFIC LIGHT RESET: Always return to RED (Idle)
+    setTrafficLightState("RED");
+    console.log("🔴 TRAFFIC LIGHT: RED (Idle - Ready to start wire)");
 
     setIsDrawing(false);
     setStartPin(null);
@@ -316,7 +332,7 @@ export function useWiringTool({
     if (canvas) {
       canvas.renderAll();
     }
-    console.log("--- Wiring tool has been reset. ---");
+    console.log("--- Wiring tool has been reset to RED state. ---");
   }, [currentLine, canvas, clearPinHighlight]);
 
   // Legacy reset function for backward compatibility
@@ -327,7 +343,15 @@ export function useWiringTool({
     (pin: fabric.Object, clickPoint: fabric.Point) => {
       if (!canvas) return;
 
+      // TRAFFIC LIGHT: RED → YELLOW transition
+      if (trafficLightState !== "RED") {
+        console.log("🚨 TRAFFIC VIOLATION: Can only start wire from RED state");
+        return;
+      }
+
       console.log("🎯 Starting wire from pin");
+      setTrafficLightState("YELLOW");
+      console.log("🟡 TRAFFIC LIGHT: YELLOW (Drawing - Wire in progress)");
 
       const pinCoords = getPinWorldCoordinates(pin);
       const orthogonalPoint = calculateOrthogonalPoint(pinCoords, clickPoint);
@@ -359,7 +383,7 @@ export function useWiringTool({
 
       console.log("✅ Wire preview created and visible - now following cursor");
     },
-    [canvas, getPinWorldCoordinates, calculateOrthogonalPoint]
+    [canvas, getPinWorldCoordinates, calculateOrthogonalPoint, trafficLightState]
   );
 
   // Update wire preview during mouse move - THE CRITICAL LIVE PREVIEW FIX
@@ -477,9 +501,14 @@ export function useWiringTool({
       const startPinIndex =
         startComponent?.getObjects().indexOf(wiringState.startPin) || 0;
 
-      // Update the current polyline to final state with junction connection
-      wiringState.currentLine.set({
-        points: finalPoints,
+      // STEP 1: CREATE THE PERMANENT WIRE
+      console.log("🔧 STEP 1: Creating permanent junction wire");
+      const permanentWire = new fabric.Polyline(finalPoints, {
+        fill: "transparent",
+        stroke: "#000000", // Final solid black color
+        strokeWidth: 2, // Final solid style
+        strokeLineCap: "round",
+        strokeLineJoin: "round",
         selectable: true,
         evented: true,
         wireType: "connection",
@@ -495,16 +524,17 @@ export function useWiringTool({
         objectCaching: false,
       } as any);
 
+      // Add the permanent wire to canvas
+      canvas.add(permanentWire);
+      console.log("✅ STEP 1: Permanent junction wire safely added to canvas");
+
       // Create and add junction dot
       const junctionDot = createJunctionDot(intersectionPoint);
       canvas.add(junctionDot);
 
       // Link the junction dot to both wires
-      (junctionDot as any).connectedWires = [
-        wiringState.currentLine,
-        existingWire,
-      ];
-      (wiringState.currentLine as any).junctionDot = junctionDot;
+      (junctionDot as any).connectedWires = [permanentWire, existingWire];
+      (permanentWire as any).junctionDot = junctionDot;
 
       // Add junction reference to existing wire if not already present
       if (!(existingWire as any).junctionDots) {
@@ -512,17 +542,44 @@ export function useWiringTool({
       }
       (existingWire as any).junctionDots.push(junctionDot);
 
-      canvas.renderAll();
+      // STEP 2: CLEAN UP THE TEMPORARY PREVIEW
+      console.log("🧹 STEP 2: Removing temporary ghost wire");
+      const temporaryGhostWire = wiringState.currentLine;
+      if (temporaryGhostWire) {
+        canvas.remove(temporaryGhostWire);
+        console.log("✅ STEP 2: Temporary ghost wire removed");
+      }
 
-      console.log("✅ Wire completed successfully with junction");
+      // STEP 3: RESET THE TOOL'S STATE
+      console.log("🔄 STEP 3: Resetting tool state");
+      setIsDrawing(false);
+      setCurrentLine(null); // Clear the temporary line reference
+      setStartPin(null);
+      setWirePoints([]);
+      
+      // Clear highlights
+      clearPinHighlight();
+
+      // TRAFFIC LIGHT: YELLOW → GREEN → RED transition
+      setTrafficLightState("GREEN");
+      console.log("🟢 TRAFFIC LIGHT: GREEN (Finishing - Wire completed)");
+
+      // Final render to update the screen
+      canvas.renderAll();
+      console.log("✅ STEP 3: Tool state reset and canvas updated");
+
+      console.log("🎉 Wire completed successfully with junction");
       console.log(
         "🔗 Junction created at:",
         intersectionPoint.x,
         intersectionPoint.y
       );
 
-      // PART 3: Call the "Reset" Function - After Successfully Completing a Wire
-      resetWiringTool();
+      // Transition back to RED state after a brief moment
+      setTimeout(() => {
+        setTrafficLightState("RED");
+        console.log("🔴 TRAFFIC LIGHT: RED (Idle - Ready for next wire)");
+      }, 100);
     },
     [
       wiringState.currentLine,
@@ -531,7 +588,7 @@ export function useWiringTool({
       canvas,
       calculateOrthogonalPoint,
       createJunctionDot,
-      resetWiringTool,
+      clearPinHighlight,
     ]
   );
 
@@ -572,9 +629,14 @@ export function useWiringTool({
         startComponent?.getObjects().indexOf(wiringState.startPin) || 0;
       const endPinIndex = endComponent?.getObjects().indexOf(endPin) || 0;
 
-      // Update the current polyline to final state with connection memory
-      wiringState.currentLine.set({
-        points: finalPoints,
+      // STEP 1: CREATE THE PERMANENT WIRE
+      console.log("🔧 STEP 1: Creating permanent wire");
+      const permanentWire = new fabric.Polyline(finalPoints, {
+        fill: "transparent",
+        stroke: "#000000", // Final solid black color
+        strokeWidth: 2, // Final solid style
+        strokeLineCap: "round",
+        strokeLineJoin: "round",
         selectable: true,
         evented: true,
         wireType: "connection",
@@ -591,10 +653,38 @@ export function useWiringTool({
         objectCaching: false, // CRITICAL: Prevent visual glitches
       } as any);
 
+      // Add the permanent wire to canvas
+      canvas.add(permanentWire);
+      console.log("✅ STEP 1: Permanent wire safely added to canvas");
+
+      // STEP 2: CLEAN UP THE TEMPORARY PREVIEW
+      console.log("🧹 STEP 2: Removing temporary ghost wire");
+      const temporaryGhostWire = wiringState.currentLine;
+      if (temporaryGhostWire) {
+        canvas.remove(temporaryGhostWire);
+        console.log("✅ STEP 2: Temporary ghost wire removed");
+      }
+
+      // STEP 3: RESET THE TOOL'S STATE
+      console.log("🔄 STEP 3: Resetting tool state");
+      setIsDrawing(false);
+      setCurrentLine(null); // Clear the temporary line reference
+      setStartPin(null);
+      setWirePoints([]);
+      
+      // Clear highlights
+      clearPinHighlight();
+
+      // TRAFFIC LIGHT: YELLOW → GREEN → RED transition
+      setTrafficLightState("GREEN");
+      console.log("🟢 TRAFFIC LIGHT: GREEN (Finishing - Wire completed)");
+
+      // Final render to update the screen
       canvas.renderAll();
+      console.log("✅ STEP 3: Tool state reset and canvas updated");
 
       console.log(
-        "✅ Wire completed successfully with",
+        "🎉 Wire completed successfully with",
         finalPoints.length,
         "points"
       );
@@ -605,8 +695,11 @@ export function useWiringTool({
         endPinIndex,
       });
 
-      // PART 3: Call the "Reset" Function - After Successfully Completing a Wire
-      resetWiringTool();
+      // Transition back to RED state after a brief moment
+      setTimeout(() => {
+        setTrafficLightState("RED");
+        console.log("🔴 TRAFFIC LIGHT: RED (Idle - Ready for next wire)");
+      }, 100);
     },
     [
       wiringState.currentLine,
@@ -615,7 +708,7 @@ export function useWiringTool({
       canvas,
       getPinWorldCoordinates,
       calculateOrthogonalPoint,
-      resetWiringTool,
+      clearPinHighlight,
     ]
   );
 
@@ -790,28 +883,73 @@ export function useWiringTool({
     [canvas, getPinWorldCoordinates, calculateOrthogonalPath]
   );
 
-  // Show/hide pins in wire mode
+  // PART 3: THE "PIN VISIBILITY" RULE - Perfect Wiring System
+  // Rule: Pins are ONLY visible in Wire Mode, hidden everywhere else
   useEffect(() => {
     if (!canvas) return;
 
+    console.log(`🔍 PIN VISIBILITY: Updating pin visibility for Wire Mode: ${isWireMode}`);
+
     const objects = canvas.getObjects();
     objects.forEach((obj) => {
-      if ((obj as any).componentType && obj.type === "group") {
+      // Handle new Component Sandwich architecture
+      if ((obj as any).data?.isComponentSandwich && obj.type === "group") {
+        const componentSandwich = obj as fabric.Group;
+        const sandwichLayers = componentSandwich.getObjects();
+
+        sandwichLayers.forEach((layer) => {
+          // Find interactive pins (yellow circles) in the sandwich
+          if ((layer as any).pin && layer.type === "circle") {
+            if (isWireMode) {
+              // SHOW pins in Wire Mode
+              layer.set({
+                opacity: 1,
+                strokeWidth: 2,
+                fill: "rgba(255, 255, 0, 0.8)", // Bright yellow
+                stroke: "rgba(0, 56, 223, 1)", // Blue border
+                visible: true,
+              });
+            } else {
+              // HIDE pins in all other modes
+              layer.set({
+                opacity: 0.1, // Nearly invisible but still there
+                strokeWidth: 0,
+                fill: "transparent",
+                stroke: "transparent", 
+                visible: true, // Keep in DOM for hit detection
+              });
+            }
+          }
+        });
+      }
+      
+      // Legacy support for old component structure (if any exist)
+      else if ((obj as any).componentType && obj.type === "group") {
         const group = obj as fabric.Group;
         const groupObjects = group.getObjects();
 
         groupObjects.forEach((groupObj) => {
           if ((groupObj as any).pin) {
-            groupObj.set({
-              strokeWidth: isWireMode ? 2 : 0,
-              fill: isWireMode ? "rgba(0, 56, 223, 0.3)" : "transparent",
-            });
+            if (isWireMode) {
+              groupObj.set({
+                strokeWidth: 2,
+                fill: "rgba(0, 56, 223, 0.3)",
+                visible: true,
+              });
+            } else {
+              groupObj.set({
+                strokeWidth: 0,
+                fill: "transparent",
+                visible: true, // Keep for hit detection
+              });
+            }
           }
         });
       }
     });
 
     canvas.renderAll();
+    console.log(`✅ PIN VISIBILITY: ${isWireMode ? 'SHOWN' : 'HIDDEN'} all pins based on Wire Mode`);
   }, [canvas, isWireMode]);
 
   // Main mouse event handlers for wire mode
@@ -968,6 +1106,7 @@ export function useWiringTool({
     isWireMode,
     isDrawingWire: wiringState.isDrawingWire,
     wireState: wiringState.isDrawingWire ? "drawing" : "idle", // For UI compatibility
+    trafficLightState, // NEW: Traffic light state for perfect state management
     toggleWireMode,
     exitWireMode,
     updateConnectedWires, // PART 2: Expose wire update function
