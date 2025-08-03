@@ -33,7 +33,7 @@
   </g>
 
   <!-- Arduino label -->
-  <text x="40" y="32" font-family="Arial" font-size="8" text-anchor="middle" fill="#000000">ARDUINO</text>
+  <text x="40" y="32" font-family="'DM Sans', sans-serif" font-size="8" text-anchor="middle" fill="#000000">ARDUINO</text>
 
   <!-- Connection points -->
   <circle id="pin" cx="20" cy="5" r="1.5" fill="#000000"/>

@@ -7,18 +7,18 @@
 
   <!-- VCC pin -->
   <line x1="0" y1="15" x2="15" y2="15" stroke="#000000" stroke-width="1.5"/>
-  <text x="8" y="12" font-family="Arial" font-size="6" text-anchor="middle" fill="#000000">VCC</text>
+  <text x="8" y="12" font-family="'DM Sans', sans-serif" font-size="6" text-anchor="middle" fill="#000000">VCC</text>
 
   <!-- GND pin -->
   <line x1="0" y1="25" x2="15" y2="25" stroke="#000000" stroke-width="1.5"/>
-  <text x="8" y="30" font-family="Arial" font-size="6" text-anchor="middle" fill="#000000">GND</text>
+  <text x="8" y="30" font-family="'DM Sans', sans-serif" font-size="6" text-anchor="middle" fill="#000000">GND</text>
 
   <!-- Signal pin -->
   <line x1="45" y1="20" x2="60" y2="20" stroke="#000000" stroke-width="1.5"/>
-  <text x="52" y="17" font-family="Arial" font-size="6" text-anchor="middle" fill="#000000">SIG</text>
+  <text x="52" y="17" font-family="'DM Sans', sans-serif" font-size="6" text-anchor="middle" fill="#000000">SIG</text>
 
   <!-- Sensor label -->
-  <text x="30" y="32" font-family="Arial" font-size="6" text-anchor="middle" fill="#000000">SENSOR</text>
+  <text x="30" y="32" font-family="'DM Sans', sans-serif" font-size="6" text-anchor="middle" fill="#000000">SENSOR</text>
 
   <!-- Connection points -->
   <circle id="pin" cx="0" cy="15" r="1.5" fill="#000000"/>

@@ -1053,7 +1053,7 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
 
             // PART 1: THE COMPONENT "SANDWICH" 🥪
             // Creating a permanent, inseparable group with three layers
-            
+
             // BOTTOM BREAD: Original, invisible pin data (stores true location)
             const invisiblePinData = pinsFromSVG.map((pin, index) => ({
               originalX: pin.left! + (pin.width || 0) / 2,

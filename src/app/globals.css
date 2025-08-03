@@ -12,6 +12,11 @@ body {
   font-family: "DM Sans", Arial, Helvetica, sans-serif;
 }
 
+/* Ensure DM Sans is available for SVG text elements */
+svg text {
+  font-family: "DM Sans", Arial, Helvetica, sans-serif;
+}
+
 #__next {
   min-height: 100vh;
   width: 100%;

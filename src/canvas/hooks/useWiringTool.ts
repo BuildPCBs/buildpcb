@@ -1,6 +1,16 @@
 /**
- * Definitive Wiring Tool - Built from scratch for reliability
- * Fixes: invisible wire preview, inconsistent state, corner drawing
+ * Professional Wiring Tool - Built for reliability and professional behavior
+ * Features: 
+ * - Automatic net coloring system for electrical networks
+ * - Professional wire editing with vertex manipulation
+ * - Intelligent wire rerouting when components move
+ * - Rule-based wire behavior for predictable user experience
+ * 
+ * PROFESSIONAL WIRING RULES:
+ * Rule #1: Wires are defined by connections, not moved freely
+ * Rule #2: Wires are edited by moving corners/vertices 
+ * Rule #3: Components moving trigger intelligent wire rerouting
+ * Rule #4: Wires only disconnect when explicitly deleted
  */
 
 import { useEffect, useState, useCallback, useRef } from "react";
@@ -13,6 +23,30 @@ interface WiringState {
   startPin: fabric.Object | null;
   wirePoints: fabric.Point[]; // Array of fixed waypoints
 }
+
+// AUTOMATIC NET COLORING SYSTEM
+interface ElectricalNet {
+  netId: string;
+  color: string;
+  pins: Set<fabric.Object>;
+  wires: Set<fabric.Polyline>;
+}
+
+// Color palette for distinct electrical nets
+const NET_COLOR_PALETTE = [
+  "#0038DF", // Blue
+  "#00C851", // Green  
+  "#8E44AD", // Purple
+  "#FF8C00", // Orange
+  "#E53E3E", // Red
+  "#00B7C3", // Teal
+  "#FF6B9D", // Pink
+  "#9C88FF", // Light Purple
+  "#FFD93D", // Yellow
+  "#6BCF7F", // Light Green
+  "#FF7043", // Deep Orange
+  "#42A5F5", // Light Blue
+] as const;
 
 // PART 2: TRAFFIC LIGHT STATE MANAGEMENT
 // The wiring tool has EXACTLY three states: Red → Yellow → Green → Red
@@ -32,6 +66,11 @@ interface UseWiringToolReturn {
   exitWireMode: () => void;
   // PART 2: Expose wire-component connection functions
   updateConnectedWires: (component: fabric.Group) => void;
+  // RULE #4: Professional wiring behavior functions
+  safeComponentMovement: (component: fabric.Group) => void;
+  deleteWire: (wire: fabric.Polyline & any) => void;
+  // NET COLORING: Expose net information
+  getNetInfo: () => { netCount: number; nets: ElectricalNet[] };
 }
 
 export function useWiringTool({
@@ -45,9 +84,14 @@ export function useWiringTool({
 
   // PART 2: THE WIRING TOOL "BRAIN" - Traffic Light State Management
   // 🔴 RED = Idle (ready to start wire)
-  // 🟡 YELLOW = Drawing (wire in progress)  
+  // 🟡 YELLOW = Drawing (wire in progress)
   // 🟢 GREEN = Finishing (completing the wire)
-  const [trafficLightState, setTrafficLightState] = useState<TrafficLightState>("RED");
+  const [trafficLightState, setTrafficLightState] =
+    useState<TrafficLightState>("RED");
+
+  // AUTOMATIC NET COLORING STATE MANAGEMENT
+  const [electricalNets, setElectricalNets] = useState<Map<string, ElectricalNet>>(new Map());
+  const [nextColorIndex, setNextColorIndex] = useState(0);
 
   // Additional state for compatibility
   const [isWireMode, setIsWireMode] = useState(false);
@@ -74,7 +118,24 @@ export function useWiringTool({
 
       const objects = canvas.getObjects();
       for (const obj of objects) {
-        if ((obj as any).componentType && obj.type === "group") {
+        if ((obj as any).data?.isComponentSandwich && obj.type === "group") {
+          const group = obj as fabric.Group;
+          const groupObjects = group.getObjects();
+
+          for (const groupObj of groupObjects) {
+            if ((groupObj as any).pin) {
+              const pinPoint = fabric.util.transformPoint(
+                new fabric.Point(groupObj.left || 0, groupObj.top || 0),
+                group.calcTransformMatrix()
+              );
+              if (point.distanceFrom(pinPoint) <= 8) {
+                return groupObj;
+              }
+            }
+          }
+        }
+        // Legacy support
+        else if ((obj as any).componentType && obj.type === "group") {
           const group = obj as fabric.Group;
           const groupObjects = group.getObjects();
 
@@ -309,6 +370,266 @@ export function useWiringTool({
     []
   );
 
+  // ===== AUTOMATIC NET COLORING SYSTEM =====
+  
+  // Generate a unique net ID
+  const generateNetId = useCallback(() => {
+    return `net_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }, []);
+
+  // Get the next available color from the palette
+  const getNextNetColor = useCallback(() => {
+    const color = NET_COLOR_PALETTE[nextColorIndex % NET_COLOR_PALETTE.length];
+    setNextColorIndex(prev => prev + 1);
+    return color;
+  }, [nextColorIndex]);
+
+  // Find which net a pin belongs to
+  const findPinNet = useCallback((pin: fabric.Object): ElectricalNet | null => {
+    for (const net of electricalNets.values()) {
+      if (net.pins.has(pin)) {
+        return net;
+      }
+    }
+    return null;
+  }, [electricalNets]);
+
+  // Create a new electrical net
+  const createNewNet = useCallback((pins: fabric.Object[], wires: fabric.Polyline[] = []): ElectricalNet => {
+    const netId = generateNetId();
+    const color = getNextNetColor();
+    
+    const newNet: ElectricalNet = {
+      netId,
+      color,
+      pins: new Set(pins),
+      wires: new Set(wires),
+    };
+
+    console.log(`🎨 NET COLORING: Created new net ${netId} with color ${color}`);
+    
+    setElectricalNets(prev => {
+      const updated = new Map(prev);
+      updated.set(netId, newNet);
+      return updated;
+    });
+
+    return newNet;
+  }, [generateNetId, getNextNetColor]);
+
+  // Add items to an existing net
+  const addToNet = useCallback((net: ElectricalNet, pins: fabric.Object[] = [], wires: fabric.Polyline[] = []) => {
+    console.log(`🎨 NET COLORING: Adding ${pins.length} pins and ${wires.length} wires to net ${net.netId}`);
+    
+    setElectricalNets(prev => {
+      const updated = new Map(prev);
+      const updatedNet = { ...net };
+      
+      pins.forEach(pin => updatedNet.pins.add(pin));
+      wires.forEach(wire => updatedNet.wires.add(wire));
+      
+      updated.set(net.netId, updatedNet);
+      return updated;
+    });
+  }, []);
+
+  // Merge two electrical nets into one
+  const mergeNets = useCallback((net1: ElectricalNet, net2: ElectricalNet): ElectricalNet => {
+    console.log(`🎨 NET COLORING: Merging net ${net2.netId} into net ${net1.netId}`);
+    
+    // Merge all pins and wires into net1
+    const mergedNet: ElectricalNet = {
+      ...net1,
+      pins: new Set([...net1.pins, ...net2.pins]),
+      wires: new Set([...net1.wires, ...net2.wires]),
+    };
+
+    setElectricalNets(prev => {
+      const updated = new Map(prev);
+      updated.set(net1.netId, mergedNet);
+      updated.delete(net2.netId); // Remove the merged net
+      return updated;
+    });
+
+    return mergedNet;
+  }, []);
+
+  // Apply net color to all wires in a net
+  const applyNetColoring = useCallback((net: ElectricalNet) => {
+    if (!canvas) return;
+
+    console.log(`🎨 NET COLORING: Applying color ${net.color} to ${net.wires.size} wires`);
+    
+    net.wires.forEach(wire => {
+      wire.set({
+        stroke: net.color,
+        netId: net.netId,
+      } as any);
+    });
+
+    // Also store netId on pins for future reference
+    net.pins.forEach(pin => {
+      (pin as any).netId = net.netId;
+    });
+
+    canvas.renderAll();
+  }, [canvas]);
+
+  // The main net coloring algorithm - determines what happens when a wire is completed
+  const handleNetColoring = useCallback((startPin: fabric.Object, endPin: fabric.Object, newWire: fabric.Polyline) => {
+    const startNet = findPinNet(startPin);
+    const endNet = findPinNet(endPin);
+
+    console.log(`🎨 NET COLORING: Analyzing connection - Start pin net: ${startNet?.netId || 'none'}, End pin net: ${endNet?.netId || 'none'}`);
+
+    if (!startNet && !endNet) {
+      // Case A: Connecting two new pins - create a new net
+      console.log("🎨 Case A: Creating new net for two unconnected pins");
+      const newNet = createNewNet([startPin, endPin], [newWire]);
+      applyNetColoring(newNet);
+      
+    } else if (startNet && !endNet) {
+      // Case B: Connecting to existing net from start pin
+      console.log("🎨 Case B: Adding end pin to existing start net");
+      addToNet(startNet, [endPin], [newWire]);
+      applyNetColoring(startNet);
+      
+    } else if (!startNet && endNet) {
+      // Case B: Connecting to existing net from end pin  
+      console.log("🎨 Case B: Adding start pin to existing end net");
+      addToNet(endNet, [startPin], [newWire]);
+      applyNetColoring(endNet);
+      
+    } else if (startNet && endNet && startNet.netId !== endNet.netId) {
+      // Case C: Merging two different nets
+      console.log("🎨 Case C: Merging two different nets");
+      const mergedNet = mergeNets(startNet, endNet);
+      addToNet(mergedNet, [], [newWire]);
+      applyNetColoring(mergedNet);
+      
+    } else if (startNet && endNet && startNet.netId === endNet.netId) {
+      // Connecting within the same net - just add the wire
+      console.log("🎨 Adding wire within same existing net");
+      addToNet(startNet, [], [newWire]);
+      applyNetColoring(startNet);
+    }
+  }, [findPinNet, createNewNet, addToNet, mergeNets, applyNetColoring]);
+
+  // Get net information for debugging/UI purposes
+  const getNetInfo = useCallback(() => {
+    const nets = Array.from(electricalNets.values());
+    console.log(`🎨 NET INFO: Currently tracking ${nets.length} electrical nets`);
+    nets.forEach(net => {
+      console.log(`  Net ${net.netId}: ${net.color} - ${net.pins.size} pins, ${net.wires.size} wires`);
+    });
+    return {
+      netCount: nets.length,
+      nets: nets,
+    };
+  }, [electricalNets]);
+
+  // ===== END NET COLORING SYSTEM =====
+
+  // ===== PROFESSIONAL WIRE EDITING SYSTEM =====
+  // RULE #2: Wire editing through vertex manipulation
+  
+  const [selectedWire, setSelectedWire] = useState<fabric.Polyline | null>(null);
+  const [wireVertexHandles, setWireVertexHandles] = useState<fabric.Circle[]>([]);
+
+  // Update wire path when a vertex is moved
+  const updateWirePathFromVertex = useCallback((wire: fabric.Polyline, vertexIndex: number, newX: number, newY: number) => {
+    if (!wire.points) return;
+
+    console.log(`✏️ RULE #2: Updating wire path - vertex ${vertexIndex} moved to (${newX}, ${newY})`);
+
+    const newPoints = [...wire.points];
+    newPoints[vertexIndex] = new fabric.Point(newX, newY);
+    
+    wire.set({ points: newPoints });
+    
+    // Apply net coloring to maintain color consistency
+    const wireNetId = (wire as any).netId;
+    if (wireNetId && electricalNets.has(wireNetId)) {
+      const net = electricalNets.get(wireNetId)!;
+      wire.set({ stroke: net.color });
+    }
+    
+    canvas?.renderAll();
+  }, [canvas, electricalNets]);
+
+  // Hide vertex handles
+  const hideWireVertexHandles = useCallback(() => {
+    if (!canvas) return;
+
+    wireVertexHandles.forEach(handle => {
+      canvas.remove(handle);
+    });
+    setWireVertexHandles([]);
+    setSelectedWire(null);
+    canvas.renderAll();
+  }, [canvas, wireVertexHandles]);
+
+  // Create vertex handle for wire editing
+  const createVertexHandle = useCallback((point: fabric.Point, index: number, isEndpoint: boolean): fabric.Circle => {
+    const handle = new fabric.Circle({
+      left: point.x,
+      top: point.y,
+      radius: isEndpoint ? 6 : 4, // Endpoints are larger
+      fill: isEndpoint ? "#FF4444" : "#4444FF", // Red for endpoints, blue for corners
+      stroke: "#FFFFFF",
+      strokeWidth: 2,
+      originX: "center",
+      originY: "center",
+      selectable: !isEndpoint, // RULE #2: Endpoints cannot be moved
+      evented: !isEndpoint,
+      hasControls: false,
+      hasBorders: false,
+      hoverCursor: isEndpoint ? "not-allowed" : "move",
+      moveCursor: isEndpoint ? "not-allowed" : "move",
+      vertexIndex: index,
+      isWireEndpoint: isEndpoint,
+      isWireVertex: true,
+    } as any);
+
+    return handle;
+  }, []);
+
+  // Show vertex handles for selected wire
+  const showWireVertexHandles = useCallback((wire: fabric.Polyline) => {
+    if (!canvas || !wire.points) return;
+
+    console.log("✏️ RULE #2: Showing vertex handles for wire editing");
+    
+    // Clear existing handles
+    hideWireVertexHandles();
+
+    const handles: fabric.Circle[] = [];
+    const points = wire.points;
+
+    points.forEach((point, index) => {
+      const isEndpoint = index === 0 || index === points.length - 1;
+      const fabricPoint = new fabric.Point(point.x, point.y);
+      const handle = createVertexHandle(fabricPoint, index, isEndpoint);
+      
+      // Add drag behavior for non-endpoint vertices
+      if (!isEndpoint) {
+        handle.on('moving', (e) => {
+          // RULE #2: Update wire path when vertex is moved
+          updateWirePathFromVertex(wire, index, handle.left!, handle.top!);
+        });
+      }
+
+      handles.push(handle);
+      canvas.add(handle);
+    });
+
+    setWireVertexHandles(handles);
+    setSelectedWire(wire);
+    canvas.renderAll();
+  }, [canvas, createVertexHandle, hideWireVertexHandles, updateWirePathFromVertex]);
+
+  // ===== END PROFESSIONAL WIRE EDITING SYSTEM =====
+
   // PART 2: Create the "Reset" Function (The Most Important Step)
   // Updated with Traffic Light State Management
   const resetWiringTool = useCallback(() => {
@@ -360,7 +681,7 @@ export function useWiringTool({
       const initialPoints = [pinCoords, orthogonalPoint];
       const newLine = new fabric.Polyline(initialPoints, {
         fill: "transparent",
-        stroke: "#0038DF",
+        stroke: "#0038DF", // Temporary preview color - final color determined by net coloring
         strokeWidth: 2,
         strokeLineCap: "round",
         strokeLineJoin: "round",
@@ -383,7 +704,12 @@ export function useWiringTool({
 
       console.log("✅ Wire preview created and visible - now following cursor");
     },
-    [canvas, getPinWorldCoordinates, calculateOrthogonalPoint, trafficLightState]
+    [
+      canvas,
+      getPinWorldCoordinates,
+      calculateOrthogonalPoint,
+      trafficLightState,
+    ]
   );
 
   // Update wire preview during mouse move - THE CRITICAL LIVE PREVIEW FIX
@@ -505,12 +831,20 @@ export function useWiringTool({
       console.log("🔧 STEP 1: Creating permanent junction wire");
       const permanentWire = new fabric.Polyline(finalPoints, {
         fill: "transparent",
-        stroke: "#000000", // Final solid black color
+        stroke: "#888888", // Neutral color - will be overridden by net coloring
         strokeWidth: 2, // Final solid style
         strokeLineCap: "round",
         strokeLineJoin: "round",
         selectable: true,
         evented: true,
+        // RULE #1: Wires are defined by connections, not moved freely
+        lockMovementX: true,
+        lockMovementY: true,
+        lockRotation: true,
+        lockScalingX: true,
+        lockScalingY: true,
+        hasControls: false, // No scaling/rotation controls
+        hasBorders: true, // Show selection border for editing
         wireType: "connection",
         startPin: wiringState.startPin,
         startComponentId: startComponentId,
@@ -527,6 +861,42 @@ export function useWiringTool({
       // Add the permanent wire to canvas
       canvas.add(permanentWire);
       console.log("✅ STEP 1: Permanent junction wire safely added to canvas");
+
+      // APPLY AUTOMATIC NET COLORING FOR JUNCTION
+      console.log("🎨 STEP 1.5: Applying automatic net coloring for junction");
+      if (wiringState.startPin) {
+        const startNet = findPinNet(wiringState.startPin);
+        const existingWireNetId = (existingWire as any).netId;
+        
+        if (existingWireNetId && startNet && startNet.netId !== existingWireNetId) {
+          // Merging with existing wire's net
+          const existingNet = electricalNets.get(existingWireNetId);
+          if (existingNet) {
+            console.log("🎨 Junction merging nets");
+            const mergedNet = mergeNets(startNet, existingNet);
+            addToNet(mergedNet, [], [permanentWire]);
+            applyNetColoring(mergedNet);
+          }
+        } else if (existingWireNetId && !startNet) {
+          // Adding to existing wire's net
+          const existingNet = electricalNets.get(existingWireNetId);
+          if (existingNet) {
+            console.log("🎨 Junction adding to existing net");
+            addToNet(existingNet, [wiringState.startPin], [permanentWire]);
+            applyNetColoring(existingNet);
+          }
+        } else if (startNet && !existingWireNetId) {
+          // Extending existing net to include junction wire
+          console.log("🎨 Junction extending existing net");
+          addToNet(startNet, [], [permanentWire]);
+          applyNetColoring(startNet);
+        } else if (!startNet && !existingWireNetId) {
+          // Creating new net for junction
+          console.log("🎨 Junction creating new net");
+          const newNet = createNewNet([wiringState.startPin], [permanentWire, existingWire]);
+          applyNetColoring(newNet);
+        }
+      }
 
       // Create and add junction dot
       const junctionDot = createJunctionDot(intersectionPoint);
@@ -556,7 +926,7 @@ export function useWiringTool({
       setCurrentLine(null); // Clear the temporary line reference
       setStartPin(null);
       setWirePoints([]);
-      
+
       // Clear highlights
       clearPinHighlight();
 
@@ -589,6 +959,12 @@ export function useWiringTool({
       calculateOrthogonalPoint,
       createJunctionDot,
       clearPinHighlight,
+      findPinNet,
+      electricalNets,
+      mergeNets,
+      addToNet,
+      applyNetColoring,
+      createNewNet,
     ]
   );
 
@@ -633,12 +1009,20 @@ export function useWiringTool({
       console.log("🔧 STEP 1: Creating permanent wire");
       const permanentWire = new fabric.Polyline(finalPoints, {
         fill: "transparent",
-        stroke: "#000000", // Final solid black color
+        stroke: "#888888", // Neutral color - will be overridden by net coloring
         strokeWidth: 2, // Final solid style
         strokeLineCap: "round",
         strokeLineJoin: "round",
         selectable: true,
         evented: true,
+        // RULE #1: Wires are defined by connections, not moved freely
+        lockMovementX: true,
+        lockMovementY: true,
+        lockRotation: true,
+        lockScalingX: true,
+        lockScalingY: true,
+        hasControls: false, // No scaling/rotation controls
+        hasBorders: true, // Show selection border for editing
         wireType: "connection",
         startPin: wiringState.startPin,
         endPin: endPin,
@@ -657,6 +1041,12 @@ export function useWiringTool({
       canvas.add(permanentWire);
       console.log("✅ STEP 1: Permanent wire safely added to canvas");
 
+      // APPLY AUTOMATIC NET COLORING
+      console.log("🎨 STEP 1.5: Applying automatic net coloring");
+      if (wiringState.startPin && endPin) {
+        handleNetColoring(wiringState.startPin, endPin, permanentWire);
+      }
+
       // STEP 2: CLEAN UP THE TEMPORARY PREVIEW
       console.log("🧹 STEP 2: Removing temporary ghost wire");
       const temporaryGhostWire = wiringState.currentLine;
@@ -671,7 +1061,7 @@ export function useWiringTool({
       setCurrentLine(null); // Clear the temporary line reference
       setStartPin(null);
       setWirePoints([]);
-      
+
       // Clear highlights
       clearPinHighlight();
 
@@ -709,6 +1099,7 @@ export function useWiringTool({
       getPinWorldCoordinates,
       calculateOrthogonalPoint,
       clearPinHighlight,
+      handleNetColoring,
     ]
   );
 
@@ -732,12 +1123,48 @@ export function useWiringTool({
     setIsWireMode(false);
   }, [resetWiringState]);
 
-  // PART 2: Update connected wires when a component moves - ENHANCED WITH RULE #3 INTELLIGENT REROUTING
+  // RULE #4: Wires only disconnect when explicitly deleted
+  const deleteWire = useCallback(
+    (targetWire: fabric.Polyline & any) => {
+      if (!canvas) return;
+
+      console.log("🗑️ RULE #4: Explicit wire deletion initiated");
+
+      try {
+        // Remove from electrical nets
+        if (targetWire.netId && electricalNets.has(targetWire.netId)) {
+          const net = electricalNets.get(targetWire.netId)!;
+          
+          // Remove this wire from the net (wires is a Set)
+          net.wires.delete(targetWire);
+          
+          console.log(`🔌 RULE #4: Wire removed from net ${targetWire.netId}`);
+          
+          // If net is empty, remove it entirely
+          if (net.wires.size === 0) {
+            electricalNets.delete(targetWire.netId);
+            console.log(`🗑️ RULE #4: Empty net ${targetWire.netId} deleted`);
+          }
+        }
+
+        // Remove from canvas
+        canvas.remove(targetWire);
+        canvas.renderAll();
+
+        console.log("✅ RULE #4: Wire explicitly deleted - no accidental disconnection");
+
+      } catch (error) {
+        console.error("❌ RULE #4: Error during explicit wire deletion:", error);
+      }
+    },
+    [canvas, electricalNets]
+  );
+
   const updateConnectedWires = useCallback(
     (movingComponent: fabric.Group) => {
       if (!canvas) return;
 
-      console.log("🔄 Updating wires with intelligent rerouting");
+      console.log("🔄 RULE #3: Intelligent wire rerouting for component movement");
 
       // Get component ID - try multiple fallback methods
       const componentId =
@@ -745,18 +1172,8 @@ export function useWiringTool({
         (movingComponent as any)?.componentId ||
         `component_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-      console.log("📍 Component ID:", componentId);
-
-      // Get all objects on canvas for obstacle detection
-      const allObjects = canvas.getObjects();
-      const obstacles = allObjects.filter(
-        (obj) =>
-          (obj as any).componentType &&
-          obj.type === "group" &&
-          obj !== movingComponent
-      );
-
       // Find all wires connected to this component
+      const allObjects = canvas.getObjects();
       const connectedWires = allObjects.filter((obj) => {
         if ((obj as any).wireType !== "connection") return false;
         const wire = obj as any;
@@ -770,45 +1187,33 @@ export function useWiringTool({
         );
       });
 
-      console.log(
-        `📍 Found ${connectedWires.length} wires connected to component`
-      );
+      console.log(`📍 RULE #3: Found ${connectedWires.length} wires to reroute`);
 
-      // Update each connected wire with intelligent rerouting
+      // RULE #3: Completely recalculate wire paths instead of stretching
       connectedWires.forEach((wireObj, index) => {
         const wire = wireObj as fabric.Polyline & any;
 
         try {
-          console.log(
-            `🔗 Applying intelligent rerouting to wire ${index + 1}/${
-              connectedWires.length
-            }`
-          );
+          console.log(`🔗 RULE #3: Recalculating path for wire ${index + 1}`);
 
-          // Initialize pin coordinates
+          // Get fresh pin coordinates (one will have moved)
           let startPinCoords: fabric.Point;
           let endPinCoords: fabric.Point;
-          let shouldReroute = false;
 
-          // Always calculate both start and end coordinates first
+          // Calculate start pin coordinates
           if (wire.startComponent && typeof wire.startPinIndex === "number") {
-            const startPin =
-              wire.startComponent.getObjects()[wire.startPinIndex];
+            const startPin = wire.startComponent.getObjects()[wire.startPinIndex];
             if (startPin) {
               startPinCoords = getPinWorldCoordinates(startPin);
             } else {
-              startPinCoords = new fabric.Point(
-                wire.points[0].x,
-                wire.points[0].y
-              );
+              console.warn("Start pin not found, using wire start point");
+              startPinCoords = new fabric.Point(wire.points[0].x, wire.points[0].y);
             }
           } else {
-            startPinCoords = new fabric.Point(
-              wire.points[0].x,
-              wire.points[0].y
-            );
+            startPinCoords = new fabric.Point(wire.points[0].x, wire.points[0].y);
           }
 
+          // Calculate end pin coordinates  
           if (wire.endComponent && typeof wire.endPinIndex === "number") {
             const endPin = wire.endComponent.getObjects()[wire.endPinIndex];
             if (endPin) {
@@ -817,70 +1222,64 @@ export function useWiringTool({
               const lastPoint = wire.points[wire.points.length - 1];
               endPinCoords = new fabric.Point(lastPoint.x, lastPoint.y);
             }
+          } else if (wire.endsAtJunction) {
+            // Junction wire - use the junction point
+            endPinCoords = wire.junctionPoint || new fabric.Point(
+              wire.points[wire.points.length - 1].x,
+              wire.points[wire.points.length - 1].y
+            );
           } else {
             const lastPoint = wire.points[wire.points.length - 1];
             endPinCoords = new fabric.Point(lastPoint.x, lastPoint.y);
           }
 
-          // Determine if rerouting is needed
-          if (
-            wire.startComponentId === componentId ||
-            wire.startComponent === movingComponent
-          ) {
-            shouldReroute = true;
-            console.log("  📌 Start component moved - will reroute");
+          // RULE #3: Calculate completely new, clean orthogonal path
+          console.log(`  🧭 Calculating fresh orthogonal path from (${startPinCoords.x}, ${startPinCoords.y}) to (${endPinCoords.x}, ${endPinCoords.y})`);
+          
+          const obstacles = allObjects.filter(obj => 
+            (obj as any).componentType && 
+            obj.type === "group" && 
+            obj !== movingComponent
+          );
+          
+          const newPath = calculateOrthogonalPath(startPinCoords, endPinCoords, obstacles);
+
+          // Apply the new path
+          wire.set({ points: newPath });
+
+          // Maintain net coloring
+          const wireNetId = wire.netId;
+          if (wireNetId && electricalNets.has(wireNetId)) {
+            const net = electricalNets.get(wireNetId)!;
+            wire.set({ stroke: net.color });
           }
 
-          if (
-            wire.endComponentId === componentId ||
-            wire.endComponent === movingComponent
-          ) {
-            shouldReroute = true;
-            console.log("  📌 End component moved - will reroute");
-          }
+          console.log(`  ✅ RULE #3: Wire rerouted with ${newPath.length} points using intelligent pathfinding`);
 
-          if (shouldReroute) {
-            // RULE #3: Apply intelligent orthogonal rerouting
-            console.log("  🧭 Calculating intelligent orthogonal path");
-            const newPath = calculateOrthogonalPath(
-              startPinCoords,
-              endPinCoords,
-              obstacles
-            );
-
-            // Update wire geometry with new intelligent path
-            wire.set({ points: newPath });
-
-            console.log(`  ✅ Wire rerouted with ${newPath.length} points`);
-          } else {
-            // Fallback: simple endpoint update for non-connected end
-            const currentPoints = wire.points || [];
-            let newPoints: fabric.Point[];
-
-            if (currentPoints.length <= 2) {
-              // Simple two-point wire
-              newPoints = [startPinCoords, endPinCoords];
-            } else {
-              // Multi-point wire - preserve middle waypoints, update endpoints
-              const middlePoints = currentPoints.slice(1, -1);
-              newPoints = [startPinCoords, ...middlePoints, endPinCoords];
-            }
-
-            wire.set({ points: newPoints });
-            console.log(
-              `  ✅ Wire updated with preserved waypoints (${newPoints.length} points)`
-            );
-          }
         } catch (error) {
-          console.error(`  ❌ Error updating wire ${index + 1}:`, error);
+          console.error(`  ❌ RULE #3: Error rerouting wire ${index + 1}:`, error);
         }
       });
 
       // Force canvas redraw to show updates
       canvas.renderAll();
-      console.log("🎨 Canvas redrawn with intelligently rerouted wires");
+      console.log("🎨 RULE #3: Canvas redrawn with intelligently rerouted wires");
     },
-    [canvas, getPinWorldCoordinates, calculateOrthogonalPath]
+    [canvas, getPinWorldCoordinates, calculateOrthogonalPath, electricalNets]
+  );
+
+  // RULE #4: Safe component movement that never accidentally disconnects wires
+  const safeComponentMovement = useCallback(
+    (movingComponent: fabric.Group) => {
+      console.log("🔒 RULE #4: Safe component movement - wires will reroute, never disconnect");
+      
+      // Apply Rule #3 intelligent rerouting
+      updateConnectedWires(movingComponent);
+      
+      // Rule #4 guarantee: No wire deletion during component movement
+      console.log("✅ RULE #4: Component moved safely - all connections preserved");
+    },
+    [updateConnectedWires]
   );
 
   // PART 3: THE "PIN VISIBILITY" RULE - Perfect Wiring System
@@ -888,7 +1287,9 @@ export function useWiringTool({
   useEffect(() => {
     if (!canvas) return;
 
-    console.log(`🔍 PIN VISIBILITY: Updating pin visibility for Wire Mode: ${isWireMode}`);
+    console.log(
+      `🔍 PIN VISIBILITY: Updating pin visibility for Wire Mode: ${isWireMode}`
+    );
 
     const objects = canvas.getObjects();
     objects.forEach((obj) => {
@@ -915,14 +1316,14 @@ export function useWiringTool({
                 opacity: 0.1, // Nearly invisible but still there
                 strokeWidth: 0,
                 fill: "transparent",
-                stroke: "transparent", 
+                stroke: "transparent",
                 visible: true, // Keep in DOM for hit detection
               });
             }
           }
         });
       }
-      
+
       // Legacy support for old component structure (if any exist)
       else if ((obj as any).componentType && obj.type === "group") {
         const group = obj as fabric.Group;
@@ -949,7 +1350,11 @@ export function useWiringTool({
     });
 
     canvas.renderAll();
-    console.log(`✅ PIN VISIBILITY: ${isWireMode ? 'SHOWN' : 'HIDDEN'} all pins based on Wire Mode`);
+    console.log(
+      `✅ PIN VISIBILITY: ${
+        isWireMode ? "SHOWN" : "HIDDEN"
+      } all pins based on Wire Mode`
+    );
   }, [canvas, isWireMode]);
 
   // Main mouse event handlers for wire mode
@@ -1110,5 +1515,8 @@ export function useWiringTool({
     toggleWireMode,
     exitWireMode,
     updateConnectedWires, // PART 2: Expose wire update function
+    safeComponentMovement, // RULE #4: Safe component movement that preserves connections
+    deleteWire, // RULE #4: Explicit wire deletion
+    getNetInfo, // NET COLORING: Expose net information for debugging/UI
   };
 }
