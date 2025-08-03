@@ -68,56 +68,56 @@ const mockComponents = [
     id: "9",
     name: "Inductor",
     category: "Inductors",
-    image: "/components/resistor.svg",
+    image: "/components/inductor.svg",
     type: "inductor",
   },
   {
     id: "10",
     name: "Op-Amp",
     category: "ICs",
-    image: "/components/arduino.svg",
+    image: "/components/opamp.svg",
     type: "opamp",
   },
   {
     id: "11",
     name: "Battery",
     category: "Power",
-    image: "/components/capacitor.svg",
+    image: "/components/battery.svg",
     type: "battery",
   },
   {
     id: "12",
     name: "Motor",
     category: "Other",
-    image: "/components/switch.svg",
+    image: "/components/motor.svg",
     type: "motor",
   },
   {
     id: "13",
     name: "Diode",
     category: "Diodes",
-    image: "/components/led.svg",
+    image: "/components/diode.svg",
     type: "diode",
   },
   {
     id: "14",
     name: "Voltage Regulator",
     category: "ICs",
-    image: "/components/arduino.svg",
+    image: "/components/voltage_regulator.svg",
     type: "voltage_regulator",
   },
   {
     id: "15",
     name: "Crystal Oscillator",
     category: "Other",
-    image: "/components/resistor.svg",
+    image: "/components/crystal.svg",
     type: "crystal",
   },
   {
     id: "16",
     name: "Push Button",
     category: "Switches",
-    image: "/components/switch.svg",
+    image: "/components/pushbutton.svg",
     type: "pushbutton",
   },
   {
@@ -201,7 +201,7 @@ const mockSchemas = [
 
 interface ComponentItemProps {
   component: (typeof mockComponents)[0];
-  onClick: () => void;
+  onClick: (e: React.MouseEvent) => void;
 }
 
 function ComponentItem({ component, onClick }: ComponentItemProps) {
@@ -213,7 +213,7 @@ function ComponentItem({ component, onClick }: ComponentItemProps) {
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          onClick();
+          onClick(e as any);
         }
       }}
     >
@@ -582,8 +582,12 @@ export function SchemaPanel() {
                     <ComponentItem
                       key={component.id}
                       component={component}
-                      onClick={() => {
-                        console.log(`Adding ${component.name} to canvas`);
+                      onClick={(e) => {
+                        e.stopPropagation(); // THE FIX - Prevent multiple event firing
+                        const timestamp = new Date().toISOString();
+                        console.log(
+                          `[${timestamp}] CLICK: Adding ${component.name} to canvas`
+                        );
                         canvasCommandManager.executeCommand("component:add", {
                           type: component.type,
                           svgPath: component.image,
@@ -615,8 +619,12 @@ export function SchemaPanel() {
                         <ComponentItem
                           key={component.id}
                           component={component}
-                          onClick={() => {
-                            console.log(`Adding ${component.name} to canvas`);
+                          onClick={(e) => {
+                            e.stopPropagation(); // THE FIX - Prevent multiple event firing
+                            const timestamp = new Date().toISOString();
+                            console.log(
+                              `[${timestamp}] CLICK: Adding ${component.name} to canvas`
+                            );
                             canvasCommandManager.executeCommand(
                               "component:add",
                               {

@@ -1,0 +1,17 @@
+<svg width="60" height="30" viewBox="0 0 60 30"  xmlns="http://www.w3.org/2000/svg">
+  <!-- Left lead (Anode) -->
+  <line x1="0" y1="15" x2="20" y2="15" stroke="#000" stroke-width="1.5"/>
+
+  <!-- Diode triangle -->
+  <polygon points="20,8 20,22 35,15"  stroke="#000" stroke-width="1.5"/>
+
+  <!-- Cathode line -->
+  <line x1="35" y1="8" x2="35" y2="22" stroke="#000" stroke-width="2"/>
+
+  <!-- Right lead (Cathode) -->
+  <line x1="35" y1="15" x2="60" y2="15" stroke="#000" stroke-width="1.5"/>
+
+  <!-- Connection points -->
+  <circle cx="0" cy="15" r="1.5" fill="#000"/>
+  <circle cx="60" cy="15" r="1.5" fill="#000"/>
+</svg>

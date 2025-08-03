@@ -93,7 +93,7 @@ export function TopToolbar({ className = "" }: TopToolbarProps) {
         {/* Right Side Export Button */}
         <button
           onClick={handleExport}
-          className="flex items-center justify-center text-white hover:bg-[#002BB5] transition-colors"
+          className="flex items-center justify-center text-white bg-[#0038DF] hover:bg-[#0032c6] transition-colors"
           style={{
             ...r({
               width: 83,
@@ -101,7 +101,6 @@ export function TopToolbar({ className = "" }: TopToolbarProps) {
               borderRadius: 8,
               padding: 10,
             }),
-            backgroundColor: "#007BFF",
             marginRight: responsive(8),
           }}
         >

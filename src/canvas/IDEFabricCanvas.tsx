@@ -115,6 +115,9 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
     // Register canvas with command manager
     canvasCommandManager.setCanvas(canvas);
 
+    // Setup simple component handler
+    setupComponentHandler(canvas);
+
     // Cleanup function to prevent memory leaks
     return () => {
       canvasCommandManager.setCanvas(null);
@@ -698,6 +701,38 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
     // saveState(); // We can add this back later
   };
 
+  const handleRotate = () => {
+    console.log("--- ACTION START: handleRotate ---");
+    if (!fabricCanvas) {
+      console.log("--- ACTION FAILED: No canvas available ---");
+      return;
+    }
+
+    const activeObject = fabricCanvas.getActiveObject();
+    if (!activeObject) {
+      console.log("--- ACTION FAILED: No component selected to rotate ---");
+      return;
+    }
+
+    // Only rotate components (not wires or other objects)
+    if (!(activeObject as any).componentType) {
+      console.log("--- ACTION FAILED: Selected object is not a component ---");
+      return;
+    }
+
+    // Rotate by 90 degrees
+    const currentAngle = activeObject.angle || 0;
+    const newAngle = (currentAngle + 90) % 360;
+
+    activeObject.set("angle", newAngle);
+    fabricCanvas.renderAll();
+
+    console.log(
+      `--- ACTION SUCCESS: handleRotate (${currentAngle}° → ${newAngle}°) ---`
+    );
+    // saveState(); // We can add this back later
+  };
+
   const handleUndo = () => {
     console.log("--- ACTION START: handleUndo ---");
     console.log(
@@ -779,6 +814,7 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
     onPaste: handlePaste,
     onUndo: handleUndo,
     onRedo: handleRedo,
+    onRotate: handleRotate,
   });
 
   // Right-click context menu handler - Completely refactored per specification
@@ -934,7 +970,7 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
 
       {/* Grid and Snap indicator */}
       <div className="absolute bottom-2 left-2 bg-green-600 bg-opacity-90 text-white px-2 py-1 rounded text-xs">
-        Grid: {gridSize}px • Snap-to-Grid Active
+        Grid: {gridSize}px • Simple SVG • R=rotate • W=wire
       </div>
 
       {/* Wire mode indicator - Professional-grade wiring tool */}
@@ -958,4 +994,174 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
       )}
     </div>
   );
+}
+
+// SIMPLE COMPONENT HANDLER - Add this at the end
+let isComponentHandlerSetup = false;
+
+export function setupComponentHandler(canvas: fabric.Canvas) {
+  if (isComponentHandlerSetup) return;
+
+  console.log("� Setting up SVG component handler...");
+
+  canvasCommandManager.on(
+    "component:add",
+    (payload: {
+      type?: string;
+      svgPath: string;
+      name?: string;
+      componentType?: string;
+      x?: number;
+      y?: number;
+    }) => {
+      console.log("Component command received:", payload);
+
+      const createComponent = (componentInfo: any) => {
+        console.log(`🔄 Loading SVG from: ${componentInfo.svgPath}`);
+
+        // First fetch the SVG content, then load it
+        fetch(componentInfo.svgPath)
+          .then((response) => response.text())
+          .then((svgString) => {
+            console.log("📄 SVG string loaded, parsing...");
+
+            // Use modern Fabric.js 6.0+ Promise-based syntax
+            fabric.loadSVGFromString(svgString).then((result) => {
+              const objectsArray = result.objects.filter((obj) => !!obj);
+              console.log("✅ SVG parsed successfully with modern syntax:", {
+                objects: objectsArray,
+              });
+              console.log("📊 Objects array length:", objectsArray?.length);
+
+                if (!objectsArray || objectsArray.length === 0) {
+                  console.error("❌ SVG parsing failed: No objects returned");
+                  return;
+                }
+
+                try {
+                  console.log("🔧 Processing and initializing objects...");
+
+                  // Process each object to ensure it's properly initialized
+                  const processedObjects = objectsArray.map(
+                    (obj: any, index: number) => {
+                      console.log(`Processing object ${index}:`, obj.type);
+
+                      // Ensure the object is properly initialized
+                      if (obj.set) {
+                        // Force initialization by setting a property
+                        obj.set({
+                          selectable: false,
+                          evented: false,
+                        });
+                      }
+
+                      return obj;
+                    }
+                  );
+
+                  console.log("✅ All objects processed and initialized");
+
+                  // Create a group from all the SVG objects
+                  console.log("🔧 Creating group from all objects...");
+                  const svgSymbol = new fabric.Group(processedObjects, {
+                    originX: "center",
+                    originY: "center",
+                  });
+                  console.log("✅ SVG symbol created:", svgSymbol);
+
+                  console.log("📏 SVG Symbol dimensions:", {
+                    width: svgSymbol.width,
+                    height: svgSymbol.height,
+                  });
+
+                  // Create the pins
+                  const pin1 = new fabric.Circle({
+                    radius: 3,
+                    fill: "rgba(0,180,0,0.5)",
+                    left: -(svgSymbol.width || 40) / 2 - 10,
+                    top: 0,
+                    originX: "center",
+                    originY: "center",
+                  });
+                  const pin2 = new fabric.Circle({
+                    radius: 3,
+                    fill: "rgba(0,180,0,0.5)",
+                    left: (svgSymbol.width || 40) / 2 + 10,
+                    top: 0,
+                    originX: "center",
+                    originY: "center",
+                  });
+
+                  // Add pin metadata for wiring
+                  pin1.set("pin", true);
+                  pin1.set("data", {
+                    type: "pin",
+                    pinId: "pin1",
+                    pinNumber: 1,
+                  });
+                  pin2.set("pin", true);
+                  pin2.set("data", {
+                    type: "pin",
+                    pinId: "pin2",
+                    pinNumber: 2,
+                  });
+
+                  console.log("📍 Pins created with metadata");
+
+                  // Create the final group with the symbol and its pins
+                  const finalComponent = new fabric.Group(
+                    [svgSymbol, pin1, pin2],
+                    {
+                      left: canvas.getVpCenter().x,
+                      top: canvas.getVpCenter().y,
+                    }
+                  );
+
+                  console.log("🎯 Final component created");
+
+                  // Add component metadata
+                  finalComponent.set(
+                    "componentType",
+                    componentInfo.type ||
+                      componentInfo.componentType ||
+                      "component"
+                  );
+                  finalComponent.set("data", {
+                    type: "component",
+                    componentType:
+                      componentInfo.type || componentInfo.componentType,
+                  });
+
+                  // Make it selectable and rotatable
+                  finalComponent.set({
+                    selectable: true,
+                    evented: true,
+                    hasControls: true,
+                    hasBorders: true,
+                    centeredRotation: true,
+                  });
+
+                  // Add the component to the canvas
+                  canvas.add(finalComponent);
+                  canvas.renderAll();
+
+                  console.log("🎉 Component successfully added to canvas!");
+                } catch (error) {
+                  console.error("💥 Error during component creation:", error);
+                }
+              }).catch((error) => {
+                console.error("❌ Error parsing SVG with modern syntax:", error);
+              });
+          })
+          .catch((error) => {
+            console.error("❌ Failed to fetch SVG file:", error);
+          });
+      };
+
+      // Run the component creation
+      createComponent(payload);
+    }
+  );
+
+  isComponentHandlerSetup = true;
 }

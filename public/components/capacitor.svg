@@ -1,6 +1,17 @@
-<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect x="8" y="10" width="16" height="12" fill="#4A90E2" rx="2"/>
-  <line x1="2" y1="16" x2="8" y2="16" stroke="#666" stroke-width="2"/>
-  <line x1="24" y1="16" x2="30" y2="16" stroke="#666" stroke-width="2"/>
-  <text x="16" y="18" font-family="Arial" font-size="8" text-anchor="middle" fill="white">C</text>
+<svg width="60" height="30" viewBox="0 0 60 30" xmlns="http://www.w3.org/2000/svg">
+  <!-- Left lead -->
+  <line x1="0" y1="15" x2="25" y2="15" stroke="#000" stroke-width="1.5"/>
+
+  <!-- Left plate -->
+  <line x1="25" y1="5" x2="25" y2="25" stroke="#000" stroke-width="2"/>
+
+  <!-- Right plate -->
+  <line x1="35" y1="5" x2="35" y2="25" stroke="#000" stroke-width="2"/>
+
+  <!-- Right lead -->
+  <line x1="35" y1="15" x2="60" y2="15" stroke="#000" stroke-width="1.5"/>
+
+  <!-- Connection points -->
+  <circle cx="0" cy="15" r="1.5" fill="#000"/>
+  <circle cx="60" cy="15" r="1.5" fill="#000"/>
 </svg>

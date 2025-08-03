@@ -1,7 +1,23 @@
-<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect x="8" y="8" width="16" height="16" fill="#333" rx="2"/>
-  <line x1="2" y1="12" x2="8" y2="12" stroke="#666" stroke-width="2"/>
-  <line x1="2" y1="20" x2="8" y2="20" stroke="#666" stroke-width="2"/>
-  <line x1="24" y1="16" x2="30" y2="16" stroke="#666" stroke-width="2"/>
-  <text x="16" y="18" font-family="Arial" font-size="6" text-anchor="middle" fill="white">T</text>
+<svg width="60" height="50" viewBox="0 0 60 50"  xmlns="http://www.w3.org/2000/svg">
+  <!-- Base lead -->
+  <line x1="0" y1="25" x2="20" y2="25" stroke="#000" stroke-width="1.5"/>
+
+  <!-- Base vertical line -->
+  <line x1="20" y1="15" x2="20" y2="35" stroke="#000" stroke-width="2"/>
+
+  <!-- Collector lead -->
+  <line x1="20" y1="20" x2="35" y2="10" stroke="#000" stroke-width="1.5"/>
+  <line x1="35" y1="10" x2="60" y2="10" stroke="#000" stroke-width="1.5"/>
+
+  <!-- Emitter lead -->
+  <line x1="20" y1="30" x2="35" y2="40" stroke="#000" stroke-width="1.5"/>
+  <line x1="35" y1="40" x2="60" y2="40" stroke="#000" stroke-width="1.5"/>
+
+  <!-- Arrow on emitter (NPN) -->
+  <polygon points="32,37 35,40 32,43" fill="#000" stroke="#000" stroke-width="1"/>
+
+  <!-- Connection points -->
+  <circle cx="0" cy="25" r="1.5" fill="#000"/>
+  <circle cx="60" cy="10" r="1.5" fill="#000"/>
+  <circle cx="60" cy="40" r="1.5" fill="#000"/>
 </svg>

@@ -1,0 +1,24 @@
+<svg width="60" height="40" viewBox="0 0 60 40"  xmlns="http://www.w3.org/2000/svg">
+  <!-- Voltage regulator package -->
+  <rect x="15" y="10" width="30" height="20"  stroke="#000" stroke-width="1.5" rx="2"/>
+
+  <!-- Input pin -->
+  <line x1="0" y1="15" x2="15" y2="15" stroke="#000" stroke-width="1.5"/>
+  <text x="8" y="12" font-family="Arial" font-size="6" text-anchor="middle" fill="#000">IN</text>
+
+  <!-- Ground pin -->
+  <line x1="30" y1="30" x2="30" y2="40" stroke="#000" stroke-width="1.5"/>
+  <text x="30" y="38" font-family="Arial" font-size="6" text-anchor="middle" fill="#000">GND</text>
+
+  <!-- Output pin -->
+  <line x1="45" y1="15" x2="60" y2="15" stroke="#000" stroke-width="1.5"/>
+  <text x="52" y="12" font-family="Arial" font-size="6" text-anchor="middle" fill="#000">OUT</text>
+
+  <!-- Regulator label -->
+  <text x="30" y="22" font-family="Arial" font-size="8" text-anchor="middle" fill="#000">REG</text>
+
+  <!-- Connection points -->
+  <circle cx="0" cy="15" r="1.5" fill="#000"/>
+  <circle cx="30" cy="40" r="1.5" fill="#000"/>
+  <circle cx="60" cy="15" r="1.5" fill="#000"/>
+</svg>

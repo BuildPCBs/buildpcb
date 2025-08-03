@@ -214,9 +214,33 @@ export const builtInCanvasCommands = {
     },
   } as CanvasCommand,
 
+  // NEW: Simple command that forwards to foolproof component factory in IDEFabricCanvas
   COMPONENT_ADD: {
     id: "component:add",
     name: "Add Component",
+    handler: async (
+      canvas: fabric.Canvas,
+      params?: {
+        type: string;
+        svgPath: string;
+        name: string;
+        x?: number;
+        y?: number;
+      }
+    ) => {
+      // Forward to the foolproof component factory by emitting the event
+      console.log(
+        `🎯 Command manager: Forwarding "component:add" for ${params?.name}`
+      );
+      canvasCommandManager.emit("component:add", params);
+    },
+  } as CanvasCommand,
+
+  // DISABLED: Old component creation system - replaced by foolproof factory in IDEFabricCanvas
+  /*
+  COMPONENT_ADD_OLD: {
+    id: "component:add-old",
+    name: "Add Component (Old)",
     handler: async (
       canvas: fabric.Canvas,
       params?: {
@@ -235,123 +259,323 @@ export const builtInCanvasCommands = {
 
         console.log(`Adding ${params.name} (${params.type}) to canvas`);
 
-        // Helper function to create pins for different component types
+        // Helper function to create pins for different component types with PRECISE positioning
         const createPinsForComponent = (type: string): fabric.Circle[] => {
           const pins: fabric.Circle[] = [];
 
-          // Different pin configurations based on component type
+          // Pin style configuration
+          const pinStyle = {
+            radius: 3,
+            fill: "silver",
+            stroke: "#0038DF",
+            strokeWidth: 2,
+            originX: "center" as const,
+            originY: "center" as const,
+            selectable: false,
+            evented: false,
+            pin: true,
+          };
+
+          // PRECISE pin configurations based on SVG designs
           switch (type) {
             case "resistor":
-            case "capacitor":
-            case "inductor":
-              // Two-terminal components
+              // Pins at exact ends of resistor leads (60px wide SVG)
               pins.push(
                 new fabric.Circle({
-                  radius: 4,
-                  fill: "transparent",
-                  stroke: "#0038DF",
-                  strokeWidth: 0,
-                  left: -35,
+                  ...pinStyle,
+                  left: -30, // Left end of resistor
                   top: 0,
-                  originX: "center",
-                  originY: "center",
-                  selectable: false,
-                  evented: false,
-                  pin: true,
                   pinType: "left",
                 } as any),
                 new fabric.Circle({
-                  radius: 4,
-                  fill: "transparent",
-                  stroke: "#0038DF",
-                  strokeWidth: 0,
-                  left: 35,
+                  ...pinStyle,
+                  left: 30, // Right end of resistor
                   top: 0,
-                  originX: "center",
-                  originY: "center",
-                  selectable: false,
-                  evented: false,
-                  pin: true,
                   pinType: "right",
                 } as any)
               );
               break;
-            case "transistor":
-              // Three-terminal component
+
+            case "capacitor":
+              // Pins at exact ends of capacitor leads (60px wide SVG)
               pins.push(
                 new fabric.Circle({
-                  radius: 4,
-                  fill: "transparent",
-                  stroke: "#0038DF",
-                  strokeWidth: 0,
-                  left: -30,
-                  top: -15,
-                  originX: "center",
-                  originY: "center",
-                  selectable: false,
-                  evented: false,
-                  pin: true,
+                  ...pinStyle,
+                  left: -30, // Left plate connection
+                  top: 0,
+                  pinType: "left",
+                } as any),
+                new fabric.Circle({
+                  ...pinStyle,
+                  left: 30, // Right plate connection
+                  top: 0,
+                  pinType: "right",
+                } as any)
+              );
+              break;
+
+            case "led":
+            case "diode":
+              // Pins at anode and cathode ends
+              pins.push(
+                new fabric.Circle({
+                  ...pinStyle,
+                  left: -30, // Anode (left)
+                  top: 0,
+                  pinType: "anode",
+                } as any),
+                new fabric.Circle({
+                  ...pinStyle,
+                  left: 30, // Cathode (right)
+                  top: 0,
+                  pinType: "cathode",
+                } as any)
+              );
+              break;
+
+            case "transistor":
+              // Base, Collector, Emitter pins (precise to SVG design)
+              pins.push(
+                new fabric.Circle({
+                  ...pinStyle,
+                  left: -30, // Base (left)
+                  top: 0,
                   pinType: "base",
                 } as any),
                 new fabric.Circle({
-                  radius: 4,
-                  fill: "transparent",
-                  stroke: "#0038DF",
-                  strokeWidth: 0,
-                  left: 30,
+                  ...pinStyle,
+                  left: 30, // Collector (top-right)
                   top: -15,
-                  originX: "center",
-                  originY: "center",
-                  selectable: false,
-                  evented: false,
-                  pin: true,
                   pinType: "collector",
                 } as any),
                 new fabric.Circle({
-                  radius: 4,
-                  fill: "transparent",
-                  stroke: "#0038DF",
-                  strokeWidth: 0,
-                  left: 30,
+                  ...pinStyle,
+                  left: 30, // Emitter (bottom-right)
                   top: 15,
-                  originX: "center",
-                  originY: "center",
-                  selectable: false,
-                  evented: false,
-                  pin: true,
                   pinType: "emitter",
                 } as any)
               );
               break;
+
+            case "switch":
+            case "pushbutton":
+              // Switch contact pins
+              pins.push(
+                new fabric.Circle({
+                  ...pinStyle,
+                  left: -30, // Left contact
+                  top: 0,
+                  pinType: "contact1",
+                } as any),
+                new fabric.Circle({
+                  ...pinStyle,
+                  left: 30, // Right contact
+                  top: 0,
+                  pinType: "contact2",
+                } as any)
+              );
+              break;
+
+            case "inductor":
+              // Inductor coil ends
+              pins.push(
+                new fabric.Circle({
+                  ...pinStyle,
+                  left: -30, // Left coil end
+                  top: 0,
+                  pinType: "left",
+                } as any),
+                new fabric.Circle({
+                  ...pinStyle,
+                  left: 30, // Right coil end
+                  top: 0,
+                  pinType: "right",
+                } as any)
+              );
+              break;
+
+            case "battery":
+              // Battery terminals
+              pins.push(
+                new fabric.Circle({
+                  ...pinStyle,
+                  left: -30, // Positive terminal
+                  top: 0,
+                  pinType: "positive",
+                } as any),
+                new fabric.Circle({
+                  ...pinStyle,
+                  left: 30, // Negative terminal
+                  top: 0,
+                  pinType: "negative",
+                } as any)
+              );
+              break;
+
+            case "motor":
+              // Motor connection pins
+              pins.push(
+                new fabric.Circle({
+                  ...pinStyle,
+                  left: -30, // Motor lead 1
+                  top: 0,
+                  pinType: "lead1",
+                } as any),
+                new fabric.Circle({
+                  ...pinStyle,
+                  left: 30, // Motor lead 2
+                  top: 0,
+                  pinType: "lead2",
+                } as any)
+              );
+              break;
+
+            case "crystal":
+              // Crystal oscillator pins
+              pins.push(
+                new fabric.Circle({
+                  ...pinStyle,
+                  left: -30, // Crystal pin 1
+                  top: 0,
+                  pinType: "pin1",
+                } as any),
+                new fabric.Circle({
+                  ...pinStyle,
+                  left: 30, // Crystal pin 2
+                  top: 0,
+                  pinType: "pin2",
+                } as any)
+              );
+              break;
+
+            case "voltage_regulator":
+              // 3-pin regulator (IN, GND, OUT)
+              pins.push(
+                new fabric.Circle({
+                  ...pinStyle,
+                  left: -30, // Input pin
+                  top: -8,
+                  pinType: "input",
+                } as any),
+                new fabric.Circle({
+                  ...pinStyle,
+                  left: 0, // Ground pin (bottom center)
+                  top: 20,
+                  pinType: "ground",
+                } as any),
+                new fabric.Circle({
+                  ...pinStyle,
+                  left: 30, // Output pin
+                  top: -8,
+                  pinType: "output",
+                } as any)
+              );
+              break;
+
+            case "sensor":
+              // 3-pin sensor (VCC, GND, SIG)
+              pins.push(
+                new fabric.Circle({
+                  ...pinStyle,
+                  left: -30, // VCC pin
+                  top: -5,
+                  pinType: "vcc",
+                } as any),
+                new fabric.Circle({
+                  ...pinStyle,
+                  left: -30, // GND pin
+                  top: 5,
+                  pinType: "ground",
+                } as any),
+                new fabric.Circle({
+                  ...pinStyle,
+                  left: 30, // Signal pin
+                  top: 0,
+                  pinType: "signal",
+                } as any)
+              );
+              break;
+
+            case "arduino":
+              // Arduino digital pins (simplified - top row)
+              for (let i = 0; i < 6; i++) {
+                pins.push(
+                  new fabric.Circle({
+                    ...pinStyle,
+                    left: -25 + i * 10, // Spread across top
+                    top: -25,
+                    pinType: `digital_${i}`,
+                  } as any)
+                );
+              }
+              // Arduino analog pins (bottom row)
+              for (let i = 0; i < 4; i++) {
+                pins.push(
+                  new fabric.Circle({
+                    ...pinStyle,
+                    left: -15 + i * 10, // Spread across bottom
+                    top: 25,
+                    pinType: `analog_${i}`,
+                  } as any)
+                );
+              }
+              break;
+
+            case "connector":
+              // Multi-pin connector (3 pins each side)
+              pins.push(
+                new fabric.Circle({
+                  ...pinStyle,
+                  left: -30, // Left pin 1
+                  top: -6,
+                  pinType: "left1",
+                } as any),
+                new fabric.Circle({
+                  ...pinStyle,
+                  left: -30, // Left pin 2
+                  top: 0,
+                  pinType: "left2",
+                } as any),
+                new fabric.Circle({
+                  ...pinStyle,
+                  left: -30, // Left pin 3
+                  top: 6,
+                  pinType: "left3",
+                } as any),
+                new fabric.Circle({
+                  ...pinStyle,
+                  left: 30, // Right pin 1
+                  top: -6,
+                  pinType: "right1",
+                } as any),
+                new fabric.Circle({
+                  ...pinStyle,
+                  left: 30, // Right pin 2
+                  top: 0,
+                  pinType: "right2",
+                } as any),
+                new fabric.Circle({
+                  ...pinStyle,
+                  left: 30, // Right pin 3
+                  top: 6,
+                  pinType: "right3",
+                } as any)
+              );
+              break;
+
             default:
               // Default two-pin configuration
               pins.push(
                 new fabric.Circle({
-                  radius: 4,
-                  fill: "transparent",
-                  stroke: "#0038DF",
-                  strokeWidth: 0,
+                  ...pinStyle,
                   left: -25,
                   top: 0,
-                  originX: "center",
-                  originY: "center",
-                  selectable: false,
-                  evented: false,
-                  pin: true,
                   pinType: "pin1",
                 } as any),
                 new fabric.Circle({
-                  radius: 4,
-                  fill: "transparent",
-                  stroke: "#0038DF",
-                  strokeWidth: 0,
+                  ...pinStyle,
                   left: 25,
                   top: 0,
-                  originX: "center",
-                  originY: "center",
-                  selectable: false,
-                  evented: false,
-                  pin: true,
                   pinType: "pin2",
                 } as any)
               );
@@ -360,85 +584,44 @@ export const builtInCanvasCommands = {
           return pins;
         };
 
-        // Helper function to create fallback component when SVG fails
-        const createFallbackComponent = (params: {
-          type: string;
-          name: string;
-        }): fabric.Rect => {
-          return new fabric.Rect({
-            width: 60,
-            height: 30,
-            fill: "#E8E8E8",
-            stroke: "#333333",
+        // Create fallback component function
+        const createFallbackComponent = (
+          params: {
+            type: string;
+            name: string;
+            x?: number;
+            y?: number;
+          },
+          pins: fabric.Circle[],
+          canvas: fabric.Canvas
+        ) => {
+          console.log(`Creating fallback component for ${params.type}`);
+
+          // Create a simple rectangle as fallback
+          const fallbackRect = new fabric.Rect({
+            width: 50,
+            height: 25,
+            fill: "#f0f0f0",
+            stroke: "#0038DF",
             strokeWidth: 2,
+            rx: 4,
+            ry: 4,
             originX: "center",
             originY: "center",
           });
-        };
 
-        // Try to load SVG component from the provided path
-        try {
-          await new Promise<void>((resolve, reject) => {
-            fabric.loadSVGFromURL(params.svgPath, (objects, options) => {
-              try {
-                // Check if objects is an array
-                if (!Array.isArray(objects)) {
-                  throw new Error("Invalid SVG objects");
-                }
-
-                // Create the component symbol from loaded SVG
-                const componentSymbol = fabric.util.groupSVGElements(
-                  objects,
-                  options
-                );
-
-                // Scale the component to appropriate size (adjust as needed)
-                componentSymbol.scaleToWidth(60);
-                componentSymbol.scaleToHeight(40);
-
-                // Create pin objects based on component type
-                const pins = createPinsForComponent(params.type);
-
-                // Group the component symbol with its pins
-                const componentGroup = new fabric.Group(
-                  [componentSymbol, ...pins],
-                  {
-                    left: params.x ?? canvas.getWidth() / 2,
-                    top: params.y ?? canvas.getHeight() / 2,
-                    originX: "center",
-                    originY: "center",
-                    selectable: true,
-                    evented: true,
-                    hoverCursor: "move",
-                    moveCursor: "move",
-                    componentType: params.type,
-                    componentName: params.name,
-                    id: `${params.type}_${Date.now()}`, // Unique ID
-                  } as any
-                );
-
-                // Add to canvas
-                canvas.add(componentGroup);
-                canvas.renderAll();
-
-                console.log(`${params.name} added to canvas successfully`);
-                resolve();
-              } catch (error) {
-                reject(error);
-              }
-            });
+          // Add component type label
+          const label = new fabric.Text(params.type.toUpperCase(), {
+            fontSize: 8,
+            fill: "#333333",
+            textAlign: "center",
+            originX: "center",
+            originY: "center",
+            top: 8, // Position below the rectangle
           });
-        } catch (error) {
-          // Fallback: Create a simple rectangle component
-          console.warn(
-            `Failed to load SVG for ${params.name}, creating fallback component`
-          );
-
-          const fallbackComponent = createFallbackComponent(params);
-          const pins = createPinsForComponent(params.type);
 
           const componentGroup = new fabric.Group(
-            [fallbackComponent, ...pins],
+            [fallbackRect, label, ...pins],
             {
               left: params.x ?? canvas.getWidth() / 2,
               top: params.y ?? canvas.getHeight() / 2,
@@ -457,13 +640,105 @@ export const builtInCanvasCommands = {
           canvas.add(componentGroup);
           canvas.renderAll();
 
-          console.log(`${params.name} fallback component added to canvas`);
-        }
+          console.log(
+            `Fallback ${params.name} added to canvas with ${pins.length} pins`
+          );
+        };
+
+        // Try to load SVG component from the provided path
+        const loadComponent = async () => {
+          const pins = createPinsForComponent(params.type);
+
+          // Prepare SVG URL (ensure it starts with /)
+          const svgUrl = params.svgPath.startsWith("/")
+            ? params.svgPath
+            : `/${params.svgPath}`;
+          console.log(`Attempting to load SVG from: ${svgUrl}`);
+
+          // Use a Promise wrapper for better error handling
+          return new Promise<void>((resolve) => {
+            fabric.loadSVGFromURL(svgUrl, (objects: any, options: any) => {
+              try {
+                if (objects && Array.isArray(objects) && objects.length > 0) {
+                  console.log(
+                    `Successfully loaded SVG for ${params.type} with ${objects.length} objects`
+                  );
+
+                  // Create the component symbol from loaded SVG
+                  const componentSymbol = fabric.util.groupSVGElements(
+                    objects,
+                    options
+                  );
+
+                  // Scale the component to appropriate size
+                  componentSymbol.set({
+                    scaleX: 1.0,
+                    scaleY: 1.0,
+                    originX: "center",
+                    originY: "center",
+                  });
+
+                  // Group the component symbol with its pins
+                  const componentGroup = new fabric.Group(
+                    [componentSymbol, ...pins],
+                    {
+                      left: params.x ?? canvas.getWidth() / 2,
+                      top: params.y ?? canvas.getHeight() / 2,
+                      originX: "center",
+                      originY: "center",
+                      selectable: true,
+                      evented: true,
+                      hoverCursor: "move",
+                      moveCursor: "move",
+                      componentType: params.type,
+                      componentName: params.name,
+                      id: `${params.type}_${Date.now()}`,
+                    } as any
+                  );
+
+                  // Add to canvas
+                  canvas.add(componentGroup);
+                  canvas.renderAll();
+
+                  console.log(
+                    `${params.name} added to canvas successfully with ${pins.length} pins`
+                  );
+                  resolve();
+                } else {
+                  console.warn(
+                    `No objects in SVG for ${params.type}, creating fallback`
+                  );
+                  createFallbackComponent(params, pins, canvas);
+                  resolve();
+                }
+              } catch (error) {
+                console.error(
+                  `Error processing SVG objects for ${params.type}:`,
+                  error
+                );
+                createFallbackComponent(params, pins, canvas);
+                resolve();
+              }
+            });
+
+            // Fallback timeout in case SVG loading hangs
+            setTimeout(() => {
+              console.warn(
+                `SVG loading timeout for ${params.type}, creating fallback`
+              );
+              createFallbackComponent(params, pins, canvas);
+              resolve();
+            }, 3000);
+          });
+        };
+
+        await loadComponent();
       } catch (error) {
         console.error("Error creating component:", error);
       }
     },
   } as CanvasCommand,
+  */
 };
 
 // Register built-in commands
