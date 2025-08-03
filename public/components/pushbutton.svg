@@ -1,17 +1,17 @@
 <svg width="60" height="30" viewBox="0 0 60 30"  xmlns="http://www.w3.org/2000/svg">
   <!-- Push button outline -->
-  <rect x="20" y="10" width="20" height="10"  stroke="#000" stroke-width="1.5" rx="2"/>
+  <rect x="20" y="10" width="20" height="10" fill="#FFFFFF" stroke="#000000" stroke-width="1.5" rx="2"/>
 
   <!-- Button press indicator -->
-  <rect x="22" y="8" width="16" height="4"  stroke="#000" stroke-width="1"/>
+  <rect x="22" y="8" width="16" height="4" fill="#E6E6E6" stroke="#000000" stroke-width="1"/>
 
   <!-- Left lead -->
-  <line x1="0" y1="15" x2="20" y2="15" stroke="#000" stroke-width="1.5"/>
+  <line x1="0" y1="15" x2="20" y2="15" stroke="#000000" stroke-width="1.5"/>
 
   <!-- Right lead -->
-  <line x1="40" y1="15" x2="60" y2="15" stroke="#000" stroke-width="1.5"/>
+  <line x1="40" y1="15" x2="60" y2="15" stroke="#000000" stroke-width="1.5"/>
 
   <!-- Connection points -->
-  <circle cx="0" cy="15" r="1.5" fill="#000"/>
-  <circle cx="60" cy="15" r="1.5" fill="#000"/>
+  <circle id="pin" cx="0" cy="15" r="1.5" fill="#000000"/>
+  <circle id="pin" cx="60" cy="15" r="1.5" fill="#000000"/>
 </svg>

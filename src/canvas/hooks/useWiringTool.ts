@@ -6,7 +6,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import * as fabric from "fabric";
 
-// Simple, reliable state management
+// Simple, reliable state management - DEFINITIVE IMPLEMENTATION
 interface WiringState {
   isDrawingWire: boolean;
   currentLine: fabric.Polyline | null;
@@ -33,13 +33,22 @@ export function useWiringTool({
   canvas,
   enabled = true,
 }: UseWiringToolProps): UseWiringToolReturn {
+  // PART 1: Define the State - Exact implementation as specified
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [startPin, setStartPin] = useState<fabric.Object | null>(null);
+  const [currentLine, setCurrentLine] = useState<fabric.Polyline | null>(null);
+
+  // Additional state for compatibility
   const [isWireMode, setIsWireMode] = useState(false);
-  const [wiringState, setWiringState] = useState<WiringState>({
-    isDrawingWire: false,
-    currentLine: null,
-    startPin: null,
-    wirePoints: [],
-  });
+  const [wirePoints, setWirePoints] = useState<fabric.Point[]>([]);
+
+  // Legacy state for compatibility - we'll sync these with the new state
+  const wiringState = {
+    isDrawingWire: isDrawing,
+    currentLine: currentLine,
+    startPin: startPin,
+    wirePoints: wirePoints,
+  };
 
   // Pin highlighting state
   const [highlightedPin, setHighlightedPin] = useState<fabric.Object | null>(
@@ -289,29 +298,29 @@ export function useWiringTool({
     []
   );
 
-  // CRITICAL: Reset the tool to clean state
-  const resetWiringState = useCallback(() => {
-    console.log("🔄 Resetting wiring tool to clean state");
+  // PART 2: Create the "Reset" Function (The Most Important Step)
+  const resetWiringTool = useCallback(() => {
+    console.log("🔄 DEFINITIVE RESET: Resetting wiring tool to clean state");
 
-    // Remove current line if exists
-    if (wiringState.currentLine && canvas) {
-      canvas.remove(wiringState.currentLine);
-      canvas.renderAll();
+    setIsDrawing(false);
+    setStartPin(null);
+    if (currentLine && canvas) {
+      canvas.remove(currentLine); // Remove the temporary line
     }
+    setCurrentLine(null);
+    setWirePoints([]);
 
     // Clear highlights
     clearPinHighlight();
 
-    // Reset state variables - THIS IS THE CRITICAL FIX
-    setWiringState({
-      isDrawingWire: false,
-      currentLine: null,
-      startPin: null,
-      wirePoints: [],
-    });
+    if (canvas) {
+      canvas.renderAll();
+    }
+    console.log("--- Wiring tool has been reset. ---");
+  }, [currentLine, canvas, clearPinHighlight]);
 
-    console.log("✅ Tool reset complete - ready for next wire");
-  }, [wiringState.currentLine, canvas, clearPinHighlight]);
+  // Legacy reset function for backward compatibility
+  const resetWiringState = resetWiringTool;
 
   // Start drawing a wire from a pin
   const startWireFromPin = useCallback(
@@ -342,13 +351,11 @@ export function useWiringTool({
       canvas.add(newLine);
       canvas.renderAll(); // Force immediate render
 
-      // Update state
-      setWiringState({
-        isDrawingWire: true,
-        currentLine: newLine,
-        startPin: pin,
-        wirePoints: [pinCoords], // Store fixed waypoints
-      });
+      // Update state using new state setters
+      setIsDrawing(true);
+      setCurrentLine(newLine);
+      setStartPin(pin);
+      setWirePoints([pinCoords]); // Store fixed waypoints
 
       console.log("✅ Wire preview created and visible - now following cursor");
     },
@@ -417,11 +424,8 @@ export function useWiringTool({
       // Add this point as a new fixed waypoint
       const newWirePoints = [...wiringState.wirePoints, orthogonalPoint];
 
-      // Update state with new waypoint
-      setWiringState((prev) => ({
-        ...prev,
-        wirePoints: newWirePoints,
-      }));
+      // Update state with new waypoint using new state setters
+      setWirePoints(newWirePoints);
 
       console.log(
         "✅ Corner added at",
@@ -517,15 +521,8 @@ export function useWiringTool({
         intersectionPoint.y
       );
 
-      // Reset for next wire
-      setWiringState({
-        isDrawingWire: false,
-        currentLine: null,
-        startPin: null,
-        wirePoints: [],
-      });
-
-      clearPinHighlight();
+      // PART 3: Call the "Reset" Function - After Successfully Completing a Wire
+      resetWiringTool();
     },
     [
       wiringState.currentLine,
@@ -534,7 +531,7 @@ export function useWiringTool({
       canvas,
       calculateOrthogonalPoint,
       createJunctionDot,
-      clearPinHighlight,
+      resetWiringTool,
     ]
   );
 
@@ -608,18 +605,8 @@ export function useWiringTool({
         endPinIndex,
       });
 
-      // CRITICAL: Reset for next wire (but don't remove the completed line)
-      setWiringState({
-        isDrawingWire: false,
-        currentLine: null,
-        startPin: null,
-        wirePoints: [],
-      });
-
-      // Clear highlights
-      clearPinHighlight();
-
-      console.log("✅ Tool reset complete - ready for next wire");
+      // PART 3: Call the "Reset" Function - After Successfully Completing a Wire
+      resetWiringTool();
     },
     [
       wiringState.currentLine,
@@ -628,7 +615,7 @@ export function useWiringTool({
       canvas,
       getPinWorldCoordinates,
       calculateOrthogonalPoint,
-      clearPinHighlight,
+      resetWiringTool,
     ]
   );
 
@@ -639,6 +626,7 @@ export function useWiringTool({
     } else {
       console.log("🔧 Entering wire mode");
       setIsWireMode(true);
+      // PART 3: Call the "Reset" Function - When Switching to Wire Tool (Ensure Clean State)
       resetWiringState(); // Ensure clean state
     }
   }, [isWireMode]);
@@ -646,6 +634,7 @@ export function useWiringTool({
   // Exit wire mode
   const exitWireMode = useCallback(() => {
     console.log("🚪 Exiting wire mode");
+    // PART 3: Call the "Reset" Function - When Switching to Another Tool
     resetWiringState();
     setIsWireMode(false);
   }, [resetWiringState]);
@@ -866,6 +855,14 @@ export function useWiringTool({
       const currentPoint = new fabric.Point(pointer.x, pointer.y);
       const pin = findPinAtPoint(currentPoint);
 
+      // PART 3: Call the "Reset" Function - After Cancelling with a Right-Click
+      if (options.e.button === 2 && wiringState.isDrawingWire) {
+        // Right-click
+        console.log("❌ Wire cancelled by right-click");
+        resetWiringTool();
+        return;
+      }
+
       // RULE #2: Check for wire intersection when drawing
       const wireInfo = findWireAtPoint(currentPoint);
 
@@ -945,7 +942,7 @@ export function useWiringTool({
       } else if (e.key === "Escape") {
         e.preventDefault();
         if (wiringState.isDrawingWire) {
-          // PART 2 FIX: Reset on cancel
+          // PART 3: Call the "Reset" Function - After Cancelling with the Esc Key
           console.log("❌ Wire cancelled by user");
           resetWiringState();
         } else {

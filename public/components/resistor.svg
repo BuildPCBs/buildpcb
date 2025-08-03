@@ -1,15 +1,15 @@
-<svg width="60" height="20" viewBox="0 0 60 20" xmlns="http://www.w3.org/2000/svg">
+<svg width="60" height="20" viewBox="0 0 60 20" fill="none" xmlns="http://www.w3.org/2000/svg">
   <!-- Left lead -->
-  <line x1="0" y1="10" x2="12" y2="10" stroke="#000" stroke-width="1.5"/>
+  <line x1="0" y1="10" x2="12" y2="10" stroke="#000000" stroke-width="1.5"/>
 
   <!-- Resistor zigzag symbol -->
   <path d="M12 10 L15 6 L18 14 L21 6 L24 14 L27 6 L30 14 L33 6 L36 14 L39 6 L42 14 L45 6 L48 10"
-        stroke="#000" stroke-width="1.5" stroke-linejoin="round"/>
+        fill="none" stroke="#000000" stroke-width="1.5" stroke-linejoin="round"/>
 
   <!-- Right lead -->
-  <line x1="48" y1="10" x2="60" y2="10" stroke="#000" stroke-width="1.5"/>
+  <line x1="48" y1="10" x2="60" y2="10" stroke="#000000" stroke-width="1.5"/>
 
-  <!-- Connection points -->
-  <circle cx="0" cy="10" r="1.5" fill="#000"/>
-  <circle cx="60" cy="10" r="1.5" fill="#000"/>
+  <!-- Connection points with pin IDs -->
+  <circle id="pin" cx="0" cy="10" r="1.5" fill="#000000"/>
+  <circle id="pin" cx="60" cy="10" r="1.5" fill="#000000"/>
 </svg>

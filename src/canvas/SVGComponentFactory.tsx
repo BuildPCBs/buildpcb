@@ -145,94 +145,154 @@ export const createSVGComponent = (
     `🎨 SVG: Attempting to load ${svgPath} for ${componentInfo.name}`
   );
 
-  // Load SVG with proper error handling
-  fabric.loadSVGFromURL(svgPath, (objects: any, options: any) => {
-    try {
-      // Handle SVG loading result
-      if (!objects || (Array.isArray(objects) && objects.length === 0)) {
-        console.error(
-          `❌ SVG: Failed to load ${svgPath}, falling back to simple component`
+  // Load SVG with Fabric.js 6.0.0+ syntax
+  fetch(svgPath)
+    .then((response) => response.text())
+    .then((svgString) => {
+      return fabric.loadSVGFromString(svgString);
+    })
+    .then((result) => {
+      try {
+        // Filter out null/undefined objects
+        const objects = result.objects.filter((obj) => !!obj);
+
+        if (!objects || objects.length === 0) {
+          console.error(
+            `❌ SVG: No valid objects in ${svgPath}, falling back to simple component`
+          );
+          createFallbackComponent(
+            fabricCanvas,
+            componentInfo,
+            config,
+            componentId
+          );
+          return;
+        }
+
+        console.log(
+          `✅ SVG: Loaded ${objects.length} SVG objects for ${componentInfo.name}`
         );
+
+        // Restore proper SVG styling that may have been stripped
+        objects.forEach((obj, index) => {
+          console.log(
+            `🎨 Processing SVG object ${index}: type=${obj.type}, fill=${obj.fill}, stroke=${obj.stroke}`
+          );
+
+          // For path elements, preserve fill: 'none' if it should be transparent
+          if (obj.type === "path") {
+            obj.set("fill", "none");
+            obj.set("stroke", obj.stroke || "#000000");
+            obj.set("strokeWidth", obj.strokeWidth || 1.5);
+          }
+          // For line elements, ensure they have proper stroke
+          else if (obj.type === "line") {
+            obj.set("fill", "none");
+            obj.set("stroke", obj.stroke || "#000000");
+            obj.set("strokeWidth", obj.strokeWidth || 1.5);
+          }
+          // For circle elements (connection points), keep fill
+          else if (obj.type === "circle") {
+            obj.set("fill", obj.fill || "#000000");
+            obj.set("stroke", obj.stroke || "#000000");
+          }
+          // For text elements, ensure they are visible
+          else if (obj.type === "text") {
+            obj.set("fill", obj.fill || "#000000");
+          }
+          // For rect elements, set appropriate styling
+          else if (obj.type === "rect") {
+            if (!obj.fill || obj.fill === "none") {
+              obj.set("fill", "none");
+              obj.set("stroke", obj.stroke || "#000000");
+              obj.set("strokeWidth", obj.strokeWidth || 1);
+            }
+          }
+
+          console.log(
+            `✅ After processing: fill=${obj.fill}, stroke=${obj.stroke}, strokeWidth=${obj.strokeWidth}`
+          );
+        });
+
+        // Create SVG group from the loaded objects
+        const svgGroup = new fabric.Group(objects, {
+          originX: "center",
+          originY: "center",
+        });
+
+        // Scale SVG to desired size
+        const scaleX = config.width / (svgGroup.width || 1);
+        const scaleY = config.height / (svgGroup.height || 1);
+        const scale = Math.min(scaleX, scaleY);
+
+        svgGroup.set({
+          scaleX: scale,
+          scaleY: scale,
+          originX: "center",
+          originY: "center",
+        });
+
+        // Create functional pins
+        const pins = createComponentPins(config, componentId);
+
+        // Add component label
+        const label = new fabric.Text(componentInfo.name.substring(0, 8), {
+          fontSize: 8,
+          fill: "#333333",
+          fontFamily: "Arial, sans-serif",
+          fontWeight: "bold",
+          originX: "center",
+          originY: "center",
+          top: config.height / 2 + 10, // Position below component
+        });
+
+        // Group everything together
+        const component = new fabric.Group([svgGroup, label, ...pins], {
+          left: componentInfo.x || fabricCanvas.getVpCenter().x,
+          top: componentInfo.y || fabricCanvas.getVpCenter().y,
+        });
+
+        // Add component metadata
+        component.set("componentType", componentInfo.type);
+        component.set("data", {
+          type: "component",
+          componentType: componentInfo.type,
+          componentName: componentInfo.name,
+          pins: pins.map((_, index) => `pin${index + 1}`),
+        });
+
+        // Make component selectable and rotatable
+        component.set({
+          selectable: true,
+          evented: true,
+          lockUniScaling: true,
+          hasControls: true,
+          hasBorders: true,
+          centeredRotation: true,
+        });
+
+        // Add to canvas
+        fabricCanvas.add(component);
+        fabricCanvas.renderAll();
+
+        console.log(
+          `✅ SVG: Added ${componentInfo.name} with SVG graphics and ${pins.length} pins!`
+        );
+      } catch (error) {
+        console.error(`❌ SVG: Error processing ${componentInfo.name}:`, error);
         createFallbackComponent(
           fabricCanvas,
           componentInfo,
           config,
           componentId
         );
-        return;
       }
-
-      console.log(`✅ SVG: Loaded SVG for ${componentInfo.name}`);
-
-      // Create SVG group - cast to any to avoid TypeScript issues
-      const svgGroup = (fabric.util as any).groupSVGElements(objects, options);
-
-      // Scale SVG to desired size
-      const scaleX = config.width / (svgGroup.width || 1);
-      const scaleY = config.height / (svgGroup.height || 1);
-      const scale = Math.min(scaleX, scaleY);
-
-      svgGroup.set({
-        scaleX: scale,
-        scaleY: scale,
-        originX: "center",
-        originY: "center",
-      });
-
-      // Create functional pins
-      const pins = createComponentPins(config, componentId);
-
-      // Add component label
-      const label = new fabric.Text(componentInfo.name.substring(0, 8), {
-        fontSize: 8,
-        fill: "#333333",
-        fontFamily: "Arial, sans-serif",
-        fontWeight: "bold",
-        originX: "center",
-        originY: "center",
-        top: config.height / 2 + 10, // Position below component
-      });
-
-      // Group everything together
-      const component = new fabric.Group([svgGroup, label, ...pins], {
-        left: componentInfo.x || fabricCanvas.getVpCenter().x,
-        top: componentInfo.y || fabricCanvas.getVpCenter().y,
-      });
-
-      // Add component metadata
-      component.set("componentType", componentInfo.type);
-      component.set("data", {
-        type: "component",
-        componentType: componentInfo.type,
-        componentName: componentInfo.name,
-        pins: pins.map((_, index) => `pin${index + 1}`),
-      });
-
-      // Make component selectable and rotatable
-      component.set({
-        selectable: true,
-        evented: true,
-        lockUniScaling: true,
-        hasControls: true,
-        hasBorders: true,
-        centeredRotation: true,
-      });
-
-      // Add to canvas
-      fabricCanvas.add(component);
-      fabricCanvas.renderAll();
-
-      console.log(
-        `✅ SVG: Added ${componentInfo.name} with SVG graphics and ${pins.length} pins!`
-      );
-    } catch (error) {
-      console.error(`❌ SVG: Error processing ${componentInfo.name}:`, error);
+    })
+    .catch((error) => {
+      console.error(`❌ SVG: Failed to load ${svgPath}:`, error);
       createFallbackComponent(fabricCanvas, componentInfo, config, componentId);
-    }
-  });
-};
-
-// Fallback to simple component if SVG loading fails
+    });
+}; // Fallback to simple component if SVG loading fails
 function createFallbackComponent(
   fabricCanvas: fabric.Canvas,
   componentInfo: any,

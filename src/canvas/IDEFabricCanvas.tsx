@@ -8,6 +8,8 @@ import { useCanvasHotkeys } from "./hooks/useCanvasHotkeys";
 import { useWiringTool } from "./hooks/useWiringTool";
 import { useCanvasViewport } from "./hooks/useCanvasViewport";
 import { canvasCommandManager } from "./canvas-command-manager";
+import { createSimpleComponent } from "./SimpleComponentFactory";
+import { createSVGComponent } from "./SVGComponentFactory";
 import { ContextMenu } from "./ui/ContextMenu";
 import { HorizontalRuler } from "./ui/HorizontalRuler";
 import { VerticalRuler } from "./ui/VerticalRuler";
@@ -970,7 +972,7 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
 
       {/* Grid and Snap indicator */}
       <div className="absolute bottom-2 left-2 bg-green-600 bg-opacity-90 text-white px-2 py-1 rounded text-xs">
-        Grid: {gridSize}px • Simple SVG • R=rotate • W=wire
+        Grid: {gridSize}px • INTELLIGENT SVG • R=rotate • W=wire
       </div>
 
       {/* Wire mode indicator - Professional-grade wiring tool */}
@@ -1007,158 +1009,123 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
   canvasCommandManager.on(
     "component:add",
     (payload: {
-      type?: string;
+      type: string;
       svgPath: string;
-      name?: string;
-      componentType?: string;
+      name: string;
       x?: number;
       y?: number;
     }) => {
-      console.log("Component command received:", payload);
+      console.log("🎯 SVG: Component command received for", payload.name);
 
-      const createComponent = (componentInfo: any) => {
-        console.log(`🔄 Loading SVG from: ${componentInfo.svgPath}`);
+      // New intelligent component creation logic
+      const createComponent = (componentInfo: typeof payload) => {
+        if (!canvas) return;
 
-        // First fetch the SVG content, then load it
+        console.log(
+          `🧠 INTELLIGENT: Creating ${componentInfo.name} with new intelligent SVG parsing`
+        );
+
         fetch(componentInfo.svgPath)
           .then((response) => response.text())
           .then((svgString) => {
-            console.log("📄 SVG string loaded, parsing...");
+            return fabric.loadSVGFromString(svgString);
+          })
+          .then((result) => {
+            const objects = result.objects.filter((obj) => !!obj);
+            const pinsFromSVG: fabric.FabricObject[] = [];
+            const symbolParts: fabric.FabricObject[] = [];
 
-            // Use modern Fabric.js 6.0+ Promise-based syntax
-            fabric.loadSVGFromString(svgString).then((result) => {
-              const objectsArray = result.objects.filter((obj) => !!obj);
-              console.log("✅ SVG parsed successfully with modern syntax:", {
-                objects: objectsArray,
+            // 1. Separate the loaded parts into PINS and SYMBOL pieces
+            objects.forEach((obj: any) => {
+              if (obj && obj.id === "pin") {
+                // This is a connection point. Save it.
+                console.log(`📍 Found PIN at x=${obj.left}, y=${obj.top}`);
+                pinsFromSVG.push(obj);
+              } else if (obj) {
+                // This is part of the visual symbol.
+                symbolParts.push(obj);
+              }
+            });
+
+            console.log(
+              `🔌 Found ${pinsFromSVG.length} pins and ${symbolParts.length} symbol parts`
+            );
+
+            // 2. Group just the visual parts into a single symbol
+            const svgSymbol = new fabric.Group(symbolParts, {
+              originX: "center",
+              originY: "center",
+            });
+
+            // 3. Create interactive pins using the EXACT positions from the SVG
+            //    We no longer guess where the pins go. We read their positions.
+            const interactivePins = pinsFromSVG.map((pin, index) => {
+              const interactivePin = new fabric.Circle({
+                radius: 4, // Make them slightly bigger and easier to click
+                fill: "rgba(0, 255, 0, 0.3)", // Transparent green for visibility
+                left: pin.left! + (pin.width || 0) / 2,
+                top: pin.top! + (pin.height || 0) / 2,
+                originX: "center",
+                originY: "center",
               });
-              console.log("📊 Objects array length:", objectsArray?.length);
 
-                if (!objectsArray || objectsArray.length === 0) {
-                  console.error("❌ SVG parsing failed: No objects returned");
-                  return;
-                }
-
-                try {
-                  console.log("🔧 Processing and initializing objects...");
-
-                  // Process each object to ensure it's properly initialized
-                  const processedObjects = objectsArray.map(
-                    (obj: any, index: number) => {
-                      console.log(`Processing object ${index}:`, obj.type);
-
-                      // Ensure the object is properly initialized
-                      if (obj.set) {
-                        // Force initialization by setting a property
-                        obj.set({
-                          selectable: false,
-                          evented: false,
-                        });
-                      }
-
-                      return obj;
-                    }
-                  );
-
-                  console.log("✅ All objects processed and initialized");
-
-                  // Create a group from all the SVG objects
-                  console.log("🔧 Creating group from all objects...");
-                  const svgSymbol = new fabric.Group(processedObjects, {
-                    originX: "center",
-                    originY: "center",
-                  });
-                  console.log("✅ SVG symbol created:", svgSymbol);
-
-                  console.log("📏 SVG Symbol dimensions:", {
-                    width: svgSymbol.width,
-                    height: svgSymbol.height,
-                  });
-
-                  // Create the pins
-                  const pin1 = new fabric.Circle({
-                    radius: 3,
-                    fill: "rgba(0,180,0,0.5)",
-                    left: -(svgSymbol.width || 40) / 2 - 10,
-                    top: 0,
-                    originX: "center",
-                    originY: "center",
-                  });
-                  const pin2 = new fabric.Circle({
-                    radius: 3,
-                    fill: "rgba(0,180,0,0.5)",
-                    left: (svgSymbol.width || 40) / 2 + 10,
-                    top: 0,
-                    originX: "center",
-                    originY: "center",
-                  });
-
-                  // Add pin metadata for wiring
-                  pin1.set("pin", true);
-                  pin1.set("data", {
-                    type: "pin",
-                    pinId: "pin1",
-                    pinNumber: 1,
-                  });
-                  pin2.set("pin", true);
-                  pin2.set("data", {
-                    type: "pin",
-                    pinId: "pin2",
-                    pinNumber: 2,
-                  });
-
-                  console.log("📍 Pins created with metadata");
-
-                  // Create the final group with the symbol and its pins
-                  const finalComponent = new fabric.Group(
-                    [svgSymbol, pin1, pin2],
-                    {
-                      left: canvas.getVpCenter().x,
-                      top: canvas.getVpCenter().y,
-                    }
-                  );
-
-                  console.log("🎯 Final component created");
-
-                  // Add component metadata
-                  finalComponent.set(
-                    "componentType",
-                    componentInfo.type ||
-                      componentInfo.componentType ||
-                      "component"
-                  );
-                  finalComponent.set("data", {
-                    type: "component",
-                    componentType:
-                      componentInfo.type || componentInfo.componentType,
-                  });
-
-                  // Make it selectable and rotatable
-                  finalComponent.set({
-                    selectable: true,
-                    evented: true,
-                    hasControls: true,
-                    hasBorders: true,
-                    centeredRotation: true,
-                  });
-
-                  // Add the component to the canvas
-                  canvas.add(finalComponent);
-                  canvas.renderAll();
-
-                  console.log("🎉 Component successfully added to canvas!");
-                } catch (error) {
-                  console.error("💥 Error during component creation:", error);
-                }
-              }).catch((error) => {
-                console.error("❌ Error parsing SVG with modern syntax:", error);
+              // Add the pin metadata that the wiring tool expects
+              interactivePin.set("pin", true);
+              interactivePin.set("data", {
+                type: "pin",
+                componentId: `component_${Date.now()}`,
+                pinId: `pin${index + 1}`,
+                pinNumber: index + 1,
+                isConnectable: true,
               });
+
+              return interactivePin;
+            });
+
+            // 4. Create the final group with the symbol and the REAL pins
+            const finalComponent = new fabric.Group(
+              [svgSymbol, ...interactivePins],
+              {
+                left: componentInfo.x || canvas.getVpCenter().x,
+                top: componentInfo.y || canvas.getVpCenter().y,
+                originX: "center",
+                originY: "center",
+                selectable: true,
+                evented: true,
+                lockScalingX: true,
+                lockScalingY: true,
+                hasControls: true,
+                hasBorders: true,
+                centeredRotation: true,
+              }
+            );
+
+            // Add component metadata that the wiring tool expects
+            finalComponent.set("componentType", componentInfo.type);
+            finalComponent.set("data", {
+              type: "component",
+              componentType: componentInfo.type,
+              componentName: componentInfo.name,
+              pins: interactivePins.map((_, index) => `pin${index + 1}`),
+            });
+
+            // 5. Add the final, perfect component to the canvas
+            canvas.add(finalComponent);
+            canvas.renderAll();
+
+            console.log(
+              `🎉 INTELLIGENT: Added ${componentInfo.name} with ${interactivePins.length} intelligent pins!`
+            );
           })
           .catch((error) => {
-            console.error("❌ Failed to fetch SVG file:", error);
+            console.error(
+              `❌ INTELLIGENT: Failed to load ${componentInfo.svgPath}:`,
+              error
+            );
           });
       };
 
-      // Run the component creation
+      // Use the new createComponent function
       createComponent(payload);
     }
   );
