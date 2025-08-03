@@ -20,11 +20,11 @@ _"The Figma for Electronics Design - Where AI meets PCB Creation"_
 
 ## 🌟 Overview
 
-BuildPCB.ai revolutionizes electronic circuit design by combining the intuitive user experience of modern design tools with the power of artificial intelligence. Think **Canva meets EasyEDA, powered by AI** - we're building the next generation of PCB design software that makes electronics accessible to everyone.
+BuildPCB.ai is an intuitive browser-based PCB design tool built with modern web technologies. Our focus is on creating a responsive, user-friendly interface for electronic circuit design that makes PCB creation accessible to everyone from beginners to professionals. Using Fabric.js for canvas rendering and Next.js for a fast, responsive interface, we're building a tool that bridges the gap between simplicity and professional capabilities.
 
 ### 🎯 **Our Mission**
 
-Transform the way people design electronic circuits by eliminating the complexity of traditional EDA tools while maintaining professional-grade capabilities.
+Transform electronic circuit design by providing a modern, intuitive web interface that eliminates the steep learning curve of traditional EDA tools while maintaining the professional-grade capabilities engineers need.
 
 ### 👥 **Built For**
 
@@ -70,13 +70,13 @@ Transform the way people design electronic circuits by eliminating the complexit
 
 | Layer                | Technology                                                                                                                                                                                                                                       | Purpose                             |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------- |
-| **Frontend**         | ![Next.js](https://img.shields.io/badge/Next.js-black?logo=next.js) ![React](https://img.shields.io/badge/React-61DAFB?logo=react&logoColor=black) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white) | Modern, responsive web interface    |
-| **Styling**          | ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?logo=tailwind-css&logoColor=white)                                                                                                                                              | Utility-first CSS framework         |
-| **State Management** | ![Zustand](https://img.shields.io/badge/Zustand-2C3E50)                                                                                                                                                                                          | Lightweight state management        |
-| **Graphics**         | ![Canvas API](https://img.shields.io/badge/Canvas_API-FF6B6B) ![WebGL](https://img.shields.io/badge/WebGL-990000)                                                                                                                                | High-performance rendering          |
-| **Backend**          | ![Node.js](https://img.shields.io/badge/Node.js-339933?logo=node.js&logoColor=white) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-336791?logo=postgresql&logoColor=white)                                                               | Scalable server infrastructure      |
-| **AI/ML**            | ![OpenAI](https://img.shields.io/badge/OpenAI-412991) ![TensorFlow](https://img.shields.io/badge/TensorFlow-FF6F00?logo=tensorflow&logoColor=white)                                                                                              | AI-powered design assistance        |
-| **Deployment**       | ![Vercel](https://img.shields.io/badge/Vercel-000000?logo=vercel&logoColor=white) ![AWS](https://img.shields.io/badge/AWS-232F3E?logo=amazon-aws&logoColor=white)                                                                                | Global CDN and cloud infrastructure |
+| **Frontend**         | ![Next.js](https://img.shields.io/badge/Next.js_15-black?logo=next.js) ![React](https://img.shields.io/badge/React_19-61DAFB?logo=react&logoColor=black) ![TypeScript](https://img.shields.io/badge/TypeScript_5-3178C6?logo=typescript&logoColor=white) | Modern, responsive web interface    |
+| **Styling**          | ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS_4-38B2AC?logo=tailwind-css&logoColor=white)                                                                                                                                              | Utility-first CSS framework         |
+| **State Management** | ![Zustand](https://img.shields.io/badge/Zustand_5-2C3E50)                                                                                                                                                                                          | Lightweight state management        |
+| **Graphics**         | ![Fabric.js](https://img.shields.io/badge/Fabric.js_6-9097B5) ![Canvas API](https://img.shields.io/badge/Canvas_API-FF6B6B)                                                                                                                     | High-performance PCB rendering      |
+| **Utilities**        | ![clsx](https://img.shields.io/badge/clsx-2.1-blue) ![tailwind--merge](https://img.shields.io/badge/tailwind--merge-3.3-blue) ![lucide--react](https://img.shields.io/badge/lucide--react-0.528-blue)                                              | UI utilities and icons              |
+| **Development**      | ![TurboPack](https://img.shields.io/badge/TurboPack-black) ![ESLint](https://img.shields.io/badge/ESLint_9-4B32C3)                                                                                                                                | Development optimization            |
+| **Deployment**       | ![Vercel](https://img.shields.io/badge/Vercel-000000?logo=vercel&logoColor=white)                                                                                                                                                                 | Edge-optimized deployment           |
 
 </div>
 
@@ -109,28 +109,31 @@ npm install -g pnpm
 3. **Set up environment variables**
 
    ```bash
-   cp .env.example .env.local
+   cp .env.example .env
+   # Or create a new .env file manually
    ```
 
-   Edit `.env.local` with your configuration:
+   Edit `.env` with your configuration:
 
    ```env
-   # Application
-   NEXT_PUBLIC_SITE_URL=http://localhost:3000
-   NEXT_PUBLIC_API_URL=https://api.buildpcbs.com
+   # App configuration
+   NODE_ENV=development
+   NEXT_PUBLIC_APP_URL=http://localhost:3000
 
-   # Authentication
+   # API configuration
+   NEXT_PUBLIC_API_URL=/api
+   API_SECRET=your-api-secret
+
+   # Auth configuration (for future use)
    NEXTAUTH_SECRET=your-secret-key
    NEXTAUTH_URL=http://localhost:3000
 
-   # Database
-   DATABASE_URL=postgresql://user:password@localhost:5432/buildpcb
-
-   # AI Services
-   OPENAI_API_KEY=your-openai-key
+   # Feature flags
+   NEXT_PUBLIC_ENABLE_ANALYTICS=false
+   NEXT_PUBLIC_ENABLE_SENTRY=false
    ```
 
-4. **Run the development server**
+4. **Run the development server with TurboPack**
 
    ```bash
    pnpm dev
@@ -155,84 +158,146 @@ docker run -p 3000:3000 buildpcb
 ```
 buildpcb/
 ├── 📁 src/
-│   ├── 📁 app/                  # Next.js App Router
-│   │   ├── 📁 (ide)/           # IDE interface routes
-│   │   ├── 📁 dashboard/       # Project management
-│   │   ├── layout.tsx          # Root layout
-│   │   └── globals.css         # Global styles
-│   ├── 📁 components/          # Reusable UI components
-│   │   ├── 📁 canvas/          # PCB canvas components
-│   │   ├── 📁 icons/           # Icon library
-│   │   ├── 📁 layout/          # Layout components
-│   │   └── 📁 ui/              # Base UI components
-│   ├── 📁 core/                # Core application logic
-│   │   ├── command-manager.ts  # Command pattern implementation
-│   │   ├── event-manager.ts    # Event system
-│   │   ├── state-manager.ts    # Global state management
-│   │   └── plugin-manager.ts   # Plugin architecture
-│   ├── 📁 hooks/               # Custom React hooks
-│   ├── 📁 lib/                 # Utility functions
-│   │   ├── api.ts              # API client
-│   │   ├── responsive.ts       # Responsive design utilities
-│   │   └── utils.ts            # Helper functions
-│   └── 📁 types/               # TypeScript type definitions
-├── 📁 public/                  # Static assets
-├── 📁 docs/                    # Documentation
+│   ├── 📁 app/                    # Next.js App Router
+│   │   ├── 📁 (ide)/             # IDE interface routes
+│   │   ├── 📁 dashboard/         # Project management
+│   │   ├── 📁 fabric-test/       # Fabric.js test page
+│   │   ├── 📁 login/             # Authentication page
+│   │   ├── 📁 test/              # Testing page
+│   │   ├── layout.tsx            # Root layout
+│   │   ├── globals.css           # Global styles
+│   │   └── responsive.css        # Responsive design styles
+│   ├── 📁 canvas/                # Canvas and PCB editor core
+│   │   ├── FabricCanvas.tsx      # Fabric.js canvas component
+│   │   ├── IDEFabricCanvas.tsx   # IDE-specific canvas implementation
+│   │   ├── ComponentLibrary.ts   # Component definitions
+│   │   ├── canvas-command-manager.ts # Canvas command system
+│   │   └── 📁 hooks/             # Canvas-specific hooks
+│   │       ├── useCanvasHotkeys.ts   # Keyboard shortcuts
+│   │       ├── useCanvasPan.ts       # Canvas panning
+│   │       ├── useCanvasZoom.ts      # Canvas zooming
+│   │       ├── useWiringTool.ts      # Wiring tool implementation
+│   │       └── useHistoryStack.ts    # Undo/redo functionality
+│   ├── 📁 components/            # Reusable UI components
+│   │   ├── 📁 auth/              # Authentication components
+│   │   ├── 📁 icons/             # Icon library
+│   │   ├── 📁 layout/            # Layout components
+│   │   └── 📁 ui/                # Base UI components
+│   ├── 📁 core/                  # Core application logic
+│   │   ├── command-manager.ts    # Command pattern implementation
+│   │   ├── event-manager.ts      # Event system
+│   │   ├── state-manager.ts      # Global state management
+│   │   ├── error-manager.ts      # Error handling
+│   │   ├── keyboard.ts           # Keyboard input handling
+│   │   └── plugin-manager.ts     # Plugin architecture
+│   ├── 📁 hooks/                 # Custom React hooks
+│   │   ├── useAuth.tsx           # Authentication hook
+│   │   ├── useStateManager.ts    # State management hook
+│   │   ├── usePreventBrowserZoom.ts # Browser control hooks
+│   │   └── useError.ts           # Error handling hook
+│   ├── 📁 lib/                   # Utility functions
+│   │   ├── api.ts                # API client
+│   │   ├── constants.ts          # App constants
+│   │   ├── responsive.ts         # Responsive design utilities
+│   │   ├── env.ts                # Environment variables
+│   │   └── utils.ts              # Helper functions
+│   ├── 📁 store/                 # State management
+│   │   └── componentStore.ts     # Component state store
+│   └── 📁 types/                 # TypeScript type definitions
+├── 📁 public/                    # Static assets
+│   └── 📁 components/            # SVG component assets
+│       ├── arduino.svg           # Arduino component
+│       ├── microcontroller.svg   # Microcontroller component
+│       └── ...                   # Other electronic components
 ├── 🔧 Configuration Files
-│   ├── next.config.ts          # Next.js configuration
-│   ├── tailwind.config.js      # Tailwind CSS config
-│   ├── tsconfig.json           # TypeScript config
-│   └── eslint.config.mjs       # ESLint configuration
+│   ├── next.config.ts            # Next.js configuration
+│   ├── postcss.config.mjs        # PostCSS configuration
+│   ├── tsconfig.json             # TypeScript config
+│   └── eslint.config.mjs         # ESLint configuration
 └── 📄 Package Files
-    ├── package.json            # Dependencies & scripts
-    └── pnpm-lock.yaml         # Lockfile
+    ├── package.json              # Dependencies & scripts
+    └── pnpm-lock.yaml            # Lockfile
 ```
 
 ## 🎮 Usage Examples
 
-### Creating Your First PCB
+### Creating Components with the Fabric Canvas
 
 ```typescript
-// Example: Initialize a new PCB project
-import { PCBProject } from "@/core/pcb-project";
+import { useCallback, useRef } from "react";
+import * as fabric from "fabric";
+import { IDEFabricCanvas } from "@/canvas/IDEFabricCanvas";
 
-const project = new PCBProject({
-  name: "Arduino Shield",
-  dimensions: { width: 68.58, height: 53.34 }, // mm
-  layers: 2,
-});
-
-// Add components with AI assistance
-project.addComponent({
-  type: "microcontroller",
-  package: "DIP-28",
-  value: "ATMEGA328P",
-});
-
-// Auto-route with AI
-await project.autoRoute({
-  strategy: "ai-optimized",
-  constraints: {
-    minTraceWidth: 0.2, // mm
-    viaSize: 0.6, // mm
-  },
-});
+// Example: Create a component and add it to the canvas
+const MyPCBEditor = () => {
+  const canvasRef = useRef<fabric.Canvas | null>(null);
+  
+  const addComponent = useCallback((type: string) => {
+    if (!canvasRef.current) return;
+    
+    // Load component from our component library
+    fabric.loadSVGFromURL(`/components/${type}.svg`, (objects, options) => {
+      const component = fabric.util.groupSVGElements(objects, options);
+      component.set({
+        left: 100,
+        top: 100,
+        cornerSize: 8,
+        hasControls: true,
+      });
+      
+      canvasRef.current?.add(component);
+      canvasRef.current?.setActiveObject(component);
+      canvasRef.current?.renderAll();
+    });
+  }, []);
+  
+  return (
+    <div className="w-full h-full">
+      <IDEFabricCanvas 
+        onReady={(canvas) => { canvasRef.current = canvas; }} 
+      />
+      <div className="toolbar">
+        <button onClick={() => addComponent('arduino')}>Add Arduino</button>
+        <button onClick={() => addComponent('microcontroller')}>Add Microcontroller</button>
+      </div>
+    </div>
+  );
+};
 ```
 
-### Using the AI Co-Engineer
+### Using the Wiring Tool
 
 ```typescript
-// Natural language PCB design
-const aiAssistant = new AICoEngineer();
+import { useWiringTool } from "@/canvas/hooks/useWiringTool";
 
-const design = await aiAssistant.createDesign(`
-  Create a temperature sensor board with:
-  - ESP32 microcontroller
-  - DS18B20 temperature sensor
-  - OLED display
-  - USB-C power input
-  - Compact 2-layer design
-`);
+// Example: Initialize the wiring tool in a component
+const WiringToolDemo = ({ canvas }) => {
+  const { 
+    isWireMode,
+    toggleWireMode,
+    startWire,
+    completeWire,
+    cancelWire
+  } = useWiringTool(canvas);
+  
+  return (
+    <div className="controls">
+      <button 
+        className={`btn ${isWireMode ? 'btn-active' : ''}`}
+        onClick={toggleWireMode}
+      >
+        {isWireMode ? 'Exit Wire Mode' : 'Enter Wire Mode'}
+      </button>
+      
+      {isWireMode && (
+        <p className="text-sm text-info">
+          Click on component pins to create connections.
+          Press ESC to cancel the current wire.
+        </p>
+      )}
+    </div>
+  );
+};
 ```
 
 ## 👥 Team & Development
@@ -269,31 +334,36 @@ pnpm build
 
 ### 🏃‍♂️ **Phase 1: Core Features** (Current)
 
-- [x] Responsive UI framework
-- [x] Basic schematic editor
-- [x] Component library integration
+- [x] Responsive UI framework with Next.js 15 and React 19
+- [x] Fabric.js canvas integration for component rendering
+- [x] Component library with SVG components
+- [x] Wiring tool for component connections
+- [x] Canvas pan and zoom controls
+- [ ] Component property editor
+
+### 🚀 **Phase 2: PCB Design Features**
+
+- [x] Pin detection for wire connections
+- [x] Wire drawing mode
+- [x] Basic component manipulation
 - [ ] PCB layout editor
 - [ ] Design rule checking
-
-### 🚀 **Phase 2: AI Integration**
-
-- [ ] AI-powered component placement
-- [ ] Intelligent auto-routing
-- [ ] Design optimization suggestions
-- [ ] Natural language design interface
+- [ ] Layer management
 
 ### 🌟 **Phase 3: Advanced Features**
 
 - [ ] Real-time collaboration
-- [ ] 3D visualization
-- [ ] SPICE simulation
-- [ ] Manufacturing integration
+- [ ] 3D visualization of PCB designs
+- [ ] Component search and filtering
+- [ ] Manufacturing exports (Gerber)
+- [ ] BOM (Bill of Materials) generation
 
 ### 🔮 **Future Vision**
 
-- [ ] Mobile app (React Native)
-- [ ] Plugin marketplace
-- [ ] Educational content platform
+- [ ] Mobile-responsive design interface
+- [ ] Plugin system for extensions
+- [ ] User authentication and project storage
+- [ ] Component marketplace
 - [ ] Community sharing features
 
 ## 📈 Performance & Metrics
