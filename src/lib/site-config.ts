@@ -3,8 +3,8 @@ export const siteConfig = {
   name: "BuildPCB.ai",
   description: "AI-powered IDE for designing electronic circuits and PCBs",
   url: process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
-  ogImage: "/og-image.png",
-  twitterImage: "/twitter-image.png",
+  ogImage: "/logo.png",
+  twitterImage: "/logo.png",
   twitterCreator: "@buildpcb",
   keywords: [
     "PCB design",

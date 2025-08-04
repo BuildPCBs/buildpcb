@@ -68,15 +68,15 @@ Transform electronic circuit design by providing a modern, intuitive web interfa
 
 <div align="center">
 
-| Layer                | Technology                                                                                                                                                                                                                                       | Purpose                             |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------- |
-| **Frontend**         | ![Next.js](https://img.shields.io/badge/Next.js_15-black?logo=next.js) ![React](https://img.shields.io/badge/React_19-61DAFB?logo=react&logoColor=black) ![TypeScript](https://img.shields.io/badge/TypeScript_5-3178C6?logo=typescript&logoColor=white) | Modern, responsive web interface    |
-| **Styling**          | ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS_4-38B2AC?logo=tailwind-css&logoColor=white)                                                                                                                                              | Utility-first CSS framework         |
-| **State Management** | ![Zustand](https://img.shields.io/badge/Zustand_5-2C3E50)                                                                                                                                                                                          | Lightweight state management        |
-| **Graphics**         | ![Fabric.js](https://img.shields.io/badge/Fabric.js_6-9097B5) ![Canvas API](https://img.shields.io/badge/Canvas_API-FF6B6B)                                                                                                                     | High-performance PCB rendering      |
-| **Utilities**        | ![clsx](https://img.shields.io/badge/clsx-2.1-blue) ![tailwind--merge](https://img.shields.io/badge/tailwind--merge-3.3-blue) ![lucide--react](https://img.shields.io/badge/lucide--react-0.528-blue)                                              | UI utilities and icons              |
-| **Development**      | ![TurboPack](https://img.shields.io/badge/TurboPack-black) ![ESLint](https://img.shields.io/badge/ESLint_9-4B32C3)                                                                                                                                | Development optimization            |
-| **Deployment**       | ![Vercel](https://img.shields.io/badge/Vercel-000000?logo=vercel&logoColor=white)                                                                                                                                                                 | Edge-optimized deployment           |
+| Layer                | Technology                                                                                                                                                                                                                                               | Purpose                          |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| **Frontend**         | ![Next.js](https://img.shields.io/badge/Next.js_15-black?logo=next.js) ![React](https://img.shields.io/badge/React_19-61DAFB?logo=react&logoColor=black) ![TypeScript](https://img.shields.io/badge/TypeScript_5-3178C6?logo=typescript&logoColor=white) | Modern, responsive web interface |
+| **Styling**          | ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS_4-38B2AC?logo=tailwind-css&logoColor=white)                                                                                                                                                    | Utility-first CSS framework      |
+| **State Management** | ![Zustand](https://img.shields.io/badge/Zustand_5-2C3E50)                                                                                                                                                                                                | Lightweight state management     |
+| **Graphics**         | ![Fabric.js](https://img.shields.io/badge/Fabric.js_6-9097B5) ![Canvas API](https://img.shields.io/badge/Canvas_API-FF6B6B)                                                                                                                              | High-performance PCB rendering   |
+| **Utilities**        | ![clsx](https://img.shields.io/badge/clsx-2.1-blue) ![tailwind--merge](https://img.shields.io/badge/tailwind--merge-3.3-blue) ![lucide--react](https://img.shields.io/badge/lucide--react-0.528-blue)                                                    | UI utilities and icons           |
+| **Development**      | ![TurboPack](https://img.shields.io/badge/TurboPack-black) ![ESLint](https://img.shields.io/badge/ESLint_9-4B32C3)                                                                                                                                       | Development optimization         |
+| **Deployment**       | ![Vercel](https://img.shields.io/badge/Vercel-000000?logo=vercel&logoColor=white)                                                                                                                                                                        | Edge-optimized deployment        |
 
 </div>
 
@@ -231,10 +231,10 @@ import { IDEFabricCanvas } from "@/canvas/IDEFabricCanvas";
 // Example: Create a component and add it to the canvas
 const MyPCBEditor = () => {
   const canvasRef = useRef<fabric.Canvas | null>(null);
-  
+
   const addComponent = useCallback((type: string) => {
     if (!canvasRef.current) return;
-    
+
     // Load component from our component library
     fabric.loadSVGFromURL(`/components/${type}.svg`, (objects, options) => {
       const component = fabric.util.groupSVGElements(objects, options);
@@ -244,21 +244,25 @@ const MyPCBEditor = () => {
         cornerSize: 8,
         hasControls: true,
       });
-      
+
       canvasRef.current?.add(component);
       canvasRef.current?.setActiveObject(component);
       canvasRef.current?.renderAll();
     });
   }, []);
-  
+
   return (
     <div className="w-full h-full">
-      <IDEFabricCanvas 
-        onReady={(canvas) => { canvasRef.current = canvas; }} 
+      <IDEFabricCanvas
+        onReady={(canvas) => {
+          canvasRef.current = canvas;
+        }}
       />
       <div className="toolbar">
-        <button onClick={() => addComponent('arduino')}>Add Arduino</button>
-        <button onClick={() => addComponent('microcontroller')}>Add Microcontroller</button>
+        <button onClick={() => addComponent("arduino")}>Add Arduino</button>
+        <button onClick={() => addComponent("microcontroller")}>
+          Add Microcontroller
+        </button>
       </div>
     </div>
   );
@@ -272,27 +276,22 @@ import { useWiringTool } from "@/canvas/hooks/useWiringTool";
 
 // Example: Initialize the wiring tool in a component
 const WiringToolDemo = ({ canvas }) => {
-  const { 
-    isWireMode,
-    toggleWireMode,
-    startWire,
-    completeWire,
-    cancelWire
-  } = useWiringTool(canvas);
-  
+  const { isWireMode, toggleWireMode, startWire, completeWire, cancelWire } =
+    useWiringTool(canvas);
+
   return (
     <div className="controls">
-      <button 
-        className={`btn ${isWireMode ? 'btn-active' : ''}`}
+      <button
+        className={`btn ${isWireMode ? "btn-active" : ""}`}
         onClick={toggleWireMode}
       >
-        {isWireMode ? 'Exit Wire Mode' : 'Enter Wire Mode'}
+        {isWireMode ? "Exit Wire Mode" : "Enter Wire Mode"}
       </button>
-      
+
       {isWireMode && (
         <p className="text-sm text-info">
-          Click on component pins to create connections.
-          Press ESC to cancel the current wire.
+          Click on component pins to create connections. Press ESC to cancel the
+          current wire.
         </p>
       )}
     </div>
