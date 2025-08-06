@@ -35,6 +35,7 @@ export const metadata: Metadata = {
         width: 1200,
         height: 630,
         alt: `${siteConfig.name} - AI-Powered PCB Design IDE`,
+        type: "image/png",
       },
     ],
   },
@@ -42,7 +43,14 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: `${siteConfig.name} - AI-Powered PCB Design IDE`,
     description: siteConfig.description,
-    images: [siteConfig.twitterImage],
+    images: [
+      {
+        url: siteConfig.twitterImage,
+        width: 1200,
+        height: 630,
+        alt: `${siteConfig.name} - AI-Powered PCB Design IDE`,
+      },
+    ],
     creator: siteConfig.twitterCreator,
   },
   robots: {
