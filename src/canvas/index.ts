@@ -1,6 +1,7 @@
 export { Canvas } from "./Canvas";
 export { FabricCanvas } from "./FabricCanvas";
 export { IDEFabricCanvas } from "./IDEFabricCanvas";
+export { PCBCanvas } from "./PCBCanvas";
 export { useCanvasInteraction } from "./useCanvasInteraction";
 export {
   useCanvasViewport,

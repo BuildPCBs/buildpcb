@@ -31,6 +31,9 @@ export interface Component {
   category: string;
   description?: string;
   specifications: Record<string, any>;
+  /**
+   * Optional footprint key, referencing a definition in FOOTPRINT_DATA
+   */
   footprint?: string;
   symbol?: string;
   datasheet?: string;

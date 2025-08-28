@@ -3,6 +3,7 @@ import { DM_Sans } from "next/font/google";
 import { siteConfig } from "@/lib/site-config";
 import { AuthProvider } from "@/hooks/useAuth";
 import { AuthOverlayWrapper } from "@/components/auth/AuthOverlayWrapper";
+import { ViewProvider } from "@/contexts/ViewContext";
 import "./globals.css";
 
 const dm_sans = DM_Sans({
@@ -80,8 +81,10 @@ export default function RootLayout({
     <html lang="en">
       <body className={dm_sans.className}>
         <AuthProvider>
-          {children}
-          <AuthOverlayWrapper />
+          <ViewProvider>
+            {children}
+            <AuthOverlayWrapper />
+          </ViewProvider>
         </AuthProvider>
       </body>
     </html>

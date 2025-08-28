@@ -13,6 +13,8 @@ import { createSVGComponent } from "./SVGComponentFactory";
 import { ContextMenu } from "./ui/ContextMenu";
 import { HorizontalRuler } from "./ui/HorizontalRuler";
 import { VerticalRuler } from "./ui/VerticalRuler";
+import { useView } from "@/contexts/ViewContext";
+import { COMPONENT_PIN_MAP } from "@/lib/constants";
 
 interface IDEFabricCanvasProps {
   className?: string;
@@ -28,6 +30,9 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
   });
   const [areRulersVisible, setAreRulersVisible] = useState(false);
 
+  // Get view context for shared component management
+  const { addSharedComponent, removeSharedComponent, updateSharedComponent, sharedComponents } = useView();
+
   // Context menu and clipboard state - Refactored per specification
   const [menuState, setMenuState] = useState({
     visible: false,
@@ -37,6 +42,9 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
     target: null as fabric.FabricObject | null,
   });
   const [clipboard, setClipboard] = useState<fabric.Object | null>(null);
+
+  // Track rendered components to avoid duplicates and sync with shared components
+  const [renderedComponentIds, setRenderedComponentIds] = useState<Set<string>>(new Set());
 
   // Use viewport control hooks
   useCanvasZoom(fabricCanvas);
@@ -117,8 +125,10 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
     // Register canvas with command manager
     canvasCommandManager.setCanvas(canvas);
 
-    // Setup simple component handler
-    setupComponentHandler(canvas);
+    // Setup simple component handler with shared component integration
+    setupComponentHandler(canvas, addSharedComponent, (componentId: string) => {
+      setRenderedComponentIds(prev => new Set(prev).add(componentId));
+    });
 
     // Cleanup function to prevent memory leaks
     return () => {
@@ -189,6 +199,46 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
       window.removeEventListener("resize", handleWindowResize);
     };
   }, [fabricCanvas, rulerSize]);
+
+  // Component Synchronization: Load shared components when switching back to schematic view
+  useEffect(() => {
+    if (!fabricCanvas || !sharedComponents.length) return;
+
+    console.log(`🔄 Schematic Canvas: Syncing ${sharedComponents.length} shared components`);
+
+    const currentRenderedIds = new Set(renderedComponentIds);
+    const newRenderedIds = new Set<string>();
+
+    // Load components that exist in shared state but not on canvas
+    sharedComponents.forEach(sharedComponent => {
+      newRenderedIds.add(sharedComponent.id);
+
+      // If component isn't rendered on schematic canvas, recreate it
+      if (!currentRenderedIds.has(sharedComponent.id)) {
+        console.log(`➕ Loading shared component to schematic: ${sharedComponent.name} (${sharedComponent.id})`);
+        
+        // Recreate the component using the same logic as the component handler
+        if (sharedComponent.type && sharedComponent.schematicPosition) {
+          recreateComponentOnCanvas(fabricCanvas, sharedComponent);
+          setRenderedComponentIds(prev => new Set(prev).add(sharedComponent.id));
+        }
+      }
+    });
+
+    // Remove components from canvas that no longer exist in shared state
+    currentRenderedIds.forEach(renderedId => {
+      if (!newRenderedIds.has(renderedId)) {
+        console.log(`➖ Removing component from schematic: ${renderedId}`);
+        removeComponentFromCanvas(fabricCanvas, renderedId);
+        setRenderedComponentIds(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(renderedId);
+          return newSet;
+        });
+      }
+    });
+
+  }, [fabricCanvas, sharedComponents, renderedComponentIds]);
 
   // PART 2: Component-Wire Follow Logic + Ruler Visibility + Snap-to-Grid + Alignment Guides
   useEffect(() => {
@@ -414,6 +464,38 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
       ) {
         console.log("🎯 Component movement completed - final wire update");
         wiringTool.updateConnectedWires(movedObject);
+
+        // 🔗 SYNC: Update shared component position
+        const sharedComponentId = (movedObject as any).sharedComponentId;
+        if (sharedComponentId && updateSharedComponent) {
+          const newSchematicX = movedObject.left || 0;
+          const newSchematicY = movedObject.top || 0;
+          
+          // Also update PCB position based on new schematic position
+          const schematicCenterX = fabricCanvas.getVpCenter().x;
+          const schematicCenterY = fabricCanvas.getVpCenter().y;
+          const pcbCanvasWidth = 1600;
+          const pcbCanvasHeight = 600;
+          const pcbBoardCenterX = pcbCanvasWidth / 2;
+          const pcbBoardCenterY = pcbCanvasHeight / 2;
+          
+          const offsetX = (newSchematicX - schematicCenterX) * 0.3;
+          const offsetY = (newSchematicY - schematicCenterY) * 0.3;
+          const newPcbX = pcbBoardCenterX + offsetX;
+          const newPcbY = pcbBoardCenterY + offsetY;
+          
+          updateSharedComponent(sharedComponentId, {
+            schematicPosition: { 
+              x: newSchematicX, 
+              y: newSchematicY 
+            },
+            pcbPosition: {
+              x: newPcbX,
+              y: newPcbY
+            }
+          });
+          console.log(`🔄 Updated shared component positions - Schematic: (${newSchematicX}, ${newSchematicY}), PCB: (${newPcbX}, ${newPcbY})`);
+        }
       }
     };
 
@@ -643,7 +725,15 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
     // Handle multiple selected objects (activeSelection)
     if (activeObject.type === "activeSelection") {
       const objects = (activeObject as any)._objects || [];
-      objects.forEach((obj: fabric.Object) => fabricCanvas.remove(obj));
+      objects.forEach((obj: fabric.Object) => {
+        // Remove from shared components if it's a component
+        const sharedComponentId = (obj as any).sharedComponentId;
+        if (sharedComponentId) {
+          removeSharedComponent(sharedComponentId);
+          console.log(`🗑️ Removed shared component: ${sharedComponentId}`);
+        }
+        fabricCanvas.remove(obj);
+      });
       fabricCanvas.discardActiveObject();
       fabricCanvas.renderAll();
       console.log(
@@ -653,6 +743,12 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
     }
 
     // Handle single object
+    const sharedComponentId = (activeObject as any).sharedComponentId;
+    if (sharedComponentId) {
+      removeSharedComponent(sharedComponentId);
+      console.log(`🗑️ Removed shared component: ${sharedComponentId}`);
+    }
+    
     fabricCanvas.remove(activeObject);
     fabricCanvas.renderAll();
     console.log("--- ACTION SUCCESS: handleDelete (deleted 1 object) ---");
@@ -975,6 +1071,19 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
         Grid: {gridSize}px • INTELLIGENT SVG • R=rotate • W=wire
       </div>
 
+      {/* Schematic View Indicator */}
+      {!wiringTool.isWireMode && (
+        <div className="absolute top-4 left-4 bg-blue-700 bg-opacity-95 text-white px-4 py-3 rounded-lg shadow-lg backdrop-blur-sm border border-blue-600">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 bg-blue-400 rounded-full animate-pulse"></div>
+            <span className="font-semibold text-sm">Schematic View</span>
+          </div>
+          <div className="text-xs opacity-90 mt-1 max-w-xs">
+            Design your circuit logic • Add components and connections
+          </div>
+        </div>
+      )}
+
       {/* Wire mode indicator - Professional-grade wiring tool */}
       {wiringTool.isWireMode && (
         <div className="absolute top-2 right-2 bg-blue-600 bg-opacity-90 text-white px-3 py-2 rounded text-sm font-medium">
@@ -998,13 +1107,134 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
   );
 }
 
+// Helper functions for component synchronization
+function recreateComponentOnCanvas(canvas: fabric.Canvas, sharedComponent: any) {
+  // Get the SVG path for this component type
+  const svgPath = `/components/${sharedComponent.type}.svg`;
+  
+  fetch(svgPath)
+    .then((response) => response.text())
+    .then((svgString) => {
+      return fabric.loadSVGFromString(svgString);
+    })
+    .then((result) => {
+      const objects = result.objects.filter((obj) => !!obj);
+      const pinsFromSVG: fabric.FabricObject[] = [];
+      const symbolParts: fabric.FabricObject[] = [];
+
+      // Separate pins and symbol parts
+      objects.forEach((obj: any) => {
+        if (obj && obj.id === "pin") {
+          pinsFromSVG.push(obj);
+        } else if (obj) {
+          symbolParts.push(obj);
+        }
+      });
+
+      // Create invisible pin data
+      const invisiblePinData = pinsFromSVG.map((pin, index) => ({
+        originalX: pin.left! + (pin.width || 0) / 2,
+        originalY: pin.top! + (pin.height || 0) / 2,
+        pinId: `pin${index + 1}`,
+        pinNumber: index + 1,
+      }));
+
+      // Create main component symbol
+      const svgSymbol = new fabric.Group(symbolParts, {
+        originX: "center",
+        originY: "center",
+      });
+
+      // Create interactive pins
+      const interactivePins = pinsFromSVG.map((pin, index) => {
+        const interactivePin = new fabric.Circle({
+          radius: 4,
+          fill: "rgba(0, 255, 0, 0.8)",
+          stroke: "#059669",
+          strokeWidth: 1,
+          left: pin.left! + (pin.width || 0) / 2,
+          top: pin.top! + (pin.height || 0) / 2,
+          originX: "center",
+          originY: "center",
+          opacity: 0,
+          visible: false,
+        });
+
+        interactivePin.set("pin", true);
+        interactivePin.set("pinData", invisiblePinData[index]);
+        interactivePin.set("data", {
+          type: "pin",
+          componentId: sharedComponent.id,
+          pinId: `pin${index + 1}`,
+          pinNumber: index + 1,
+          isConnectable: true,
+        });
+
+        return interactivePin;
+      });
+
+      // Create the component sandwich
+      const componentSandwich = new fabric.Group(
+        [svgSymbol, ...interactivePins],
+        {
+          left: sharedComponent.schematicPosition.x,
+          top: sharedComponent.schematicPosition.y,
+          originX: "center",
+          originY: "center",
+          selectable: true,
+          evented: true,
+          lockScalingX: true,
+          lockScalingY: true,
+          hasControls: true,
+          hasBorders: true,
+          centeredRotation: true,
+        }
+      );
+
+      // Set component metadata
+      componentSandwich.set("componentType", sharedComponent.type);
+      componentSandwich.set("invisiblePinData", invisiblePinData);
+      componentSandwich.set("sharedComponentId", sharedComponent.id);
+      componentSandwich.set("data", {
+        type: "component",
+        componentType: sharedComponent.type,
+        componentName: sharedComponent.name,
+        pins: interactivePins.map((_, index) => `pin${index + 1}`),
+        isComponentSandwich: true,
+      });
+
+      // Add to canvas
+      canvas.add(componentSandwich);
+      canvas.renderAll();
+
+      console.log(`🥪 Recreated component sandwich: ${sharedComponent.name}`);
+    })
+    .catch((error) => {
+      console.error(`❌ Failed to recreate component ${sharedComponent.name}:`, error);
+    });
+}
+
+function removeComponentFromCanvas(canvas: fabric.Canvas, componentId: string) {
+  const objects = canvas.getObjects();
+  const componentToRemove = objects.find(obj => {
+    const sharedId = (obj as any).sharedComponentId;
+    return sharedId === componentId;
+  });
+
+  if (componentToRemove) {
+    canvas.remove(componentToRemove);
+    canvas.renderAll();
+    console.log(`🗑️ Removed component from schematic: ${componentId}`);
+  }
+}
+
 // SIMPLE COMPONENT HANDLER - Add this at the end
 let isComponentHandlerSetup = false;
 
-export function setupComponentHandler(canvas: fabric.Canvas) {
+export function setupComponentHandler(canvas: fabric.Canvas, addSharedComponent: any, onComponentAdded?: (componentId: string) => void) {
   if (isComponentHandlerSetup) return;
 
-  console.log("� Setting up SVG component handler...");
+  console.log("🔧 Setting up SVG component handler...");
 
   canvasCommandManager.on(
     "component:add",
@@ -1017,13 +1247,37 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
     }) => {
       console.log("🎯 SVG: Component command received for", payload.name);
 
-      // New intelligent component creation logic
+      // New intelligent component creation logic with shared component integration
       const createComponent = (componentInfo: typeof payload) => {
         if (!canvas) return;
 
         console.log(
-          `🧠 INTELLIGENT: Creating ${componentInfo.name} with new intelligent SVG parsing`
+          `🧠 INTELLIGENT: Creating ${componentInfo.name} with shared component integration`
         );
+
+        // Get component footprint from constants
+        const componentConfig = COMPONENT_PIN_MAP[componentInfo.type as keyof typeof COMPONENT_PIN_MAP];
+        const footprintKey = (componentConfig as any)?.footprint;
+
+        // Calculate positions
+        const schematicX = componentInfo.x || canvas.getVpCenter().x;
+        const schematicY = componentInfo.y || canvas.getVpCenter().y;
+        
+        // Transform schematic coordinates to PCB board coordinates
+        // PCB board is centered on the canvas with dimensions 400x300
+        const pcbCanvasWidth = 1600; // Typical PCB canvas width
+        const pcbCanvasHeight = 600; // Typical PCB canvas height
+        const pcbBoardCenterX = pcbCanvasWidth / 2;
+        const pcbBoardCenterY = pcbCanvasHeight / 2;
+        
+        // Offset from schematic center and scale appropriately for PCB board size
+        const schematicCenterX = canvas.getVpCenter().x;
+        const schematicCenterY = canvas.getVpCenter().y;
+        const offsetX = (schematicX - schematicCenterX) * 0.3; // Scale down for PCB board
+        const offsetY = (schematicY - schematicCenterY) * 0.3;
+        
+        const pcbX = pcbBoardCenterX + offsetX;
+        const pcbY = pcbBoardCenterY + offsetY;
 
         fetch(componentInfo.svgPath)
           .then((response) => response.text())
@@ -1103,8 +1357,8 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
             const componentSandwich = new fabric.Group(
               [svgSymbol, ...interactivePins],
               {
-                left: componentInfo.x || canvas.getVpCenter().x,
-                top: componentInfo.y || canvas.getVpCenter().y,
+                left: schematicX,
+                top: schematicY,
                 originX: "center",
                 originY: "center",
                 selectable: true,
@@ -1128,13 +1382,41 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
               isComponentSandwich: true, // Mark this as a proper sandwich
             });
 
-            // 5. Add the COMPONENT SANDWICH to the canvas - physically impossible to separate
+            // Add the COMPONENT SANDWICH to the canvas
             canvas.add(componentSandwich);
             canvas.renderAll();
 
             console.log(
               `🥪 COMPONENT SANDWICH: Added ${componentInfo.name} with ${interactivePins.length} permanently attached pins!`
             );
+
+            // 🔗 INTEGRATION: Add to shared component system with enhanced ID generation
+            // This will automatically trigger footprint creation in PCB view
+            if (addSharedComponent && footprintKey) {
+              const componentId = addSharedComponent({
+                id: `component_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                type: componentInfo.type,
+                name: componentInfo.name,
+                footprintKey: footprintKey,
+                schematicPosition: { x: schematicX, y: schematicY },
+                pcbPosition: { x: pcbX, y: pcbY },
+                rotation: 0,
+                properties: {
+                  fabricObjectId: Date.now().toString(),
+                  createdAt: new Date().toISOString(),
+                }
+              });
+
+              // Store the shared component ID on the fabric object for cross-probing
+              componentSandwich.set("sharedComponentId", componentId);
+              
+              console.log(`🔗 Added to shared components with ID: ${componentId}`);
+              
+              // Track the component as rendered
+              if (onComponentAdded) {
+                onComponentAdded(componentId);
+              }
+            }
           })
           .catch((error) => {
             console.error(

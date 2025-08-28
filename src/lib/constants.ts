@@ -83,31 +83,49 @@ export const GRID_SIZES = [0.1, 0.25, 0.5, 1, 2.5, 5, 10, 25, 50, 100] as const;
 // Component Pin Configurations
 // Positions are relative to symbol dimensions (0.5 = half width/height)
 export const COMPONENT_PIN_MAP = {
-  resistor: [
-    { x: -0.5, y: 0, type: "left" },
-    { x: 0.5, y: 0, type: "right" },
-  ],
-  capacitor: [
-    { x: -0.5, y: 0, type: "left" },
-    { x: 0.5, y: 0, type: "right" },
-  ],
-  inductor: [
-    { x: -0.5, y: 0, type: "left" },
-    { x: 0.5, y: 0, type: "right" },
-  ],
-  led: [
-    { x: -0.5, y: 0, type: "anode" },
-    { x: 0.5, y: 0, type: "cathode" },
-  ],
-  diode: [
-    { x: -0.5, y: 0, type: "anode" },
-    { x: 0.5, y: 0, type: "cathode" },
-  ],
-  transistor: [
-    { x: -0.5, y: 0, type: "base" },
-    { x: 0.5, y: -0.25, type: "collector" },
-    { x: 0.5, y: 0.25, type: "emitter" },
-  ],
+  resistor: {
+    footprint: 'RESISTOR',
+    pins: [
+      { x: -0.5, y: 0, type: "left" },
+      { x: 0.5, y: 0, type: "right" },
+    ],
+  },
+  capacitor: {
+    footprint: 'CAPACITOR',
+    pins: [
+      { x: -0.5, y: 0, type: "left" },
+      { x: 0.5, y: 0, type: "right" },
+    ],
+  },
+  inductor: {
+    // No footprint yet
+    pins: [
+      { x: -0.5, y: 0, type: "left" },
+      { x: 0.5, y: 0, type: "right" },
+    ],
+  },
+  led: {
+    footprint: 'LED',
+    pins: [
+      { x: -0.5, y: 0, type: "anode" },
+      { x: 0.5, y: 0, type: "cathode" },
+    ],
+  },
+  diode: {
+    footprint: 'DIODE',
+    pins: [
+      { x: -0.5, y: 0, type: "anode" },
+      { x: 0.5, y: 0, type: "cathode" },
+    ],
+  },
+  transistor: {
+    footprint: 'TRANSISTOR',
+    pins: [
+      { x: -0.5, y: 0, type: "base" },
+      { x: 0.5, y: -0.25, type: "collector" },
+      { x: 0.5, y: 0.25, type: "emitter" },
+    ],
+  },
   switch: [
     { x: -0.5, y: 0, type: "contact1" },
     { x: 0.5, y: 0, type: "contact2" },

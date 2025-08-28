@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { UserIcon, ChartIcon, CloudIcon } from "@/components/icons";
 import { ActivityAnalyticsPanel } from "./ActivityAnalyticsPanel";
 import { r, responsive } from "@/lib/responsive";
+import { useView } from "@/contexts/ViewContext";
 
 interface TopToolbarProps {
   className?: string;
@@ -12,6 +13,7 @@ interface TopToolbarProps {
 export function TopToolbar({ className = "" }: TopToolbarProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [showAnalyticsPanel, setShowAnalyticsPanel] = useState(false);
+  const { currentView, toggleView } = useView();
 
   // Simulate autosave status
   useEffect(() => {
@@ -89,6 +91,24 @@ export function TopToolbar({ className = "" }: TopToolbarProps) {
             <ChartIcon size={16} className="text-gray-700" />
           </button>
         </div>
+
+        {/* Center - View Toggle Button */}
+        <button
+          onClick={toggleView}
+          className="flex items-center justify-center text-white transition-colors"
+          style={{
+            ...r({
+              width: 120,
+              height: 30,
+              borderRadius: 8,
+            }),
+            backgroundColor: currentView === "schematic" ? "#0038DF" : "#16a34a",
+          }}
+        >
+          <span className="font-medium" style={{ fontSize: responsive(10) }}>
+            {currentView === "schematic" ? "Schematic" : "PCB Layout"}
+          </span>
+        </button>
 
         {/* Right Side Export Button */}
         <button
