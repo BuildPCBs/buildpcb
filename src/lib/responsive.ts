@@ -70,7 +70,7 @@ export const createResponsiveStyles = (
       } else if (key.includes("Height") || key === "height") {
         responsiveStyles[key] =
           key === "height"
-            ? `max(${toRem(value)}, ${toVH(value)})`
+            ? responsiveSize(value, 2) // Use same scaling as width for proportional elements
             : responsive(value);
       } else if (key.includes("padding") || key.includes("margin")) {
         responsiveStyles[key] = responsive(value);
@@ -119,6 +119,18 @@ export const responsiveFontSize = (designPx: number) => {
   return `clamp(${toRem(designPx * 0.85)}, ${toVW(designPx)}, ${toRem(
     designPx * 1.15
   )})`;
+};
+
+/**
+ * Square/circular element responsive utility
+ * Ensures width and height scale proportionally to maintain aspect ratio
+ */
+export const responsiveSquare = (size: number) => {
+  const responsiveValue = responsiveSize(size, 2);
+  return {
+    width: responsiveValue,
+    height: responsiveValue,
+  };
 };
 
 /**

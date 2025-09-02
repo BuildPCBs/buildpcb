@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { DotsIcon, MicIcon } from "@/components/icons";
-import { r, responsive } from "@/lib/responsive";
+import { r, responsive, responsiveSquare } from "@/lib/responsive";
 import { BRAND_COLORS } from "@/lib/constants";
 import { Send } from "lucide-react";
 
@@ -118,11 +118,8 @@ export function PromptEntry({
               disabled={isThinking}
               className="flex items-center justify-center bg-white border hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
-                ...r({
-                  width: 32,
-                  height: 32,
-                  borderRadius: 99, // Fully circular
-                }),
+                ...responsiveSquare(32),
+                borderRadius: responsive(99), // Fully circular
                 borderColor: "#DDDDDD",
                 borderWidth: responsive(1),
               }}
@@ -147,11 +144,8 @@ export function PromptEntry({
               disabled={isThinking}
               className="flex items-center justify-center bg-white border hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
-                ...r({
-                  width: 32,
-                  height: 32,
-                  borderRadius: 99, // Fully circular
-                }),
+                ...responsiveSquare(32),
+                borderRadius: responsive(99), // Fully circular
                 borderColor: "#DDDDDD",
                 borderWidth: responsive(1),
               }}
@@ -177,11 +171,8 @@ export function PromptEntry({
             disabled={isThinking || !prompt.trim()}
             className="flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
-              ...r({
-                width: 32,
-                height: 32,
-                borderRadius: 99, // Fully circular
-              }),
+              ...responsiveSquare(32),
+              borderRadius: responsive(99), // Fully circular
               backgroundColor: prompt.trim() && !isThinking ? BRAND_COLORS.primary : "#CCCCCC", // Blue when enabled, gray when disabled
               border: "none",
               cursor: prompt.trim() && !isThinking ? "pointer" : "not-allowed",

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { UserIcon, ChartIcon, CloudIcon } from "@/components/icons";
 import { ActivityAnalyticsPanel } from "./ActivityAnalyticsPanel";
-import { r, responsive } from "@/lib/responsive";
+import { r, responsive, responsiveSquare } from "@/lib/responsive";
 
 interface TopToolbarProps {
   className?: string;
@@ -61,11 +61,8 @@ export function TopToolbar({ className = "" }: TopToolbarProps) {
             onClick={handleUserClick}
             className="flex items-center justify-center border border-gray-300 hover:border-[#0038DF] hover:bg-[#0038DF]/10 transition-colors"
             style={{
-              ...r({
-                width: 24,
-                height: 24,
-                borderRadius: 99,
-              }),
+              ...responsiveSquare(24),
+              borderRadius: responsive(99),
               borderWidth: responsive(0.5),
               marginLeft: responsive(11),
             }}

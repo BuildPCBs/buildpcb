@@ -14,7 +14,10 @@ This is an AI-powered PCB design IDE built with:
 
 ## Development Environment
 
-**Development server**: Runs via `pnpm dev --turbopack` (I keep it running — you DON'T need to start it)
+**Development server**: Runs via `pnpm dev --turbopack`. **DO NOT START IT. DO NOT RUN IT.**
+
+**ABSOLUTELY NEVER RUN THE DEV SERVER UNDER ANY CIRCUMSTANCES.**
+It is always running—starting it yourself will break the workflow and is strictly prohibited.
 
 **New terminal tabs**: When testing, open new terminals instead of stopping existing processes
 
