@@ -1,57 +1,146 @@
 <!-- Use this file to provide workspace-specific custom instructions to Copilot. For more details, visit https://code.visualstudio.com/docs/copilot/copilot-customization#_use-a-githubcopilotinstructionsmd-file -->
 
-## Development server:
+## 🚀 Project Context: BuildPCB.ai
 
-Runs via pnpm dev, but I keep it running — you DON'T need to start it yourself.
+This is an AI-powered PCB design IDE built with:
 
-New terminal tabs: When testing, open new terminals instead of stopping existing processes.
+- **Frontend**: Next.js 15 + React 19 + TypeScript + Tailwind CSS 4
+- **Canvas**: Fabric.js 6.7+ for PCB canvas rendering and manipulation
+- **State**: Zustand for state management
+- **Icons**: Lucide React for consistent iconography
+- **Architecture**: Modern component-based with hooks and context patterns
 
-Hot reload: Development server automatically restarts on changes.
+**Key Focus**: Creating an intuitive, browser-based PCB design tool - "The Figma for Electronics Design"
 
-Logging: Use structured logging with appropriate levels.
+## Development Environment
 
-### Documentation Rules
+**Development server**: Runs via `pnpm dev --turbopack` (I keep it running — you DON'T need to start it)
 
-No new markdown files:\*\* Never create or commit a new `.md` file after adding a feature unless explicitly instructed
+**New terminal tabs**: When testing, open new terminals instead of stopping existing processes
 
-- Always add any md file created to gitignore
-- Never add any test file, not even to test
-- Never add a comment at the top of any file — place documentation where it belongs within the code
+**Hot reload**: Development server automatically restarts on changes
 
-## Code Editing & Rewriting
+**Logging**: Use structured logging with appropriate levels
 
-When rewriting a file completely, always verify that the result is not empty and preserves essential logic.
+## 📁 Code Organization & Architecture
 
-Never remove unrelated code during a fix unless explicitly instructed.
+**File Structure Patterns**:
 
-When creating new files, confirm they are placed in the correct folder based on the file structure guidelines.
+- `src/canvas/`: Canvas components and Fabric.js integrations (IDEFabricCanvas, hooks, UI components)
+- `src/components/`: Reusable React components (auth, icons, layout, ui)
+- `src/hooks/`: Custom React hooks for business logic
+- `src/lib/`: Utility functions, API clients, shared logic
+- `src/store/`: Zustand stores for state management
+- `src/types/`: TypeScript type definitions
+- `src/contexts/`: React contexts for app-wide state
 
-## Response Format
+**Component Naming**: Use PascalCase for components, camelCase for utilities
+**Hook Pattern**: Prefix custom hooks with `use` (e.g., `useCanvasInteraction`)
+**Type Safety**: Always provide proper TypeScript types, especially for Fabric.js objects
 
-Before taking any action or writing code, always begin with a short summary of what I understand from your request and how I plan to execute it.
+## 🚫 Documentation & File Management Rules
 
-The summary should clearly confirm:
+**No new markdown files**: Never create or commit a new `.md` file after adding a feature unless explicitly instructed
 
-The main task you are asking for.
+- Always add any md file created to `.gitignore`
+- Never add test files, not even for testing
+- Never add comments at the top of files — place documentation within the code where it belongs
 
-The approach or steps I will take to solve it.
+**Canvas-Specific**: When working with Fabric.js, ensure proper cleanup and event handling
 
-Example:
+## ✏️ Code Editing & Rewriting Standards
 
-Summary: You want me to create a new API route /users/:id that returns a user profile in JSON format, with role-based access control and Swagger documentation.
+**File Safety**: When rewriting files completely, always verify the result is not empty and preserves essential logic
 
-How I would solve: I will set up the route in Express, add authentication middleware for role-based access, define a Swagger schema, and return the user profile from the database.
-THEN PROCEED
+**Scope Control**: Never remove unrelated code during a fix unless explicitly instructed
 
-When generating code, please follow these patterns and maintain consistency with the existing codebase. Always consider the health-focused nature of the application and implement appropriate safety measures for medical content.
+**File Placement**: When creating new files, confirm they're placed in the correct folder based on file structure guidelines
 
-The approach or steps I will take to solve it.
+**Canvas Integration**: For Fabric.js components, ensure proper:
 
-Example:
+- Event listener cleanup in useEffect
+- Canvas object disposal when components unmount
+- Type safety with fabric.Object extensions
+- Performance optimization for large canvases
 
-Summary: You want me to create a new API route /users/:id that returns a user profile in JSON format, with role-based access control and Swagger documentation.
+**React Patterns**: Follow modern React patterns:
 
-How I would solve: I will set up the route in Express, add authentication middleware for role-based access, define a Swagger schema, and return the user profile from the database.
-THEN PROCEED
+- Functional components with hooks
+- Proper dependency arrays in useEffect
+- Memoization for expensive operations
+- Error boundaries for canvas components
 
-When generating code, please follow these patterns and maintain consistency with the existing codebase. Always consider the health-focused nature of the application and implement appropriate safety measures for medical content.
+## 💬 Response Format & Communication
+
+**Always Start With Summary**: Before any action, begin with:
+
+1. **What I understand**: Clear restatement of your request
+2. **My approach**: Step-by-step plan to solve it
+3. **Expected outcome**: What you'll get when I'm done
+
+**Example**:
+
+```
+Summary: You want me to create a new PCB component selector with drag-and-drop functionality using Fabric.js, integrated with the existing component library.
+
+Approach: I'll create a ComponentSelector component, add drag event handlers, integrate with the canvas store, and update the component library to support the new selector.
+
+Expected: A working component selector that allows dragging components onto the PCB canvas.
+```
+
+**Tool Usage**:
+
+- Never mention tool names to you (e.g., don't say "I'll use the replace_string_in_file tool")
+- Focus on what I'm doing, not how I'm doing it
+- Use tools efficiently - read large chunks rather than many small reads
+
+**Code Presentation**:
+
+- Use proper markdown formatting
+- Wrap filenames and symbols in backticks: `ComponentFactory.tsx`
+- Provide context for code changes
+- Explain complex Fabric.js or canvas logic
+
+## 🎯 Project-Specific Patterns
+
+**Canvas Components**: Always consider:
+
+- Performance impact on large PCBs
+- Memory management for fabric objects
+- Touch/mobile compatibility
+- Undo/redo state management
+
+**State Management**:
+
+- Use Zustand for global state
+- Prefer local state for component-specific data
+- Keep canvas state separate from UI state
+
+**Error Handling**:
+
+- Implement error boundaries for canvas operations
+- Graceful degradation for unsupported browsers
+- User-friendly error messages for PCB validation
+
+**Performance**:
+
+- Virtualize large component lists
+- Debounce canvas interactions
+- Optimize re-renders with React.memo and useMemo
+
+## 🔧 Debugging & Testing Guidance
+
+**When I encounter issues**:
+
+1. Check browser console for Fabric.js errors
+2. Verify TypeScript types are correct
+3. Test canvas operations in isolation
+4. Validate state changes in dev tools
+
+**Common PCB-specific scenarios to consider**:
+
+- Component placement validation
+- Wire routing conflicts
+- Layer management
+- Export/import functionality
+- Real-time collaboration features

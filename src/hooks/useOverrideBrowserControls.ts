@@ -8,8 +8,32 @@ export function useOverrideBrowserControls() {
       e.stopPropagation();
     };
 
-    // Disable context menu globally
+    // Disable context menu globally - but allow on canvas
     const handleContextMenu = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+
+      console.log("🔍 CONTEXT MENU DEBUG:");
+      console.log("- Target element:", target);
+      console.log("- Target tagName:", target.tagName);
+      console.log("- Target className:", target.className);
+      console.log(
+        "- Closest canvas-container:",
+        target.closest(".canvas-container")
+      );
+      console.log("- Closest canvas element:", target.closest("canvas"));
+      console.log("- Is CANVAS:", target.tagName === "CANVAS");
+
+      // Allow context menu on canvas elements and their containers
+      if (
+        target.tagName === "CANVAS" ||
+        target.closest(".canvas-container") ||
+        target.closest('[data-allow-context-menu="true"]')
+      ) {
+        console.log("✅ ALLOWING context menu on canvas element");
+        return; // Don't interfere with canvas context menus
+      }
+
+      console.log("❌ PREVENTING context menu on non-canvas element");
       e.preventDefault();
       return false;
     };
@@ -22,8 +46,35 @@ export function useOverrideBrowserControls() {
 
     // Disable text selection on drag
     const handleSelectStart = (e: Event) => {
+      const target = e.target as HTMLElement;
+      
+      // Check if target is an HTMLElement before calling closest
+      if (target && typeof target.closest === 'function') {
+        // Allow text selection on context menu elements
+        if (target.closest('[data-allow-selection="true"]') || 
+            target.closest('.context-menu') ||
+            target.closest('button')) {
+          return; // Allow selection on these elements
+        }
+      }
+      
       e.preventDefault();
       return false;
+    };
+
+        // Handle clicks - allow on context menu elements
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      
+      // Check if target is an HTMLElement before calling closest
+      if (target && typeof target.closest === 'function') {
+        // Allow clicks on context menu elements and buttons
+        if (target.closest('button') || 
+            target.closest('.context-menu') ||
+            target.closest('[data-allow-clicks="true"]')) {
+          return; // Don't interfere with these clicks
+        }
+      }
     };
 
     // Disable browser zoom/pan gestures
@@ -114,6 +165,7 @@ export function useOverrideBrowserControls() {
     document.addEventListener("contextmenu", handleContextMenu);
     document.addEventListener("dragstart", handleDragStart);
     document.addEventListener("selectstart", handleSelectStart);
+    document.addEventListener("click", handleClick);
     document.addEventListener("touchstart", handleTouchStart, {
       passive: false,
     });
@@ -128,21 +180,50 @@ export function useOverrideBrowserControls() {
       img.addEventListener("dragstart", preventDefaults);
     });
 
-    // Set CSS to disable selection and dragging
+    // Set CSS to disable selection and dragging - but allow on context menu
     document.body.style.userSelect = "none";
     document.body.style.webkitUserSelect = "none";
     (document.body.style as any).webkitTouchCallout = "none";
     (document.body.style as any).webkitUserDrag = "none";
+    
+    // Add CSS rule to allow interactions on context menu elements
+    const style = document.createElement('style');
+    style.textContent = `
+      .context-menu,
+      .context-menu *,
+      button,
+      button * {
+        user-select: text !important;
+        -webkit-user-select: text !important;
+        -webkit-touch-callout: default !important;
+        -webkit-user-drag: auto !important;
+        cursor: pointer !important;
+        pointer-events: auto !important;
+      }
+      
+      /* Ensure context menu is above overlay */
+      .context-menu {
+        z-index: 9999 !important;
+        position: fixed !important;
+      }
+    `;
+    document.head.appendChild(style);
 
     // Cleanup
     return () => {
       document.removeEventListener("contextmenu", handleContextMenu);
       document.removeEventListener("dragstart", handleDragStart);
       document.removeEventListener("selectstart", handleSelectStart);
+      document.removeEventListener("click", handleClick);
       document.removeEventListener("touchstart", handleTouchStart);
       document.removeEventListener("touchmove", handleTouchMove);
       document.removeEventListener("keydown", handleKeyDown);
       document.removeEventListener("wheel", handleWheel);
+
+      // Remove the style element
+      if (style.parentNode) {
+        style.parentNode.removeChild(style);
+      }
 
       // Reset CSS
       document.body.style.userSelect = "";

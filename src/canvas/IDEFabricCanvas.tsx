@@ -33,10 +33,18 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
     visible: false,
     x: 0,
     y: 0,
-    type: "object" as "object" | "canvas",
-    target: null as fabric.FabricObject | null,
+    canvasX: 0, // Canvas coordinates for paste
+    canvasY: 0, // Canvas coordinates for paste
+    type: "canvas" as "object" | "canvas",
+    target: null as fabric.Object | null,
   });
   const [clipboard, setClipboard] = useState<fabric.Object | null>(null);
+
+  // Track last mouse position for smart paste positioning
+  const lastMousePosition = useRef<{ x: number; y: number }>({
+    x: 400,
+    y: 300,
+  });
 
   // Use viewport control hooks
   useCanvasZoom(fabricCanvas);
@@ -84,6 +92,13 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
       source: patternCanvas,
       repeat: "repeat",
     });
+  };
+
+  // Context menu paste handler - uses right-click position
+  const handleContextPaste = () => {
+    console.log("🔍 DEBUG: handleContextPaste called");
+    console.log("🔍 DEBUG: menuState:", menuState);
+    handlePaste({ x: menuState.canvasX, y: menuState.canvasY });
   };
 
   // Initialize Fabric.js canvas
@@ -660,6 +675,7 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
   };
 
   const handleCopy = () => {
+    console.log("🔍 DEBUG: handleCopy called");
     console.log("--- ACTION START: handleCopy ---");
     if (!fabricCanvas) {
       console.log("--- ACTION FAILED: No canvas available ---");
@@ -677,7 +693,7 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
     console.log("--- ACTION SUCCESS: handleCopy ---");
   };
 
-  const handlePaste = () => {
+  const handlePaste = (position?: { x: number; y: number }) => {
     console.log("--- ACTION START: handlePaste ---");
     if (!fabricCanvas) {
       console.log("--- ACTION FAILED: No canvas available ---");
@@ -689,16 +705,21 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
       return;
     }
 
-    // Simple paste implementation - clone the object
+    // Smart paste implementation - place at mouse cursor position
     clipboard.clone().then((cloned: any) => {
+      // Use provided position or current mouse position for paste location
+      const pastePos = position || lastMousePosition.current;
+
       cloned.set({
-        left: cloned.left + 20,
-        top: cloned.top + 20,
+        left: pastePos.x,
+        top: pastePos.y,
       });
       fabricCanvas.add(cloned);
       fabricCanvas.setActiveObject(cloned);
       fabricCanvas.renderAll();
-      console.log("--- ACTION SUCCESS: handlePaste ---");
+      console.log(
+        `--- ACTION SUCCESS: handlePaste at position (${pastePos.x}, ${pastePos.y}) ---`
+      );
     });
     // saveState(); // We can add this back later
   };
@@ -826,41 +847,58 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
     const containerDiv = containerRef.current;
 
     const handleContextMenu = (e: MouseEvent) => {
+      console.log("🔍 IDEFabricCanvas handleContextMenu triggered!");
+      console.log("- Event:", e);
+      console.log("- clientX:", e.clientX, "clientY:", e.clientY);
+
       e.preventDefault(); // Stop the default browser menu
 
       // Use canvas.findTarget() to determine if user right-clicked on an object
       const target = fabricCanvas.findTarget(e);
+      console.log("- Fabric target found:", target);
+      console.log("- Target name:", target ? (target as any).name : "none");
 
       if (target && (target as any).name !== "workspace") {
+        console.log("✅ Showing OBJECT context menu");
         // Case A: Right-Click on an Object
         // Make that object the active selection on the canvas
         fabricCanvas.setActiveObject(target);
         fabricCanvas.renderAll();
 
         // Show context menu with "Copy" and "Delete" options
-        setMenuState({
+        const objectMenuState = {
           visible: true,
           x: e.clientX,
           y: e.clientY,
-          type: "object",
+          canvasX: fabricCanvas.getPointer(e).x,
+          canvasY: fabricCanvas.getPointer(e).y,
+          type: "object" as const,
           target: target,
-        });
+        };
+        console.log("🔧 Setting OBJECT menu state:", objectMenuState);
+        setMenuState(objectMenuState);
       } else {
+        console.log("✅ Showing CANVAS context menu");
         // Case B: Right-Click on Empty Canvas
         // Show context menu with only "Paste" option
-        setMenuState({
+        const canvasMenuState = {
           visible: true,
           x: e.clientX,
           y: e.clientY,
-          type: "canvas",
+          canvasX: fabricCanvas.getPointer(e).x,
+          canvasY: fabricCanvas.getPointer(e).y,
+          type: "canvas" as const,
           target: null,
-        });
+        };
+        console.log("🔧 Setting CANVAS menu state:", canvasMenuState);
+        setMenuState(canvasMenuState);
       }
     };
 
     const handleClick = (e: MouseEvent) => {
-      // Close context menu on any regular click
-      if (e.button !== 2) {
+      // Close context menu on any regular click, but not on right-click
+      // Right-click (button 2) should not close the menu that it just opened
+      if (e.button === 0) { // Only close on left-click
         setMenuState((prev) => ({ ...prev, visible: false }));
       }
     };
@@ -875,10 +913,26 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
     };
   }, [fabricCanvas]);
 
+  // Track mouse position for smart paste placement
+  useEffect(() => {
+    if (!fabricCanvas) return;
+
+    const handleMouseMove = (event: fabric.TEvent) => {
+      const pointer = fabricCanvas.getPointer(event.e);
+      lastMousePosition.current = { x: pointer.x, y: pointer.y };
+    };
+
+    fabricCanvas.on("mouse:move", handleMouseMove);
+
+    return () => {
+      fabricCanvas.off("mouse:move", handleMouseMove);
+    };
+  }, [fabricCanvas]);
+
   return (
     <div
       ref={containerRef}
-      className={`w-full h-full ${className}`}
+      className={`w-full h-full canvas-container ${className}`}
       style={{ width: "100%", height: "100%" }}
     >
       {/* Rulers Layout - Only visible when manipulating objects */}
@@ -960,7 +1014,7 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
         onUngroup={handleUngroup}
         onDelete={handleDelete}
         onCopy={handleCopy}
-        onPaste={handlePaste}
+        onPaste={handleContextPaste}
       />
 
       {/* Optional debug info */}
