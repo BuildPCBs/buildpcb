@@ -173,13 +173,15 @@ export function PromptEntry({
             style={{
               ...responsiveSquare(32),
               borderRadius: responsive(99), // Fully circular
-              backgroundColor: prompt.trim() && !isThinking ? BRAND_COLORS.primary : "#CCCCCC", // Blue when enabled, gray when disabled
+              backgroundColor:
+                prompt.trim() && !isThinking ? BRAND_COLORS.primary : "#CCCCCC", // Blue when enabled, gray when disabled
               border: "none",
               cursor: prompt.trim() && !isThinking ? "pointer" : "not-allowed",
             }}
             onMouseEnter={(e) => {
               if (prompt.trim() && !isThinking) {
-                e.currentTarget.style.backgroundColor = BRAND_COLORS.primaryHover; // Darker blue on hover
+                e.currentTarget.style.backgroundColor =
+                  BRAND_COLORS.primaryHover; // Darker blue on hover
               }
             }}
             onMouseLeave={(e) => {
