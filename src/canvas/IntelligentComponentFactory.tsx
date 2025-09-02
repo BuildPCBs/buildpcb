@@ -161,3 +161,122 @@ export const createIntelligentComponent = (
       );
     });
 };
+
+// Function to recreate pins for pasted intelligent components  
+export const recreateIntelligentComponentPins = (
+  component: fabric.Group,
+  fabricCanvas: fabric.Canvas
+): fabric.Group => {
+  if (!component || !fabricCanvas) return component;
+
+  const componentData = (component as any).data;
+  const componentType = (component as any).componentType;
+  
+  if (!componentData || componentData.type !== "component" || !componentType) {
+    console.log("🔄 Not an intelligent component, skipping pin recreation");
+    return component;
+  }
+
+  console.log(`🔄 Recreating intelligent pins for ${componentData.componentName || componentType}`);
+
+  const newComponentId = `component_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
+  // Get existing objects from the component (excluding old pins)
+  const existingObjects = component.getObjects().filter((obj: any) => {
+    // Keep everything except old pins
+    return !obj.pin && !(obj.data && obj.data.type === "pin");
+  });
+
+  // Try to recreate pins based on component size and type
+  const componentBounds = component.getBoundingRect();
+  const pinCount = componentData.pins ? componentData.pins.length : 2;
+  
+  const newPins: fabric.Circle[] = [];
+  
+  if (pinCount <= 2) {
+    // Simple 2-pin layout
+    for (let i = 0; i < pinCount; i++) {
+      const pin = new fabric.Circle({
+        radius: 4,
+        fill: "#10B981",
+        stroke: "#059669",
+        strokeWidth: 1,
+        originX: "center",
+        originY: "center",
+        left: i === 0 ? -componentBounds.width / 4 : componentBounds.width / 4,
+        top: 0,
+      });
+      
+      pin.set("pin", true);
+      pin.set("data", {
+        type: "pin",
+        componentId: newComponentId,
+        pinId: `pin${i + 1}`,
+        pinNumber: i + 1,
+        isConnectable: true,
+      });
+      
+      newPins.push(pin);
+    }
+  } else {
+    // Multi-pin layout - distribute around perimeter
+    const pinsPerSide = Math.ceil(pinCount / 2);
+    for (let i = 0; i < pinCount; i++) {
+      const isLeftSide = i < pinsPerSide;
+      const sideIndex = isLeftSide ? i : i - pinsPerSide;
+      
+      const pin = new fabric.Circle({
+        radius: 3,
+        fill: "#10B981",
+        stroke: "#059669",
+        strokeWidth: 1,
+        originX: "center",
+        originY: "center",
+        left: isLeftSide ? -componentBounds.width / 2 - 5 : componentBounds.width / 2 + 5,
+        top: -componentBounds.height / 2 + 10 + (sideIndex * (componentBounds.height - 20) / (pinsPerSide - 1)),
+      });
+      
+      pin.set("pin", true);
+      pin.set("data", {
+        type: "pin",
+        componentId: newComponentId,
+        pinId: `pin${i + 1}`,
+        pinNumber: i + 1,
+        isConnectable: true,
+      });
+      
+      newPins.push(pin);
+    }
+  }
+
+  // Create new component group with existing objects + new pins
+  const newComponent = new fabric.Group([...existingObjects, ...newPins], {
+    left: component.left,
+    top: component.top,
+    angle: component.angle,
+    scaleX: component.scaleX,
+    scaleY: component.scaleY,
+  });
+
+  // Restore component metadata with new ID
+  newComponent.set("componentType", componentType);
+  newComponent.set("data", {
+    type: "component",
+    componentType: componentType,
+    componentName: componentData.componentName,
+    pins: newPins.map((_, index) => `pin${index + 1}`),
+  });
+
+  // Restore component properties
+  newComponent.set({
+    selectable: true,
+    evented: true,
+    lockUniScaling: true,
+    hasControls: true,
+    hasBorders: true,
+    centeredRotation: true,
+  });
+
+  console.log(`✅ Intelligent pin recreation: Added ${newPins.length} functional pins to pasted component`);
+  return newComponent;
+};

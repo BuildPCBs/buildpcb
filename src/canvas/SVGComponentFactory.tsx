@@ -18,6 +18,15 @@ const componentSVGPaths = {
   motor: "/components/motor.svg",
   voltage_regulator: "/components/voltage_regulator.svg",
   arduino: "/components/arduino.svg",
+  buzzer: "/components/buzzer.svg",
+  "display-lcd": "/components/display-lcd.svg",
+  fuse: "/components/fuse.svg",
+  microcontroller: "/components/microcontroller.svg",
+  "photo-resistor": "/components/photo-resistor.svg",
+  potentiometer: "/components/potentiometer.svg",
+  relay: "/components/relay.svg",
+  "servo-motor": "/components/servo-motor.svg",
+  "temperature-sensor": "/components/temperature-sensor.svg",
 };
 
 // Component configuration for pin placement and sizing
@@ -38,6 +47,15 @@ const componentConfig = {
   motor: { width: 60, height: 60, pinDistance: 35, pinCount: 2 },
   voltage_regulator: { width: 60, height: 40, pinDistance: 35, pinCount: 3 },
   arduino: { width: 120, height: 80, pinDistance: 65, pinCount: 20 },
+  buzzer: { width: 45, height: 45, pinDistance: 25, pinCount: 2 },
+  "display-lcd": { width: 80, height: 60, pinDistance: 45, pinCount: 16 },
+  fuse: { width: 50, height: 20, pinDistance: 30, pinCount: 2 },
+  microcontroller: { width: 100, height: 70, pinDistance: 55, pinCount: 16 },
+  "photo-resistor": { width: 60, height: 40, pinDistance: 35, pinCount: 2 },
+  potentiometer: { width: 50, height: 50, pinDistance: 30, pinCount: 3 },
+  relay: { width: 70, height: 50, pinDistance: 40, pinCount: 8 },
+  "servo-motor": { width: 70, height: 50, pinDistance: 40, pinCount: 3 },
+  "temperature-sensor": { width: 45, height: 40, pinDistance: 28, pinCount: 3 },
 };
 
 // Create functional pins for the component
@@ -115,8 +133,128 @@ function createComponentPins(config: any, componentId: string) {
     pin3.set("data", { type: "pin", componentId, pinId: "pin3", pinNumber: 3 });
 
     pins.push(pin1, pin2, pin3);
+  } else if (config.pinCount === 8) {
+    // Eight pins: 4 on each side (for op-amps, relays)
+    for (let i = 0; i < 4; i++) {
+      // Left side pins
+      const leftPin = new fabric.Circle({
+        radius: 3,
+        fill: "#10B981",
+        stroke: "#059669",
+        strokeWidth: 1,
+        originX: "center",
+        originY: "center",
+        left: -config.width / 2 - 5,
+        top: -config.height / 3 + (i * config.height / 4),
+      });
+      leftPin.set("pin", true);
+      leftPin.set("data", { type: "pin", componentId, pinId: `pin${i + 1}`, pinNumber: i + 1 });
+
+      // Right side pins
+      const rightPin = new fabric.Circle({
+        radius: 3,
+        fill: "#10B981",
+        stroke: "#059669",
+        strokeWidth: 1,
+        originX: "center",
+        originY: "center",
+        left: config.width / 2 + 5,
+        top: -config.height / 3 + (i * config.height / 4),
+      });
+      rightPin.set("pin", true);
+      rightPin.set("data", { type: "pin", componentId, pinId: `pin${i + 5}`, pinNumber: i + 5 });
+
+      pins.push(leftPin, rightPin);
+    }
+  } else if (config.pinCount === 16) {
+    // Sixteen pins: 8 on each side (for microcontrollers, LCD displays)
+    for (let i = 0; i < 8; i++) {
+      // Left side pins
+      const leftPin = new fabric.Circle({
+        radius: 2.5,
+        fill: "#10B981",
+        stroke: "#059669",
+        strokeWidth: 1,
+        originX: "center",
+        originY: "center",
+        left: -config.width / 2 - 5,
+        top: -config.height / 2 + 5 + (i * (config.height - 10) / 7),
+      });
+      leftPin.set("pin", true);
+      leftPin.set("data", { type: "pin", componentId, pinId: `pin${i + 1}`, pinNumber: i + 1 });
+
+      // Right side pins
+      const rightPin = new fabric.Circle({
+        radius: 2.5,
+        fill: "#10B981",
+        stroke: "#059669",
+        strokeWidth: 1,
+        originX: "center",
+        originY: "center",
+        left: config.width / 2 + 5,
+        top: -config.height / 2 + 5 + (i * (config.height - 10) / 7),
+      });
+      rightPin.set("pin", true);
+      rightPin.set("data", { type: "pin", componentId, pinId: `pin${i + 9}`, pinNumber: i + 9 });
+
+      pins.push(leftPin, rightPin);
+    }
+  } else if (config.pinCount === 20) {
+    // Twenty pins: Arduino-style layout with pins around the perimeter
+    for (let i = 0; i < 10; i++) {
+      // Left side pins
+      const leftPin = new fabric.Circle({
+        radius: 2,
+        fill: "#10B981",
+        stroke: "#059669",
+        strokeWidth: 1,
+        originX: "center",
+        originY: "center",
+        left: -config.width / 2 - 5,
+        top: -config.height / 2 + 5 + (i * (config.height - 10) / 9),
+      });
+      leftPin.set("pin", true);
+      leftPin.set("data", { type: "pin", componentId, pinId: `pin${i + 1}`, pinNumber: i + 1 });
+
+      // Right side pins
+      const rightPin = new fabric.Circle({
+        radius: 2,
+        fill: "#10B981",
+        stroke: "#059669",
+        strokeWidth: 1,
+        originX: "center",
+        originY: "center",
+        left: config.width / 2 + 5,
+        top: -config.height / 2 + 5 + (i * (config.height - 10) / 9),
+      });
+      rightPin.set("pin", true);
+      rightPin.set("data", { type: "pin", componentId, pinId: `pin${i + 11}`, pinNumber: i + 11 });
+
+      pins.push(leftPin, rightPin);
+    }
   }
-  // Add more pin configurations as needed for multi-pin components
+  // Default fallback for other pin counts - create pins in a grid pattern
+  else if (config.pinCount > 3) {
+    const pinsPerSide = Math.ceil(config.pinCount / 2);
+    for (let i = 0; i < config.pinCount; i++) {
+      const isLeftSide = i < pinsPerSide;
+      const sideIndex = isLeftSide ? i : i - pinsPerSide;
+      
+      const pin = new fabric.Circle({
+        radius: 3,
+        fill: "#10B981",
+        stroke: "#059669",
+        strokeWidth: 1,
+        originX: "center",
+        originY: "center",
+        left: isLeftSide ? -config.width / 2 - 5 : config.width / 2 + 5,
+        top: -config.height / 2 + 10 + (sideIndex * (config.height - 20) / (pinsPerSide - 1)),
+      });
+      pin.set("pin", true);
+      pin.set("data", { type: "pin", componentId, pinId: `pin${i + 1}`, pinNumber: i + 1 });
+      pins.push(pin);
+    }
+  }
 
   return pins;
 }
@@ -292,6 +430,67 @@ export const createSVGComponent = (
       console.error(`❌ SVG: Failed to load ${svgPath}:`, error);
       createFallbackComponent(fabricCanvas, componentInfo, config, componentId);
     });
+};
+
+// Function to recreate pins for pasted components
+export const recreateComponentPins = (
+  component: fabric.Group,
+  fabricCanvas: fabric.Canvas
+): fabric.Group => {
+  if (!component || !fabricCanvas) return component;
+
+  const componentData = (component as any).data;
+  const componentType = (component as any).componentType;
+  
+  if (!componentData || componentData.type !== "component" || !componentType) {
+    console.log("🔄 Not a component, skipping pin recreation");
+    return component;
+  }
+
+  console.log(`🔄 Recreating pins for ${componentData.componentName || componentType}`);
+
+  const config = componentConfig[componentType as keyof typeof componentConfig] || componentConfig.resistor;
+  const newComponentId = `component_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
+  // Get existing objects from the component (excluding old pins)
+  const existingObjects = component.getObjects().filter((obj: any) => {
+    // Keep everything except old pins
+    return !obj.pin && !(obj.data && obj.data.type === "pin");
+  });
+
+  // Create new functional pins
+  const newPins = createComponentPins(config, newComponentId);
+
+  // Create new component group with existing objects + new pins
+  const newComponent = new fabric.Group([...existingObjects, ...newPins], {
+    left: component.left,
+    top: component.top,
+    angle: component.angle,
+    scaleX: component.scaleX,
+    scaleY: component.scaleY,
+  });
+
+  // Restore component metadata with new ID
+  newComponent.set("componentType", componentType);
+  newComponent.set("data", {
+    type: "component",
+    componentType: componentType,
+    componentName: componentData.componentName,
+    pins: newPins.map((_, index) => `pin${index + 1}`),
+  });
+
+  // Restore component properties
+  newComponent.set({
+    selectable: true,
+    evented: true,
+    lockUniScaling: true,
+    hasControls: true,
+    hasBorders: true,
+    centeredRotation: true,
+  });
+
+  console.log(`✅ Pin recreation: Added ${newPins.length} functional pins to pasted component`);
+  return newComponent;
 }; // Fallback to simple component if SVG loading fails
 function createFallbackComponent(
   fabricCanvas: fabric.Canvas,

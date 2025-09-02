@@ -184,3 +184,102 @@ export const createSimpleComponent = (
 
   console.log(`✅ ENHANCED: Added ${componentInfo.name} with functional pins!`);
 };
+
+// Function to recreate pins for pasted simple components
+export const recreateSimpleComponentPins = (
+  component: fabric.Group,
+  fabricCanvas: fabric.Canvas
+): fabric.Group => {
+  if (!component || !fabricCanvas) return component;
+
+  const componentData = (component as any).data;
+  const componentType = (component as any).componentType;
+  
+  if (!componentData || componentData.type !== "component" || !componentType) {
+    console.log("🔄 Not a simple component, skipping pin recreation");
+    return component;
+  }
+
+  console.log(`🔄 Recreating simple pins for ${componentData.componentName || componentType}`);
+
+  const style = componentStyles[componentType as keyof typeof componentStyles] || componentStyles.resistor;
+  const newComponentId = `component_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
+  // Get existing objects from the component (excluding old pins)
+  const existingObjects = component.getObjects().filter((obj: any) => {
+    // Keep everything except old pins
+    return !obj.pin && !(obj.data && obj.data.type === "pin");
+  });
+
+  // Create new functional pins
+  const pin1 = new fabric.Circle({
+    radius: 5,
+    fill: "#10B981",
+    stroke: "#059669",
+    strokeWidth: 2,
+    originX: "center",
+    originY: "center",
+    left: -style.pinDistance,
+    top: 0,
+  });
+
+  pin1.set("pin", true);
+  pin1.set("data", {
+    type: "pin",
+    componentId: newComponentId,
+    pinId: "pin1",
+    pinNumber: 1,
+    isConnectable: true,
+  });
+
+  const pin2 = new fabric.Circle({
+    radius: 5,
+    fill: "#10B981",
+    stroke: "#059669",
+    strokeWidth: 2,
+    originX: "center",
+    originY: "center",
+    left: style.pinDistance,
+    top: 0,
+  });
+
+  pin2.set("pin", true);
+  pin2.set("data", {
+    type: "pin",
+    componentId: newComponentId,
+    pinId: "pin2",
+    pinNumber: 2,
+    isConnectable: true,
+  });
+
+  // Create new component group with existing objects + new pins
+  const newComponent = new fabric.Group([...existingObjects, pin1, pin2], {
+    left: component.left,
+    top: component.top,
+    angle: component.angle,
+    scaleX: component.scaleX,
+    scaleY: component.scaleY,
+  });
+
+  // Restore component metadata with new ID
+  newComponent.set("componentType", componentType);
+  newComponent.set("data", {
+    type: "component",
+    componentType: componentType,
+    componentName: componentData.componentName,
+    pins: ["pin1", "pin2"],
+  });
+
+  // Restore component properties
+  newComponent.set({
+    selectable: true,
+    evented: true,
+    lockUniScaling: true,
+    hasControls: true,
+    hasBorders: true,
+    centeredRotation: true,
+  });
+
+  console.log(`✅ Simple pin recreation: Added functional pins to pasted component`);
+  return newComponent;
+};

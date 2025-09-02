@@ -714,12 +714,63 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
         left: pastePos.x,
         top: pastePos.y,
       });
-      fabricCanvas.add(cloned);
-      fabricCanvas.setActiveObject(cloned);
-      fabricCanvas.renderAll();
-      console.log(
-        `--- ACTION SUCCESS: handlePaste at position (${pastePos.x}, ${pastePos.y}) ---`
-      );
+
+      // Check if this is a component that needs pin recreation
+      const componentData = cloned.data;
+      const componentType = cloned.componentType;
+      
+      if (componentData && componentData.type === "component" && componentType) {
+        console.log(`🔄 Pasted component detected: ${componentData.componentName || componentType}`);
+        
+        // Dynamically import the appropriate pin recreation function based on component characteristics
+        const recreateComponentPins = async () => {
+          try {
+            // Try SVG factory first (most feature-complete)
+            const { recreateComponentPins: svgRecreate } = await import("./SVGComponentFactory");
+            let recreatedComponent = svgRecreate(cloned, fabricCanvas);
+            
+            // If that didn't work, try intelligent factory
+            if (!recreatedComponent || recreatedComponent === cloned) {
+              const { recreateIntelligentComponentPins } = await import("./IntelligentComponentFactory");
+              recreatedComponent = recreateIntelligentComponentPins(cloned, fabricCanvas);
+            }
+            
+            // If that didn't work, try simple factory
+            if (!recreatedComponent || recreatedComponent === cloned) {
+              const { recreateSimpleComponentPins } = await import("./SimpleComponentFactory");
+              recreatedComponent = recreateSimpleComponentPins(cloned, fabricCanvas);
+            }
+            
+            fabricCanvas.add(recreatedComponent);
+            fabricCanvas.setActiveObject(recreatedComponent);
+            fabricCanvas.renderAll();
+            
+            console.log(
+              `--- ACTION SUCCESS: handlePaste with pin recreation at position (${pastePos.x}, ${pastePos.y}) ---`
+            );
+          } catch (error) {
+            console.error("❌ Failed to recreate component pins:", error);
+            // Fallback: add the cloned component as-is
+            fabricCanvas.add(cloned);
+            fabricCanvas.setActiveObject(cloned);
+            fabricCanvas.renderAll();
+            
+            console.log(
+              `--- ACTION SUCCESS: handlePaste (fallback) at position (${pastePos.x}, ${pastePos.y}) ---`
+            );
+          }
+        };
+        
+        recreateComponentPins();
+      } else {
+        // Regular object - just add it
+        fabricCanvas.add(cloned);
+        fabricCanvas.setActiveObject(cloned);
+        fabricCanvas.renderAll();
+        console.log(
+          `--- ACTION SUCCESS: handlePaste at position (${pastePos.x}, ${pastePos.y}) ---`
+        );
+      }
     });
     // saveState(); // We can add this back later
   };
