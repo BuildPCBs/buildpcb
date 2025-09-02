@@ -69,3 +69,10 @@ yarn-error.log*
 next-env.d.ts
 
 dev/
+
+# Documentation files created during development
+SUPABASE_AUTH_SETUP.md
+src/components/auth/AuthTest.tsx
+src/lib/auth-debug.ts
+src/components/debug/CanvasDebug.tsx
+src/components/debug/ComponentVisibilityTest.tsx

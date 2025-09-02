@@ -3,6 +3,7 @@ import { DM_Sans } from "next/font/google";
 import { siteConfig } from "@/lib/site-config";
 import { AuthProvider } from "@/hooks/useAuth";
 import { AuthOverlayWrapper } from "@/components/auth/AuthOverlayWrapper";
+import { RouteGuard } from "@/components/auth/RouteGuard";
 import "./globals.css";
 
 const dm_sans = DM_Sans({

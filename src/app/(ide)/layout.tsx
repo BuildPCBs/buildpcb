@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { generatePageMetadata } from "@/lib/metadata";
 import { pages } from "@/lib/site-config";
+import { RouteGuard } from "@/components/auth/RouteGuard";
 
 export const metadata: Metadata = generatePageMetadata({
   title: pages.home.title,
@@ -20,5 +21,9 @@ export const metadata: Metadata = generatePageMetadata({
 });
 
 export default function IDELayout({ children }: { children: React.ReactNode }) {
-  return children;
+  return (
+    <RouteGuard requireAuth={true}>
+      {children}
+    </RouteGuard>
+  );
 }

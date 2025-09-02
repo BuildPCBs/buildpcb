@@ -4,7 +4,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { AuthOverlay } from "./AuthOverlay";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { isAuthOverlayOpen, hideAuthOverlay, login } = useAuth();
+  const { isAuthOverlayOpen, hideAuthOverlay } = useAuth();
+
+  const handleAuthSuccess = () => {
+    // Authentication success is automatically handled by the auth context
+    hideAuthOverlay();
+  };
 
   return (
     <>
@@ -12,7 +17,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       <AuthOverlay
         isOpen={isAuthOverlayOpen}
         onClose={hideAuthOverlay}
-        onSuccess={login}
+        onSuccess={handleAuthSuccess}
       />
     </>
   );

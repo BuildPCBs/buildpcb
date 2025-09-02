@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { r, responsive } from "@/lib/responsive";
+import { useAuth } from "@/hooks/useAuth";
 
 interface AuthOverlayProps {
   isOpen: boolean;
@@ -9,25 +10,33 @@ interface AuthOverlayProps {
 
 interface AuthFormProps {
   onBack?: () => void;
-  onSuccess?: () => void;
+  onSuccess?: (email?: string) => void;
+  email?: string;
 }
 
 function EmailEntryForm({ onSuccess }: Pick<AuthFormProps, "onSuccess">) {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { signInWithOtp } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;
 
     setIsLoading(true);
+    setError(null);
 
-    // Simulate API call
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      console.log("Sending code to:", email);
-      onSuccess?.();
-    } catch (error) {
+      const { error } = await signInWithOtp(email);
+      if (error) {
+        setError(error.message || "Failed to send verification code");
+        console.error("Failed to send OTP:", error);
+      } else {
+        onSuccess?.(email);
+      }
+    } catch (error: any) {
+      setError("Failed to send verification code");
       console.error("Failed to send code:", error);
     } finally {
       setIsLoading(false);
@@ -94,6 +103,19 @@ function EmailEntryForm({ onSuccess }: Pick<AuthFormProps, "onSuccess">) {
             required
           />
 
+          {/* Error Message */}
+          {error && (
+            <div
+              className="mt-2 text-red-500 text-center"
+              style={{
+                fontSize: responsive(10),
+                maxWidth: responsive(289),
+              }}
+            >
+              {error}
+            </div>
+          )}
+
           {/* Submit Button */}
           <button
             type="submit"
@@ -134,10 +156,12 @@ function EmailEntryForm({ onSuccess }: Pick<AuthFormProps, "onSuccess">) {
   );
 }
 
-function CodeVerificationForm({ onBack, onSuccess }: AuthFormProps) {
+function CodeVerificationForm({ onBack, onSuccess, email }: AuthFormProps) {
   const [code, setCode] = useState(["", "", "", "", "", ""]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const { verifyOtp } = useAuth();
 
   const handleCodeChange = (index: number, value: string) => {
     if (value.length > 1) return; // Only allow single digit
@@ -162,15 +186,21 @@ function CodeVerificationForm({ onBack, onSuccess }: AuthFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const codeString = code.join("");
-    if (codeString.length !== 6) return;
+    if (codeString.length !== 6 || !email) return;
 
     setIsLoading(true);
+    setError(null);
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      console.log("Verifying code:", codeString);
-      onSuccess?.();
-    } catch (error) {
+      const { error } = await verifyOtp(email, codeString);
+      if (error) {
+        setError(error.message || "Invalid verification code");
+        console.error("Failed to verify OTP:", error);
+      } else {
+        onSuccess?.();
+      }
+    } catch (error: any) {
+      setError("Failed to verify code");
       console.error("Failed to verify code:", error);
     } finally {
       setIsLoading(false);
@@ -287,6 +317,19 @@ function CodeVerificationForm({ onBack, onSuccess }: AuthFormProps) {
             </div>
           </div>
 
+          {/* Error Message */}
+          {error && (
+            <div
+              className="mt-2 text-red-500 text-center"
+              style={{
+                fontSize: responsive(10),
+                maxWidth: responsive(272),
+              }}
+            >
+              {error}
+            </div>
+          )}
+
           {/* Submit Button */}
           <button
             type="submit"
@@ -343,17 +386,22 @@ function CodeVerificationForm({ onBack, onSuccess }: AuthFormProps) {
 
 export function AuthOverlay({ isOpen, onClose, onSuccess }: AuthOverlayProps) {
   const [step, setStep] = useState<"email" | "code">("email");
+  const [email, setEmail] = useState("");
 
   if (!isOpen) return null;
 
-  const handleEmailSuccess = () => {
-    setStep("code");
+  const handleEmailSuccess = (userEmail?: string) => {
+    if (userEmail) {
+      setEmail(userEmail);
+      setStep("code");
+    }
   };
 
   const handleCodeSuccess = () => {
     onSuccess?.();
     onClose();
     setStep("email"); // Reset for next time
+    setEmail(""); // Clear email
   };
 
   const handleBack = () => {
@@ -375,6 +423,7 @@ export function AuthOverlay({ isOpen, onClose, onSuccess }: AuthOverlayProps) {
           <EmailEntryForm onSuccess={handleEmailSuccess} />
         ) : (
           <CodeVerificationForm
+            email={email}
             onBack={handleBack}
             onSuccess={handleCodeSuccess}
           />

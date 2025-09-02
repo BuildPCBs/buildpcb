@@ -9,7 +9,11 @@ import { r, responsive, responsiveFontSize } from "@/lib/responsive";
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState("recently-viewed");
-  const { isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, signOut } = useAuth();
+
+  const handleLogout = async () => {
+    await signOut();
+  };
 
   const mockProjects = [
     {
@@ -75,14 +79,14 @@ const Dashboard = () => {
                   className="font-medium text-gray-900"
                   style={{ fontSize: responsiveFontSize(14) }}
                 >
-                  {isAuthenticated ? "Authenticated User" : "Guest"}
+                  {isAuthenticated ? user?.email || "Authenticated User" : "Guest"}
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <NotificationIcon size={16} className="text-[#969696]" />
                 {isAuthenticated && (
                   <button
-                    onClick={logout}
+                    onClick={handleLogout}
                     className="text-xs text-gray-600 hover:text-gray-800 transition-colors"
                   >
                     Logout
