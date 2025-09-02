@@ -1,8 +1,7 @@
 import { User, Session } from '@supabase/supabase-js'
 
-export interface AuthUser extends User {
-  // Add any additional user properties you want to track
-}
+// Using User type directly from Supabase
+export type AuthUser = User
 
 export interface AuthContextType {
   user: AuthUser | null
