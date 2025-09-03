@@ -22,6 +22,10 @@ class CanvasCommandManager {
     this.isWorkspaceCreated = false; // Reset workspace state when canvas changes
   }
 
+  getCanvas(): fabric.Canvas | null {
+    return this.canvas;
+  }
+
   // Event system methods
   on(event: string, callback: Function): () => void {
     if (!this.eventListeners.has(event)) {
