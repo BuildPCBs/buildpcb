@@ -43,11 +43,12 @@ It is always running—starting it yourself will break the workflow and is stric
 
 ## 🚫 Documentation & File Management Rules
 
-**No new markdown files**: Never create or commit a new `.md` file after adding a feature unless explicitly instructed
+**Markdown File Rules**:
 
-- Always add any md file created to `.gitignore`
-- Never add test files, not even for testing
-- Never add comments at the top of files — place documentation within the code where it belongs
+- Do not create or commit new `.md` files after adding a feature unless you are explicitly instructed to do so.
+- If you are explicitly instructed to create a markdown file, always add it to the `/dev` directory.
+- Never add test files of any kind, including for testing purposes.
+- Do not place comments at the top of files; include documentation within the code where appropriate.
 
 **Canvas-Specific**: When working with Fabric.js, ensure proper cleanup and event handling
 
