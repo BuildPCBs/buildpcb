@@ -16,6 +16,7 @@ interface UseCanvasHotkeysProps {
   onRedo: () => void;
   onRotate?: () => void; // Add rotation function
   onSave?: () => void; // Add save function
+  onToggleGrid?: () => void; // Add grid toggle function
 }
 
 /**
@@ -32,6 +33,7 @@ interface UseCanvasHotkeysProps {
  * - Ctrl/Cmd + Y or Ctrl/Cmd + Shift + Z: Redo
  * - Ctrl/Cmd + S: Save project
  * - R: Rotate selected component 90°
+ * - G: Toggle grid visibility
  */
 export function useCanvasHotkeys({
   canvas,
@@ -45,6 +47,7 @@ export function useCanvasHotkeys({
   onRedo,
   onRotate,
   onSave,
+  onToggleGrid,
 }: UseCanvasHotkeysProps) {
   useEffect(() => {
     if (!enabled || !canvas) return;
@@ -143,6 +146,14 @@ export function useCanvasHotkeys({
           }
           break;
 
+        case "g":
+          if (!isModifierPressed && onToggleGrid) {
+            e.preventDefault();
+            console.log("TRIGGER: G key pressed - Toggling grid.");
+            onToggleGrid();
+          }
+          break;
+
         default:
           // No action for other keys
           break;
@@ -166,5 +177,8 @@ export function useCanvasHotkeys({
     onPaste,
     onUndo,
     onRedo,
+    onRotate,
+    onSave,
+    onToggleGrid,
   ]);
 }

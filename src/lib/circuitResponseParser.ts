@@ -398,7 +398,7 @@ export async function applyCircuitToCanvas(
 
     // Small delay to ensure components are fully added before creating wires
     console.log("⏳ Waiting for components to be fully added...");
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     // Force canvas render to ensure all components are visible
     canvas.renderAll();
@@ -559,8 +559,14 @@ async function addWireToCanvas(
   const objects = canvas.getObjects();
   console.log("🔍 Looking for components on canvas:");
   console.log("  - Total objects on canvas:", objects.length);
-  console.log("  - Looking for fromComponent:", operation.fromConnection!.componentId);
-  console.log("  - Looking for toComponent:", operation.toConnection!.componentId);
+  console.log(
+    "  - Looking for fromComponent:",
+    operation.fromConnection!.componentId
+  );
+  console.log(
+    "  - Looking for toComponent:",
+    operation.toConnection!.componentId
+  );
 
   // Debug: List all component IDs on canvas
   objects.forEach((obj, index) => {

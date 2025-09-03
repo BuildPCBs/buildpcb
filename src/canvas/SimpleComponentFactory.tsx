@@ -64,7 +64,10 @@ export const createSimpleComponent = (
     id?: string; // Add optional id parameter
   }
 ) => {
-  console.log(`🏭 ENHANCED: Creating ${componentInfo.name} on canvas:`, !!fabricCanvas);
+  console.log(
+    `🏭 ENHANCED: Creating ${componentInfo.name} on canvas:`,
+    !!fabricCanvas
+  );
   console.log(`🏭 Canvas type:`, fabricCanvas?.constructor?.name);
 
   if (!fabricCanvas) {
@@ -185,8 +188,15 @@ export const createSimpleComponent = (
   });
 
   // Add to canvas
-  console.log(`🎨 Adding component to canvas at position:`, component.left, component.top);
-  console.log(`🎨 Canvas objects before add:`, fabricCanvas.getObjects().length);
+  console.log(
+    `🎨 Adding component to canvas at position:`,
+    component.left,
+    component.top
+  );
+  console.log(
+    `🎨 Canvas objects before add:`,
+    fabricCanvas.getObjects().length
+  );
 
   fabricCanvas.add(component);
 

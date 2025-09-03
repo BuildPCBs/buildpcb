@@ -42,7 +42,10 @@ export function AIPromptPanel({
       await onPromptSubmit(prompt);
     } else {
       // Use context handler with canvas state and canvas
-      console.log("📤 Calling context handlePromptSubmit with canvas:", !!canvas);
+      console.log(
+        "📤 Calling context handlePromptSubmit with canvas:",
+        !!canvas
+      );
       await contextHandlePromptSubmit(prompt, canvasState, canvas);
     }
   };

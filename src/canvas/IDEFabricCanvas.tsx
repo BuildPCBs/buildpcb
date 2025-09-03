@@ -22,7 +22,10 @@ interface IDEFabricCanvasProps {
   onCanvasReady?: (canvas: any) => void;
 }
 
-export function IDEFabricCanvas({ className = "", onCanvasReady }: IDEFabricCanvasProps) {
+export function IDEFabricCanvas({
+  className = "",
+  onCanvasReady,
+}: IDEFabricCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [fabricCanvas, setFabricCanvas] = useState<fabric.Canvas | null>(null);
@@ -32,6 +35,22 @@ export function IDEFabricCanvas({ className = "", onCanvasReady }: IDEFabricCanv
   });
   const [areRulersVisible, setAreRulersVisible] = useState(false);
   const [restorationInProgress, setRestorationInProgress] = useState(false);
+  const [currentZoom, setCurrentZoom] = useState(1); // Track current zoom level
+  const lastZoomRef = useRef(1); // Use ref to avoid stale closure issues
+  const [gridVisible, setGridVisible] = useState(false); // Manual grid toggle
+
+  // Grid toggle function
+  const toggleGrid = () => {
+    const newGridVisible = !gridVisible;
+    setGridVisible(newGridVisible);
+    if (fabricCanvas) {
+      const gridPattern = createGridPattern(fabricCanvas, gridSize, currentZoom);
+      if (gridPattern) {
+        fabricCanvas.backgroundColor = gridPattern;
+        fabricCanvas.renderAll();
+      }
+    }
+  };
 
   // Context menu and clipboard state - Refactored per specification
   const [menuState, setMenuState] = useState({
@@ -99,7 +118,7 @@ export function IDEFabricCanvas({ className = "", onCanvasReady }: IDEFabricCanv
           console.log("✅ Canvas restoration completed");
 
           // Reapply grid pattern after restoration
-          const gridPattern = createGridPattern(fabricCanvas, gridSize);
+          const gridPattern = createGridPattern(fabricCanvas, gridSize, currentZoom);
           if (gridPattern) {
             console.log("Reapplying grid pattern after restoration");
             fabricCanvas.backgroundColor = gridPattern;
@@ -114,7 +133,7 @@ export function IDEFabricCanvas({ className = "", onCanvasReady }: IDEFabricCanv
           console.error("❌ Canvas restoration failed:", error);
 
           // Still apply grid even if restoration failed
-          const gridPattern = createGridPattern(fabricCanvas, gridSize);
+          const gridPattern = createGridPattern(fabricCanvas, gridSize, currentZoom);
           if (gridPattern) {
             console.log("Applying grid pattern after restoration failure");
             fabricCanvas.backgroundColor = gridPattern;
@@ -131,8 +150,8 @@ export function IDEFabricCanvas({ className = "", onCanvasReady }: IDEFabricCanv
   const gridSize = 10; // Grid spacing in pixels
 
   // Helper function to create background grid pattern
-  const createGridPattern = (canvas: fabric.Canvas, gridSize: number) => {
-    console.log("Creating grid pattern with size:", gridSize);
+  const createGridPattern = (canvas: fabric.Canvas, gridSize: number, zoom: number = 1) => {
+    console.log("Creating grid pattern with size:", gridSize, "zoom:", zoom);
     // Create a temporary canvas for the pattern
     const patternCanvas = document.createElement("canvas");
     const patternCtx = patternCanvas.getContext("2d");
@@ -142,20 +161,37 @@ export function IDEFabricCanvas({ className = "", onCanvasReady }: IDEFabricCanv
     patternCanvas.width = gridSize;
     patternCanvas.height = gridSize;
 
-    // Draw grid lines
-    patternCtx.strokeStyle = "#CCCCCC"; // Make grid lines more visible
-    patternCtx.lineWidth = 1; // Thicker lines
-    patternCtx.beginPath();
+    // Calculate grid line opacity based on zoom level and manual toggle
+    // Grid lines are invisible at normal zoom, become visible when zoomed in or manually enabled
+    let lineOpacity = 0;
 
-    // Vertical line
-    patternCtx.moveTo(gridSize, 0);
-    patternCtx.lineTo(gridSize, gridSize);
+    if (gridVisible) {
+      // Manual grid toggle always shows grid at 50% opacity
+      lineOpacity = 0.5;
+    } else if (zoom >= 1.5) {
+      // Auto-show grid at 1.5x zoom and above
+      lineOpacity = Math.min((zoom - 1.5) * 0.3, 0.8); // Max opacity 0.8
+    }
 
-    // Horizontal line
-    patternCtx.moveTo(0, gridSize);
-    patternCtx.lineTo(gridSize, gridSize);
+    if (lineOpacity > 0) {
+      // Draw grid lines
+      patternCtx.strokeStyle = `rgba(204, 204, 204, ${lineOpacity})`; // Semi-transparent gray
+      patternCtx.lineWidth = Math.max(0.5, 1 / zoom); // Thinner lines when zoomed out
+      patternCtx.beginPath();
 
-    patternCtx.stroke();
+      // Vertical line
+      patternCtx.moveTo(gridSize, 0);
+      patternCtx.lineTo(gridSize, gridSize);
+
+      // Horizontal line
+      patternCtx.moveTo(0, gridSize);
+      patternCtx.lineTo(gridSize, gridSize);
+
+      patternCtx.stroke();
+      console.log(`Grid pattern created with opacity: ${lineOpacity} (manual: ${gridVisible})`);
+    } else {
+      console.log("Grid pattern created (invisible at current zoom)");
+    }
 
     // Create Fabric.js pattern
     const pattern = new fabric.Pattern({
@@ -163,7 +199,6 @@ export function IDEFabricCanvas({ className = "", onCanvasReady }: IDEFabricCanv
       repeat: "repeat",
     });
 
-    console.log("Grid pattern created successfully");
     return pattern;
   };
 
@@ -204,7 +239,7 @@ export function IDEFabricCanvas({ className = "", onCanvasReady }: IDEFabricCanv
     });
 
     // Create and apply grid pattern immediately
-    const gridPattern = createGridPattern(canvas, gridSize);
+    const gridPattern = createGridPattern(canvas, gridSize, 1); // Start with zoom = 1
     if (gridPattern) {
       console.log("Applying initial grid pattern to canvas");
       canvas.backgroundColor = gridPattern;
@@ -244,6 +279,21 @@ export function IDEFabricCanvas({ className = "", onCanvasReady }: IDEFabricCanv
     };
   }, [rulerSize]);
 
+  // Update grid when zoom or visibility changes
+  useEffect(() => {
+    if (!fabricCanvas) return;
+
+    const updateGrid = () => {
+      const gridPattern = createGridPattern(fabricCanvas, gridSize, currentZoom);
+      if (gridPattern) {
+        fabricCanvas.backgroundColor = gridPattern;
+        fabricCanvas.renderAll();
+      }
+    };
+
+    updateGrid();
+  }, [fabricCanvas, currentZoom, gridSize, gridVisible]);
+
   // Dynamic canvas resizing with ResizeObserver
   useEffect(() => {
     if (!fabricCanvas || !containerRef.current) return;
@@ -265,7 +315,7 @@ export function IDEFabricCanvas({ className = "", onCanvasReady }: IDEFabricCanv
           setCanvasDimensions({ width: canvasWidth, height: canvasHeight });
 
           // Reapply grid pattern after resize
-          const gridPattern = createGridPattern(fabricCanvas, gridSize);
+          const gridPattern = createGridPattern(fabricCanvas, gridSize, currentZoom);
           if (gridPattern) {
             console.log("Reapplying grid pattern after ResizeObserver resize");
             fabricCanvas.backgroundColor = gridPattern;
@@ -305,7 +355,7 @@ export function IDEFabricCanvas({ className = "", onCanvasReady }: IDEFabricCanv
           setCanvasDimensions({ width: canvasWidth, height: canvasHeight });
 
           // Reapply grid pattern after resize
-          const gridPattern = createGridPattern(fabricCanvas, gridSize);
+          const gridPattern = createGridPattern(fabricCanvas, gridSize, currentZoom);
           if (gridPattern) {
             console.log("Reapplying grid pattern after window resize");
             fabricCanvas.backgroundColor = gridPattern;
@@ -1028,6 +1078,7 @@ export function IDEFabricCanvas({ className = "", onCanvasReady }: IDEFabricCanv
     onRedo: handleRedo,
     onRotate: handleRotate,
     onSave: autoSave.saveNow,
+    onToggleGrid: toggleGrid, // Add grid toggle
   });
 
   // Right-click context menu handler - Completely refactored per specification
@@ -1126,156 +1177,155 @@ export function IDEFabricCanvas({ className = "", onCanvasReady }: IDEFabricCanv
       className={`w-full h-full canvas-container ${className}`}
       style={{ width: "100%", height: "100%" }}
     >
-        {/* Rulers Layout - Only visible when manipulating objects */}
-        <div className="relative w-full h-full">
-          {areRulersVisible && (
-            <>
-              {/* Top-left corner space */}
-              <div
-                className="absolute top-0 left-0 border-b border-r border-gray-300"
-                style={{
-                  width: rulerSize,
-                  height: rulerSize,
-                  background:
-                    "linear-gradient(135deg, #fafafa 0%, #f0f0f0 100%)",
-                  zIndex: 10,
-                }}
+      {/* Rulers Layout - Only visible when manipulating objects */}
+      <div className="relative w-full h-full">
+        {areRulersVisible && (
+          <>
+            {/* Top-left corner space */}
+            <div
+              className="absolute top-0 left-0 border-b border-r border-gray-300"
+              style={{
+                width: rulerSize,
+                height: rulerSize,
+                background: "linear-gradient(135deg, #fafafa 0%, #f0f0f0 100%)",
+                zIndex: 10,
+              }}
+            />
+
+            {/* Horizontal Ruler */}
+            <div
+              className="absolute top-0"
+              style={{
+                left: rulerSize,
+                width: canvasDimensions.width,
+                height: rulerSize,
+                zIndex: 10,
+              }}
+            >
+              <HorizontalRuler
+                width={canvasDimensions.width}
+                height={rulerSize}
+                viewportTransform={viewportState.viewportTransform}
+                zoom={viewportState.zoom}
               />
+            </div>
 
-              {/* Horizontal Ruler */}
-              <div
-                className="absolute top-0"
-                style={{
-                  left: rulerSize,
-                  width: canvasDimensions.width,
-                  height: rulerSize,
-                  zIndex: 10,
-                }}
-              >
-                <HorizontalRuler
-                  width={canvasDimensions.width}
-                  height={rulerSize}
-                  viewportTransform={viewportState.viewportTransform}
-                  zoom={viewportState.zoom}
-                />
-              </div>
+            {/* Vertical Ruler */}
+            <div
+              className="absolute left-0"
+              style={{
+                top: rulerSize,
+                width: rulerSize,
+                height: canvasDimensions.height,
+                zIndex: 10,
+              }}
+            >
+              <VerticalRuler
+                width={rulerSize}
+                height={canvasDimensions.height}
+                viewportTransform={viewportState.viewportTransform}
+                zoom={viewportState.zoom}
+              />
+            </div>
+          </>
+        )}
 
-              {/* Vertical Ruler */}
-              <div
-                className="absolute left-0"
-                style={{
-                  top: rulerSize,
-                  width: rulerSize,
-                  height: canvasDimensions.height,
-                  zIndex: 10,
-                }}
-              >
-                <VerticalRuler
-                  width={rulerSize}
-                  height={canvasDimensions.height}
-                  viewportTransform={viewportState.viewportTransform}
-                  zoom={viewportState.zoom}
-                />
-              </div>
-            </>
-          )}
-
-          {/* Main Canvas */}
-          <div
-            className="absolute"
-            style={{
-              top: areRulersVisible ? rulerSize : 0,
-              left: areRulersVisible ? rulerSize : 0,
-              width: areRulersVisible ? canvasDimensions.width : "100%",
-              height: areRulersVisible ? canvasDimensions.height : "100%",
-            }}
-          >
-            <canvas ref={canvasRef} />
-          </div>
+        {/* Main Canvas */}
+        <div
+          className="absolute"
+          style={{
+            top: areRulersVisible ? rulerSize : 0,
+            left: areRulersVisible ? rulerSize : 0,
+            width: areRulersVisible ? canvasDimensions.width : "100%",
+            height: areRulersVisible ? canvasDimensions.height : "100%",
+          }}
+        >
+          <canvas ref={canvasRef} />
         </div>
-
-        {/* Context Menu - PART 2: Direct Function Connection Test */}
-        <ContextMenu
-          visible={menuState.visible}
-          top={menuState.y}
-          left={menuState.x}
-          menuType={menuState.type}
-          canPaste={clipboard !== null}
-          onClose={() => setMenuState((prev) => ({ ...prev, visible: false }))}
-          onGroup={handleGroup}
-          onUngroup={handleUngroup}
-          onDelete={handleDelete}
-          onCopy={handleCopy}
-          onPaste={handleContextPaste}
-        />
-
-        {/* Optional debug info */}
-        {panState.isPanMode && (
-          <div className="absolute top-2 left-2 bg-black bg-opacity-75 text-white px-2 py-1 rounded text-xs">
-            Pan Mode {panState.isDragging ? "- Dragging" : ""}
-          </div>
-        )}
-
-        {/* Grid and Snap indicator */}
-        <div className="absolute bottom-2 left-2 bg-green-600 bg-opacity-90 text-white px-2 py-1 rounded text-xs">
-          Grid: {gridSize}px • INTELLIGENT SVG • R=rotate • W=wire
-        </div>
-
-        {/* Wire mode indicator - Professional-grade wiring tool */}
-        {wiringTool.isWireMode && (
-          <div className="absolute top-2 right-2 bg-blue-600 bg-opacity-90 text-white px-3 py-2 rounded text-sm font-medium">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-              <span>
-                {wiringTool.wireState === "idle" &&
-                  "Wire Mode - Click pin to start"}
-                {wiringTool.wireState === "drawing" &&
-                  "Drawing - Click to add waypoint"}
-                {wiringTool.wireState === "finishing" &&
-                  "Finishing - Click pin to complete"}
-              </span>
-            </div>
-            <div className="text-xs opacity-80 mt-1">
-              Press W to toggle • ESC to cancel • Right-click to cancel
-            </div>
-          </div>
-        )}
-
-        {/* Auto-save status indicator */}
-        {currentProject && (
-          <div className="absolute top-2 left-1/2 transform -translate-x-1/2 bg-gray-800 bg-opacity-90 text-white px-3 py-1 rounded text-xs">
-            <div className="flex items-center gap-2">
-              {autoSave.saving && (
-                <div className="w-2 h-2 bg-yellow-400 rounded-full animate-spin"></div>
-              )}
-              {!autoSave.saving && autoSave.isDirty && (
-                <div className="w-2 h-2 bg-orange-400 rounded-full"></div>
-              )}
-              {!autoSave.saving && !autoSave.isDirty && (
-                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-              )}
-              <span>
-                {autoSave.saving && "Saving..."}
-                {!autoSave.saving && autoSave.isDirty && "Unsaved changes"}
-                {!autoSave.saving &&
-                  !autoSave.isDirty &&
-                  autoSave.lastSaved &&
-                  `Saved ${autoSave.lastSaved.toLocaleTimeString()}`}
-                {(!autoSave.saving &&
-                  !autoSave.isDirty &&
-                  !autoSave.lastSaved &&
-                  currentProject.name) ||
-                  "Project"}
-              </span>
-            </div>
-            {autoSave.error && (
-              <div className="text-xs text-red-300 mt-1">
-                Save failed: {autoSave.error}
-              </div>
-            )}
-          </div>
-        )}
       </div>
+
+      {/* Context Menu - PART 2: Direct Function Connection Test */}
+      <ContextMenu
+        visible={menuState.visible}
+        top={menuState.y}
+        left={menuState.x}
+        menuType={menuState.type}
+        canPaste={clipboard !== null}
+        onClose={() => setMenuState((prev) => ({ ...prev, visible: false }))}
+        onGroup={handleGroup}
+        onUngroup={handleUngroup}
+        onDelete={handleDelete}
+        onCopy={handleCopy}
+        onPaste={handleContextPaste}
+      />
+
+      {/* Optional debug info */}
+      {panState.isPanMode && (
+        <div className="absolute top-2 left-2 bg-black bg-opacity-75 text-white px-2 py-1 rounded text-xs">
+          Pan Mode {panState.isDragging ? "- Dragging" : ""}
+        </div>
+      )}
+
+      {/* Grid and Snap indicator */}
+      <div className="absolute bottom-2 left-2 bg-green-600 bg-opacity-90 text-white px-2 py-1 rounded text-xs">
+        Grid: {gridSize}px • INTELLIGENT SVG • R=rotate • W=wire
+      </div>
+
+      {/* Wire mode indicator - Professional-grade wiring tool */}
+      {wiringTool.isWireMode && (
+        <div className="absolute top-2 right-2 bg-blue-600 bg-opacity-90 text-white px-3 py-2 rounded text-sm font-medium">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+            <span>
+              {wiringTool.wireState === "idle" &&
+                "Wire Mode - Click pin to start"}
+              {wiringTool.wireState === "drawing" &&
+                "Drawing - Click to add waypoint"}
+              {wiringTool.wireState === "finishing" &&
+                "Finishing - Click pin to complete"}
+            </span>
+          </div>
+          <div className="text-xs opacity-80 mt-1">
+            Press W to toggle • ESC to cancel • Right-click to cancel
+          </div>
+        </div>
+      )}
+
+      {/* Auto-save status indicator */}
+      {currentProject && (
+        <div className="absolute top-2 left-1/2 transform -translate-x-1/2 bg-gray-800 bg-opacity-90 text-white px-3 py-1 rounded text-xs">
+          <div className="flex items-center gap-2">
+            {autoSave.saving && (
+              <div className="w-2 h-2 bg-yellow-400 rounded-full animate-spin"></div>
+            )}
+            {!autoSave.saving && autoSave.isDirty && (
+              <div className="w-2 h-2 bg-orange-400 rounded-full"></div>
+            )}
+            {!autoSave.saving && !autoSave.isDirty && (
+              <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+            )}
+            <span>
+              {autoSave.saving && "Saving..."}
+              {!autoSave.saving && autoSave.isDirty && "Unsaved changes"}
+              {!autoSave.saving &&
+                !autoSave.isDirty &&
+                autoSave.lastSaved &&
+                `Saved ${autoSave.lastSaved.toLocaleTimeString()}`}
+              {(!autoSave.saving &&
+                !autoSave.isDirty &&
+                !autoSave.lastSaved &&
+                currentProject.name) ||
+                "Project"}
+            </span>
+          </div>
+          {autoSave.error && (
+            <div className="text-xs text-red-300 mt-1">
+              Save failed: {autoSave.error}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

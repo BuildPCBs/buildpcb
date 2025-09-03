@@ -23,11 +23,16 @@ export default function ProjectPage({ params }: ProjectPageProps) {
   const router = useRouter();
   const resolvedParams = use(params);
 
+  // Update page title with project name when project loads
   useEffect(() => {
-    console.log("IDE Core Status:", ideCore.getStatus());
-  }, []);
+    if (currentProject?.name) {
+      document.title = `${currentProject.name} - BuildPCB`;
+    } else {
+      document.title = "BuildPCB";
+    }
+  }, [currentProject?.name]);
 
-  // Load the specific project when component mounts
+  // Show loading state while project is being loaded
   useEffect(() => {
     if (resolvedParams.id && loadSpecificProject) {
       // Only load if we don't already have this project loaded

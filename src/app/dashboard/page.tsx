@@ -44,13 +44,32 @@ const DashboardContent = () => {
     loadProjects();
   }, [user]);
 
+  // Filter projects based on active tab
+  const getFilteredProjects = () => {
+    if (activeTab === "recently-viewed") {
+      // Sort by last_opened_at for "Recently Viewed"
+      return [...projects].sort((a, b) => {
+        const aDate = new Date(a.last_opened_at || a.updated_at);
+        const bDate = new Date(b.last_opened_at || b.updated_at);
+        return bDate.getTime() - aDate.getTime();
+      });
+    } else if (activeTab === "shared") {
+      // Filter for shared/public projects
+      return projects.filter(project => project.is_public);
+    }
+    // Default: sort by updated_at (most recently edited)
+    return projects;
+  };
+
+  const filteredProjects = getFilteredProjects();
+
   // Open project
   const handleOpenProject = (projectId: string) => {
     console.log("🔀 Opening project:", projectId);
     router.push(`/project/${projectId}`);
   };
 
-  // Format date helper
+  // Format date helper - now context-aware
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -60,6 +79,22 @@ const DashboardContent = () => {
     if (diffInHours < 24) return `${Math.floor(diffInHours)} hours ago`;
     if (diffInHours < 168) return `${Math.floor(diffInHours / 24)} days ago`;
     return date.toLocaleDateString();
+  };
+
+  // Get the appropriate date and label based on tab
+  const getProjectDateInfo = (project: Project) => {
+    if (activeTab === "recently-viewed") {
+      const dateToUse = project.last_opened_at || project.updated_at;
+      return {
+        date: dateToUse,
+        label: "Viewed"
+      };
+    } else {
+      return {
+        date: project.updated_at,
+        label: "Edited"
+      };
+    }
   };
 
   return (
@@ -142,48 +177,66 @@ const DashboardContent = () => {
         >
           {/* Tabs */}
           <div
-            className="flex"
-            style={{ gap: responsive(8), marginBottom: responsive(24) }}
+            className="flex items-center justify-between"
+            style={{ marginBottom: responsive(24) }}
           >
-            <button
-              onClick={() => setActiveTab("recently-viewed")}
-              className={`transition-colors ${
-                activeTab === "recently-viewed"
-                  ? "bg-[#ebebeb] border border-[#dddddd] text-[#999999]"
-                  : "text-[#c0bfbf] hover:text-[#999999]"
-              }`}
-              style={{
-                padding: `${responsive(8)} ${responsive(16)}`,
-                fontSize: responsiveFontSize(14),
-                borderRadius: responsive(6),
-                ...r({
-                  borderWidth: activeTab === "recently-viewed" ? 0.5 : 0,
-                }),
-              }}
+            <div
+              className="flex"
+              style={{ gap: responsive(8) }}
             >
-              Recently Viewed
-            </button>
-            <button
-              onClick={() => setActiveTab("shared")}
-              className={`transition-colors ${
-                activeTab === "shared"
-                  ? "bg-[#ebebeb] border border-[#dddddd] text-[#999999]"
-                  : "text-[#c0bfbf] hover:text-[#999999]"
-              }`}
-              style={{
-                padding: `${responsive(8)} ${responsive(16)}`,
-                fontSize: responsiveFontSize(14),
-                borderRadius: responsive(6),
-                ...r({
-                  borderWidth: activeTab === "shared" ? 0.5 : 0,
-                }),
-              }}
-            >
-              Shared
-            </button>
-          </div>
+              <button
+                onClick={() => setActiveTab("recently-viewed")}
+                className={`transition-colors ${
+                  activeTab === "recently-viewed"
+                    ? "bg-[#ebebeb] border border-[#dddddd] text-[#999999]"
+                    : "text-[#c0bfbf] hover:text-[#999999]"
+                }`}
+                style={{
+                  padding: `${responsive(8)} ${responsive(16)}`,
+                  fontSize: responsiveFontSize(14),
+                  borderRadius: responsive(6),
+                  ...r({
+                    borderWidth: activeTab === "recently-viewed" ? 0.5 : 0,
+                  }),
+                }}
+              >
+                Recently Viewed
+              </button>
+              <button
+                onClick={() => setActiveTab("shared")}
+                className={`transition-colors ${
+                  activeTab === "shared"
+                    ? "bg-[#ebebeb] border border-[#dddddd] text-[#999999]"
+                    : "text-[#c0bfbf] hover:text-[#999999]"
+                }`}
+                style={{
+                  padding: `${responsive(8)} ${responsive(16)}`,
+                  fontSize: responsiveFontSize(14),
+                  borderRadius: responsive(6),
+                  ...r({
+                    borderWidth: activeTab === "shared" ? 0.5 : 0,
+                  }),
+                }}
+              >
+                Shared
+              </button>
+            </div>
 
-          {/* Project Cards */}
+            {/* New Project Button */}
+            <button
+              onClick={() => router.push('/project/new')}
+              className="bg-blue-600 hover:bg-blue-700 text-white transition-colors flex items-center"
+              style={{
+                padding: `${responsive(8)} ${responsive(16)}`,
+                fontSize: responsiveFontSize(14),
+                borderRadius: responsive(6),
+                gap: responsive(8),
+              }}
+            >
+              <span>+</span>
+              <span>New Project</span>
+            </button>
+          </div>          {/* Project Cards */}
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
@@ -227,97 +280,100 @@ const DashboardContent = () => {
                 maxWidth: responsive(850), // Constrains to 2 cards max
               }}
             >
-              {projects.map((project) => (
-                <div
-                  key={project.id}
-                  onClick={() => handleOpenProject(project.id)}
-                  className="bg-[#f5f5f5] border border-[#a6a6a6] hover:shadow-md transition-shadow cursor-pointer"
-                  style={{
-                    ...r({
-                      borderRadius: 24,
-                      padding: 20,
-                    }),
-                    width: responsive(400),
-                    // Remove fixed height - let content determine height naturally
-                  }}
-                >
-                  {/* Inner container with 2px spacing from card edges */}
-                  <div style={{ padding: responsive(2) }}>
-                    {/* Project Image/Thumbnail */}
-                    <div
-                      className="w-full bg-white border border-[#a6a6a6]"
-                      style={{
-                        ...r({
-                          borderRadius: 20,
-                          borderWidth: 0.3,
-                        }),
-                        height: responsive(180),
-                        marginBottom: responsive(5), // Consistent 5px spacing
-                      }}
-                    >
-                      {/* Placeholder for project preview */}
-                    </div>
-
-                    {/* Project Info - Fixed alignment */}
-                    <div
-                      className="flex items-center" // Changed to items-center for proper alignment
-                      style={{
-                        gap: responsive(12),
-                        height: responsive(50), // Fixed height container
-                        marginTop: responsive(5), // Positive spacing from image
-                      }}
-                    >
-                      {/* User Icons - Fixed size container */}
+              {filteredProjects.map((project) => {
+                const { date, label } = getProjectDateInfo(project);
+                return (
+                  <div
+                    key={project.id}
+                    onClick={() => handleOpenProject(project.id)}
+                    className="bg-[#f5f5f5] border border-[#a6a6a6] hover:shadow-md transition-shadow cursor-pointer"
+                    style={{
+                      ...r({
+                        borderRadius: 24,
+                        padding: 20,
+                      }),
+                      width: responsive(400),
+                      // Remove fixed height - let content determine height naturally
+                    }}
+                  >
+                    {/* Inner container with 2px spacing from card edges */}
+                    <div style={{ padding: responsive(2) }}>
+                      {/* Project Image/Thumbnail */}
                       <div
-                        className="flex items-center"
+                        className="w-full bg-white border border-[#a6a6a6]"
                         style={{
-                          marginLeft: responsive(-4), // Slight negative margin for better alignment
-                          height: responsive(50), // Match text container height
+                          ...r({
+                            borderRadius: 20,
+                            borderWidth: 0.3,
+                          }),
+                          height: responsive(180),
+                          marginBottom: responsive(5), // Consistent 5px spacing
                         }}
                       >
-                        <div
-                          className="bg-[#d0d0d0] border border-[#969696] rounded-full flex items-center justify-center"
-                          style={{
-                            width: responsive(24),
-                            height: responsive(24),
-                            ...r({ borderWidth: 0.68 }),
-                          }}
-                        >
-                          <UserIcon size={12} className="text-[#969696]" />
-                        </div>
-                        {/* For now, showing single user - will add collaborators later */}
+                        {/* Placeholder for project preview */}
                       </div>
 
-                      {/* Text Content - Fixed height container */}
+                      {/* Project Info - Fixed alignment */}
                       <div
-                        className="flex-1 flex flex-col justify-center"
-                        style={{ height: responsive(50) }} // Match avatar height
+                        className="flex items-center" // Changed to items-center for proper alignment
+                        style={{
+                          gap: responsive(12),
+                          height: responsive(50), // Fixed height container
+                          marginTop: responsive(5), // Positive spacing from image
+                        }}
                       >
-                        <h3
-                          className="font-medium text-[#666666] leading-tight"
+                        {/* User Icons - Fixed size container */}
+                        <div
+                          className="flex items-center"
                           style={{
-                            fontSize: responsiveFontSize(14),
-                            marginBottom: responsive(2), // Minimal spacing
-                            lineHeight: 1.2,
+                            marginLeft: responsive(-4), // Slight negative margin for better alignment
+                            height: responsive(50), // Match text container height
                           }}
                         >
-                          {project.name}
-                        </h3>
-                        <p
-                          className="text-[#999999] leading-tight"
-                          style={{
-                            fontSize: responsiveFontSize(12),
-                            lineHeight: 1.2,
-                          }}
+                          <div
+                            className="bg-[#d0d0d0] border border-[#969696] rounded-full flex items-center justify-center"
+                            style={{
+                              width: responsive(24),
+                              height: responsive(24),
+                              ...r({ borderWidth: 0.68 }),
+                            }}
+                          >
+                            <UserIcon size={12} className="text-[#969696]" />
+                          </div>
+                          {/* For now, showing single user - will add collaborators later */}
+                        </div>
+
+                        {/* Text Content - Fixed height container */}
+                        <div
+                          className="flex-1 flex flex-col justify-center"
+                          style={{ height: responsive(50) }} // Match avatar height
                         >
-                          Edited {formatDate(project.updated_at)}
-                        </p>
+                          <h3
+                            className="font-medium text-[#666666] leading-tight"
+                            style={{
+                              fontSize: responsiveFontSize(14),
+                              marginBottom: responsive(2), // Minimal spacing
+                              lineHeight: 1.2,
+                            }}
+                          >
+                            {project.name}
+                          </h3>
+                          <p
+                            className="text-[#999999] leading-tight"
+                            style={{
+                              fontSize: responsiveFontSize(12),
+                              lineHeight: 1.2,
+                            }}
+                          >
+                            {label} {formatDate(date)}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  </div>{" "}
-                  {/* Close inner container with 4px spacing */}
-                </div>
-              ))}
+                    </div>{" "}
+                    {/* Close inner container with 4px spacing */}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

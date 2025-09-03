@@ -24,7 +24,7 @@ export function AIChatInterface({
     setCurrentMessageIndex,
     startEditingMessage,
     saveEditedMessage,
-    cancelEditingMessage
+    cancelEditingMessage,
   } = useAIChat();
 
   // Get canvas state for AI context
@@ -66,14 +66,16 @@ export function AIChatInterface({
     // Find the original prompt and resubmit it
   };
 
-  const [editingContent, setEditingContent] = useState<{ [key: string]: string }>({});
+  const [editingContent, setEditingContent] = useState<{
+    [key: string]: string;
+  }>({});
 
   const handleEdit = (messageId: string) => {
-    const message = messages.find(msg => msg.id === messageId);
+    const message = messages.find((msg) => msg.id === messageId);
     if (message) {
-      setEditingContent(prev => ({
+      setEditingContent((prev) => ({
         ...prev,
-        [messageId]: message.content
+        [messageId]: message.content,
       }));
       startEditingMessage(messageId);
     }
@@ -83,7 +85,7 @@ export function AIChatInterface({
     const newContent = editingContent[messageId];
     if (newContent && newContent.trim()) {
       saveEditedMessage(messageId, newContent.trim());
-      setEditingContent(prev => {
+      setEditingContent((prev) => {
         const updated = { ...prev };
         delete updated[messageId];
         return updated;
@@ -93,7 +95,7 @@ export function AIChatInterface({
 
   const handleCancelEdit = (messageId: string) => {
     cancelEditingMessage(messageId);
-    setEditingContent(prev => {
+    setEditingContent((prev) => {
       const updated = { ...prev };
       delete updated[messageId];
       return updated;
@@ -163,23 +165,35 @@ export function AIChatInterface({
                         /* Editing Mode */
                         <div className="mb-1">
                           <textarea
-                            value={editingContent[message.id] || message.content}
-                            onChange={(e) => setEditingContent(prev => ({
-                              ...prev,
-                              [message.id]: e.target.value
-                            }))}
+                            value={
+                              editingContent[message.id] || message.content
+                            }
+                            onChange={(e) =>
+                              setEditingContent((prev) => ({
+                                ...prev,
+                                [message.id]: e.target.value,
+                              }))
+                            }
                             onKeyDown={(e) => {
-                              if (e.key === 'Enter' && !e.shiftKey) {
+                              if (e.key === "Enter" && !e.shiftKey) {
                                 e.preventDefault();
                                 handleSaveEdit(message.id);
-                              } else if (e.key === 'Escape') {
+                              } else if (e.key === "Escape") {
                                 e.preventDefault();
                                 handleCancelEdit(message.id);
                               }
                             }}
                             className="w-full rounded-2xl rounded-br-md px-4 py-2 text-sm border-2 border-blue-300 focus:border-blue-500 focus:outline-none resize-none"
-                            rows={Math.min(5, (editingContent[message.id] || message.content).split('\n').length)}
-                            style={{ backgroundColor: BRAND_COLORS.primary, color: 'white' }}
+                            rows={Math.min(
+                              5,
+                              (
+                                editingContent[message.id] || message.content
+                              ).split("\n").length
+                            )}
+                            style={{
+                              backgroundColor: BRAND_COLORS.primary,
+                              color: "white",
+                            }}
                             autoFocus
                             placeholder="Edit your message..."
                           />
@@ -222,7 +236,8 @@ export function AIChatInterface({
                             onClick={() => handleEdit(message.id)}
                             className="p-1 text-gray-500 hover:bg-gray-100 rounded transition-colors"
                             onMouseEnter={(e) =>
-                              (e.currentTarget.style.color = BRAND_COLORS.primary)
+                              (e.currentTarget.style.color =
+                                BRAND_COLORS.primary)
                             }
                             onMouseLeave={(e) =>
                               (e.currentTarget.style.color = "#6B7280")
@@ -247,7 +262,8 @@ export function AIChatInterface({
                             onClick={() => handleCopy(message.content)}
                             className="p-1 text-gray-500 hover:bg-gray-100 rounded transition-colors"
                             onMouseEnter={(e) =>
-                              (e.currentTarget.style.color = BRAND_COLORS.primary)
+                              (e.currentTarget.style.color =
+                                BRAND_COLORS.primary)
                             }
                             onMouseLeave={(e) =>
                               (e.currentTarget.style.color = "#6B7280")

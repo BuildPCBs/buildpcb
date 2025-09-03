@@ -1,6 +1,6 @@
 # Component SVG Design Guidelines for BuildPCB.ai
 
-**Version 3.0 - Comprehensive Design System** | *Last Updated: September 3, 2025*
+**Version 3.0 - Comprehensive Design System** | _Last Updated: September 3, 2025_
 
 Following these guidelines ensures all component SVGs are consistent, performant, and fully integrated with BuildPCB's canvas system and wiring tools.
 
@@ -9,6 +9,7 @@ Following these guidelines ensures all component SVGs are consistent, performant
 ## 📋 **OVERVIEW & REQUIREMENTS**
 
 ### **Core Principles**
+
 - **Consistency**: All components follow identical structure and styling patterns
 - **Performance**: Optimized for real-time canvas rendering and interaction
 - **Accessibility**: Clear visual hierarchy and semantic structure
@@ -16,6 +17,7 @@ Following these guidelines ensures all component SVGs are consistent, performant
 - **Integration**: Seamless compatibility with Fabric.js and wiring systems
 
 ### **Technical Specifications**
+
 - **Format**: SVG 1.1 compliant
 - **Coordinate System**: 0-100 width, 0-60 height (100x60 viewBox)
 - **Units**: Pixel-based coordinates
@@ -27,6 +29,7 @@ Following these guidelines ensures all component SVGs are consistent, performant
 ## 🎨 **SVG STRUCTURE REQUIREMENTS**
 
 ### **1. Document Structure**
+
 ```xml
 <svg width="100" height="60" viewBox="0 0 100 60" xmlns="http://www.w3.org/2000/svg">
   <!-- Visual elements group -->
@@ -47,6 +50,7 @@ Following these guidelines ensures all component SVGs are consistent, performant
 ### **2. Required Elements**
 
 #### **Symbol Group (`<g id="symbol">`)**
+
 - **Purpose**: Contains all visible component graphics
 - **Attributes**:
   - `id="symbol"`: Required for canvas manipulation
@@ -55,6 +59,7 @@ Following these guidelines ensures all component SVGs are consistent, performant
   - `fill="none"`: Transparent fill (unless component requires solid fill)
 
 #### **Pin Markers (`<circle id="pin">` or `<rect id="pin">`)**
+
 - **Purpose**: Define electrical connection points for wiring tool
 - **Critical Requirements**:
   - `id="pin"`: **MANDATORY** - Wiring tool searches for this exact ID
@@ -63,6 +68,7 @@ Following these guidelines ensures all component SVGs are consistent, performant
   - Small radius (1-2px) for accurate wire attachment
 
 #### **Optional Metadata**
+
 ```xml
 <metadata>
   <component-info
@@ -81,6 +87,7 @@ Following these guidelines ensures all component SVGs are consistent, performant
 ### **Pattern 1: Two-Terminal Components (Resistors, Capacitors, Diodes)**
 
 #### **Horizontal Layout (Standard)**
+
 ```xml
 <svg width="100" height="60" viewBox="0 0 100 60" xmlns="http://www.w3.org/2000/svg">
   <g id="symbol" stroke="black" stroke-width="2" fill="none">
@@ -101,6 +108,7 @@ Following these guidelines ensures all component SVGs are consistent, performant
 ```
 
 #### **Vertical Layout (Alternative)**
+
 ```xml
 <svg width="100" height="60" viewBox="0 0 100 60" xmlns="http://www.w3.org/2000/svg">
   <g id="symbol" stroke="black" stroke-width="2" fill="none">
@@ -122,6 +130,7 @@ Following these guidelines ensures all component SVGs are consistent, performant
 ### **Pattern 2: Three-Terminal Components (Transistors, Regulators)**
 
 #### **BJT Transistor (NPN)**
+
 ```xml
 <svg width="100" height="60" viewBox="0 0 100 60" xmlns="http://www.w3.org/2000/svg">
   <g id="symbol" stroke="black" stroke-width="2" fill="none">
@@ -153,6 +162,7 @@ Following these guidelines ensures all component SVGs are consistent, performant
 ### **Pattern 3: Multi-Terminal Components (ICs, Microcontrollers)**
 
 #### **DIP Package IC**
+
 ```xml
 <svg width="100" height="60" viewBox="0 0 100 60" xmlns="http://www.w3.org/2000/svg">
   <g id="symbol" stroke="black" stroke-width="2" fill="none">
@@ -194,6 +204,7 @@ Following these guidelines ensures all component SVGs are consistent, performant
 ## 🎨 **COMPONENT-SPECIFIC EXAMPLES**
 
 ### **Resistor (with Zigzag)**
+
 ```xml
 <svg width="100" height="60" viewBox="0 0 100 60" xmlns="http://www.w3.org/2000/svg">
   <g id="symbol" stroke="black" stroke-width="2" fill="none">
@@ -207,6 +218,7 @@ Following these guidelines ensures all component SVGs are consistent, performant
 ```
 
 ### **Capacitor (Polarized)**
+
 ```xml
 <svg width="100" height="60" viewBox="0 0 100 60" xmlns="http://www.w3.org/2000/svg">
   <g id="symbol" stroke="black" stroke-width="2" fill="none">
@@ -224,6 +236,7 @@ Following these guidelines ensures all component SVGs are consistent, performant
 ```
 
 ### **LED (with Arrow)**
+
 ```xml
 <svg width="100" height="60" viewBox="0 0 100 60" xmlns="http://www.w3.org/2000/svg">
   <g id="symbol" stroke="black" stroke-width="2" fill="none">
@@ -241,6 +254,7 @@ Following these guidelines ensures all component SVGs are consistent, performant
 ```
 
 ### **Switch (SPST)**
+
 ```xml
 <svg width="100" height="60" viewBox="0 0 100 60" xmlns="http://www.w3.org/2000/svg">
   <g id="symbol" stroke="black" stroke-width="2" fill="none">
@@ -261,18 +275,21 @@ Following these guidelines ensures all component SVGs are consistent, performant
 ## 🔧 **TECHNICAL BEST PRACTICES**
 
 ### **Performance Optimization**
+
 - **Minimize Path Complexity**: Use simple shapes over complex curves when possible
 - **Avoid Excessive Details**: Focus on schematic representation, not photorealism
 - **Optimize Stroke Widths**: Consistent 2px strokes render faster
 - **Limit Element Count**: Keep total SVG elements under 50 for best performance
 
 ### **Coordinate Precision**
+
 - **Integer Coordinates**: Use whole numbers for cleaner rendering
 - **Consistent Spacing**: 5-10 unit spacing between elements
 - **Pin Alignment**: Center pins at exact connection points
 - **ViewBox Utilization**: Use full 0-100 width range for horizontal components
 
 ### **Color and Styling Standards**
+
 - **Primary Color**: `stroke="black"` for all outlines
 - **Background**: `fill="none"` for transparency
 - **Special Cases**: Use `fill="black"` only for solid components (grounds, etc.)
@@ -283,6 +300,7 @@ Following these guidelines ensures all component SVGs are consistent, performant
 ## 🧪 **TESTING & VALIDATION**
 
 ### **Automated Checks**
+
 - [ ] **Pin Count**: Verify correct number of `id="pin"` elements
 - [ ] **Visibility**: Confirm pins have `fill="none"` and `stroke="none"`
 - [ ] **Structure**: Ensure `<g id="symbol">` wrapper exists
@@ -290,6 +308,7 @@ Following these guidelines ensures all component SVGs are consistent, performant
 - [ ] **Coordinates**: Check all elements within viewBox bounds
 
 ### **Integration Testing**
+
 - [ ] **Canvas Rendering**: Component displays correctly on Fabric.js canvas
 - [ ] **Wire Connection**: Pins accept wire connections properly
 - [ ] **Selection**: Component can be selected and moved
@@ -297,6 +316,7 @@ Following these guidelines ensures all component SVGs are consistent, performant
 - [ ] **Performance**: Renders smoothly in real-time
 
 ### **Visual Inspection**
+
 - [ ] **Alignment**: Component centered in viewBox
 - [ ] **Proportions**: Realistic aspect ratio for component type
 - [ ] **Clarity**: Symbol easily recognizable at small sizes
@@ -309,21 +329,25 @@ Following these guidelines ensures all component SVGs are consistent, performant
 ### **Common Issues & Solutions**
 
 #### **Wires Not Connecting**
+
 - **Problem**: Wiring tool can't find connection points
 - **Solution**: Ensure all pins have `id="pin"` and are invisible
 - **Check**: Pin coordinates match symbol connection points exactly
 
 #### **Component Not Rendering**
+
 - **Problem**: Symbol appears blank or distorted
 - **Solution**: Verify `<g id="symbol">` wrapper and viewBox settings
 - **Check**: All paths use relative coordinates within 0-100 range
 
 #### **Performance Issues**
+
 - **Problem**: Canvas lag when many components present
 - **Solution**: Simplify paths, reduce element count, use consistent stroke widths
 - **Check**: Total SVG elements < 50, no complex gradients or filters
 
 #### **Pin Misalignment**
+
 - **Problem**: Wires connect to wrong points
 - **Solution**: Recalculate pin coordinates to match symbol endpoints
 - **Check**: Pin centers align with terminal line endpoints
@@ -333,6 +357,7 @@ Following these guidelines ensures all component SVGs are consistent, performant
 ## 📁 **FILE ORGANIZATION & NAMING**
 
 ### **Directory Structure**
+
 ```
 src/assets/components/
 ├── passive/
@@ -354,6 +379,7 @@ src/assets/components/
 ```
 
 ### **Naming Conventions**
+
 - **Format**: `component-type-variant.svg`
 - **Examples**:
   - `resistor.svg` (basic)
@@ -370,12 +396,14 @@ src/assets/components/
 ## 🔄 **MAINTENANCE & UPDATES**
 
 ### **Version Control**
+
 - **Semantic Versioning**: `v1.0.0`, `v1.1.0`, `v2.0.0`
 - **Changelog**: Document all visual and functional changes
 - **Backward Compatibility**: Avoid breaking existing integrations
 - **Deprecation Notices**: Warn before removing component variants
 
 ### **Update Process**
+
 1. **Design Review**: Validate against current guidelines
 2. **Testing**: Verify canvas integration and wire connections
 3. **Performance Check**: Ensure no degradation in rendering speed
@@ -383,6 +411,7 @@ src/assets/components/
 5. **Deployment**: Roll out with feature flags for gradual adoption
 
 ### **Quality Assurance**
+
 - **Automated Validation**: SVG structure and syntax checking
 - **Cross-browser Testing**: Verify rendering in all supported browsers
 - **Accessibility Audit**: Ensure high contrast and screen reader compatibility
@@ -393,18 +422,21 @@ src/assets/components/
 ## 🎯 **SUCCESS METRICS**
 
 ### **Technical Quality**
+
 - ✅ **100% Pin Compliance**: All connection points properly defined
 - ✅ **Zero Rendering Errors**: Components display correctly in all contexts
 - ✅ **Optimal Performance**: < 16ms render time per component
 - ✅ **Perfect Integration**: Seamless wiring tool compatibility
 
 ### **Design Consistency**
+
 - ✅ **Visual Harmony**: All components follow identical style patterns
 - ✅ **Proportional Accuracy**: Realistic representations of physical components
 - ✅ **Scalability**: Clear at all zoom levels (25% to 400%)
 - ✅ **Professional Appearance**: Clean, schematic-appropriate styling
 
 ### **Developer Experience**
+
 - ✅ **Easy Maintenance**: Simple structure for quick modifications
 - ✅ **Clear Documentation**: Comprehensive guidelines and examples
 - ✅ **Tool Integration**: Works seamlessly with existing workflows
@@ -415,20 +447,23 @@ src/assets/components/
 ## 📚 **RESOURCES & REFERENCES**
 
 ### **Essential Reading**
+
 - [SVG 1.1 Specification](https://www.w3.org/TR/SVG11/)
 - [Fabric.js Documentation](http://fabricjs.com/docs/)
 - [Electrical Symbol Standards](https://en.wikipedia.org/wiki/Electronic_symbol)
 
 ### **Tools & Software**
+
 - **Design**: Inkscape, Adobe Illustrator, Figma
 - **Validation**: SVGOMG, SVGO, custom linting scripts
 - **Testing**: Browser dev tools, canvas performance monitors
 
 ### **Community Resources**
+
 - **Component Libraries**: Open-source electronics symbol collections
 - **Best Practices**: Industry standards for schematic design
 - **Accessibility Guidelines**: WCAG compliance for technical diagrams
 
 ---
 
-*These guidelines ensure BuildPCB's component library remains professional, performant, and maintainable while providing the best possible user experience for circuit design.*
+_These guidelines ensure BuildPCB's component library remains professional, performant, and maintainable while providing the best possible user experience for circuit design._

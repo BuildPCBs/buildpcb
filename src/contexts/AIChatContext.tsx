@@ -169,7 +169,10 @@ export function AIChatProvider({
       // Apply circuit changes to canvas if we have a canvas
       let circuitApplicationResult = null;
       console.log("🔍 Starting canvas application check...");
-      console.log("📊 Parsed response operations:", parsedResponse.operations.length);
+      console.log(
+        "📊 Parsed response operations:",
+        parsedResponse.operations.length
+      );
       console.log("✅ Response valid:", parsedResponse.isValid);
       console.log("🎨 Canvas object exists:", !!canvas);
 
@@ -184,11 +187,15 @@ export function AIChatProvider({
         console.log("📋 Operations to apply:", parsedResponse.operations);
 
         // Check if canvas is actually ready to use
-        if (canvas && typeof canvas.add === 'function' && typeof canvas.renderAll === 'function') {
+        if (
+          canvas &&
+          typeof canvas.add === "function" &&
+          typeof canvas.renderAll === "function"
+        ) {
           console.log("✅ Canvas is fully initialized and ready to use");
 
           // Add a small delay to ensure canvas is fully ready
-          await new Promise(resolve => setTimeout(resolve, 100));
+          await new Promise((resolve) => setTimeout(resolve, 100));
 
           try {
             console.log("🚀 Calling applyCircuitToCanvas...");
@@ -203,17 +210,25 @@ export function AIChatProvider({
           } catch (applyError) {
             console.error("❌ Failed to apply circuit changes:", applyError);
             console.error("❌ Error details:", {
-              message: applyError instanceof Error ? applyError.message : 'Unknown error',
-              stack: applyError instanceof Error ? applyError.stack : 'No stack trace',
+              message:
+                applyError instanceof Error
+                  ? applyError.message
+                  : "Unknown error",
+              stack:
+                applyError instanceof Error
+                  ? applyError.stack
+                  : "No stack trace",
               canvas: !!canvas,
-              operations: parsedResponse.operations.length
+              operations: parsedResponse.operations.length,
             });
           }
         } else {
-          console.log("⚠️ Canvas is not fully initialized yet, skipping application");
+          console.log(
+            "⚠️ Canvas is not fully initialized yet, skipping application"
+          );
           console.log("Canvas methods check:", {
-            hasAdd: typeof canvas?.add === 'function',
-            hasRenderAll: typeof canvas?.renderAll === 'function'
+            hasAdd: typeof canvas?.add === "function",
+            hasRenderAll: typeof canvas?.renderAll === "function",
           });
         }
       } else {
