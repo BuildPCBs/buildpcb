@@ -83,7 +83,7 @@ export class FallbackProjectService {
       description: "New PCB design project",
       owner_id: "fallback-user",
       is_public: false,
-      thumbnail_url: null,
+      thumbnail_url: undefined,
       created_at: now,
       updated_at: now,
       last_opened_at: now,
@@ -99,7 +99,7 @@ export class FallbackProjectService {
         snap: true,
       },
       tags: [],
-      category: null,
+      category: undefined,
     };
   }
 

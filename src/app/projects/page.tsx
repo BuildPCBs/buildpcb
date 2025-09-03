@@ -8,6 +8,7 @@ import { ResponsiveContainer } from "@/components/layout/ResponsiveContainer";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { DatabaseService, Project } from "@/lib/database";
 import { Folder, Clock, Users } from "lucide-react";
+import { responsive as r } from "@/lib/responsive";
 
 const databaseService = new DatabaseService();
 
@@ -30,7 +31,7 @@ const ProjectsContent = () => {
         setError(null);
         console.log("📂 Loading projects for user:", user.id);
 
-        const userProjects = await DatabaseService.getUserProjects(user.id);
+        const userProjects = await DatabaseService.getUserProjects();
         console.log("📂 Loaded projects:", userProjects);
 
         setProjects(userProjects);
@@ -58,7 +59,6 @@ const ProjectsContent = () => {
         name: `Untitled Project ${new Date().toLocaleDateString()}`,
         description: "New PCB design project",
         owner_id: user.id,
-        circuit_data: { components: [], wires: [] },
       });
 
       console.log("✅ Created new project:", newProject);
@@ -103,11 +103,11 @@ const ProjectsContent = () => {
         <div
           className="absolute bg-[#f5f5f5] border border-[#a6a6a6]"
           style={{
-            top: r("1.5rem"),
-            left: r("1.5rem"),
-            right: r("1.5rem"),
-            height: r("4rem"),
-            borderRadius: r("0.5rem"),
+            top: r(24),
+            left: r(24),
+            right: r(24),
+            height: r(64),
+            borderRadius: r(8),
           }}
         >
           <div className="flex items-center justify-between h-full px-6">
@@ -127,7 +127,7 @@ const ProjectsContent = () => {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  style={{ width: r("20rem") }}
+                  style={{ width: r(320) }}
                 />
               </div>
 
@@ -143,11 +143,11 @@ const ProjectsContent = () => {
         <div
           className="absolute bg-white border border-[#a6a6a6] overflow-hidden"
           style={{
-            top: r("7rem"),
-            left: r("1.5rem"),
-            right: r("1.5rem"),
-            bottom: r("1.5rem"),
-            borderRadius: r("0.5rem"),
+            top: r(112),
+            left: r(24),
+            right: r(24),
+            bottom: r(24),
+            borderRadius: r(8),
           }}
         >
           {/* Tabs */}
@@ -224,7 +224,7 @@ const ProjectsContent = () => {
                 {filteredProjects.length === 0 ? (
                   <div className="flex items-center justify-center py-12">
                     <div className="text-center">
-                      <FolderIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                      <Folder className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                       <h3 className="text-lg font-semibold text-gray-800 mb-2">
                         {searchQuery ? "No projects found" : "No projects yet"}
                       </h3>
@@ -252,9 +252,9 @@ const ProjectsContent = () => {
                         className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow cursor-pointer group"
                       >
                         <div className="flex items-start justify-between mb-4">
-                          <FolderIcon className="w-8 h-8 text-blue-600 group-hover:text-blue-700 transition-colors" />
+                          <Folder className="w-8 h-8 text-blue-600 group-hover:text-blue-700 transition-colors" />
                           <div className="text-xs text-gray-500">
-                            {formatDate(project.last_modified)}
+                            {formatDate(project.last_opened_at)}
                           </div>
                         </div>
 
@@ -270,16 +270,9 @@ const ProjectsContent = () => {
 
                         <div className="flex items-center justify-between text-xs text-gray-500">
                           <div className="flex items-center gap-1">
-                            <ClockIcon className="w-3 h-3" />
-                            Modified {formatDate(project.last_modified)}
+                            <Clock className="w-3 h-3" />
+                            Modified {formatDate(project.last_opened_at)}
                           </div>
-
-                          {project.collaborator_count && (
-                            <div className="flex items-center gap-1">
-                              <UsersIcon className="w-3 h-3" />
-                              {project.collaborator_count}
-                            </div>
-                          )}
                         </div>
                       </div>
                     ))}

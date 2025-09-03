@@ -14,14 +14,16 @@ export interface Project {
   id: string;
   name: string;
   description?: string;
-  type: "pcb" | "schematic" | "simulation";
-  status: "draft" | "in-progress" | "completed" | "archived";
-  userId: string;
-  collaborators: string[];
-  tags: string[];
-  createdAt: string;
-  updatedAt: string;
-  lastModified: string;
+  owner_id: string;
+  is_public?: boolean;
+  thumbnail_url?: string;
+  created_at: string;
+  updated_at: string;
+  last_opened_at: string;
+  canvas_settings?: any;
+  grid_settings?: any;
+  tags?: string[];
+  category?: string;
 }
 
 export interface Component {
