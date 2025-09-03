@@ -15,7 +15,7 @@ const NewProjectPage = () => {
     const createNewProject = async () => {
       if (!user) {
         console.log("❌ No user found, redirecting to login");
-        router.push('/login');
+        router.push("/login");
         return;
       }
 
@@ -35,7 +35,7 @@ const NewProjectPage = () => {
       } catch (err) {
         console.error("❌ Failed to create project:", err);
         // On error, redirect to projects page
-        router.push('/projects');
+        router.push("/projects");
       }
     };
 

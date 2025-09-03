@@ -63,10 +63,13 @@ export function useCanvasHotkeys({
           (activeElement as HTMLElement).contentEditable === "true" ||
           (activeElement as HTMLElement).isContentEditable ||
           activeElement.closest('[contenteditable="true"]') ||
-          activeElement.closest('input') ||
-          activeElement.closest('textarea'))
+          activeElement.closest("input") ||
+          activeElement.closest("textarea"))
       ) {
-        console.log("🔇 Hotkeys disabled - user is typing in:", activeElement.tagName);
+        console.log(
+          "🔇 Hotkeys disabled - user is typing in:",
+          activeElement.tagName
+        );
         return;
       }
 

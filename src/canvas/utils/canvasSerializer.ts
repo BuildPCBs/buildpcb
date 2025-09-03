@@ -30,12 +30,16 @@ export function serializeCanvasToCircuit(
     .filter((obj) => obj.type !== "line" && obj.type !== "path") // Exclude wires
     .map((obj, index) => {
       // Get component metadata from fabric object
-      const componentData = (obj as any).componentData || {};
+      const componentData =
+        (obj as any).data || (obj as any).componentData || {};
 
       return {
         id: componentData.id || `comp_${index}`,
-        name: componentData.name || `Component ${index + 1}`,
-        type: componentData.type || "unknown",
+        name:
+          componentData.componentName ||
+          componentData.name ||
+          `Component ${index + 1}`,
+        type: componentData.componentType || componentData.type || "unknown",
         category: componentData.category || "general",
         specifications: componentData.specifications || {},
         availability: componentData.availability || ("in-stock" as const),
@@ -58,7 +62,7 @@ export function serializeCanvasToCircuit(
     .filter((obj) => (obj as any).wireType === "connection")
     .map((obj, index) => {
       const wireObj = obj as any;
-      const wireData = wireObj.wireData || {};
+      const wireData = wireObj.wireData || wireObj;
 
       return {
         id: wireData.id || wireObj.id || `conn_${index}`,

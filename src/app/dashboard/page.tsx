@@ -55,7 +55,7 @@ const DashboardContent = () => {
       });
     } else if (activeTab === "shared") {
       // Filter for shared/public projects
-      return projects.filter(project => project.is_public);
+      return projects.filter((project) => project.is_public);
     }
     // Default: sort by updated_at (most recently edited)
     return projects;
@@ -87,12 +87,12 @@ const DashboardContent = () => {
       const dateToUse = project.last_opened_at || project.updated_at;
       return {
         date: dateToUse,
-        label: "Viewed"
+        label: "Viewed",
       };
     } else {
       return {
         date: project.updated_at,
-        label: "Edited"
+        label: "Edited",
       };
     }
   };
@@ -180,10 +180,7 @@ const DashboardContent = () => {
             className="flex items-center justify-between"
             style={{ marginBottom: responsive(24) }}
           >
-            <div
-              className="flex"
-              style={{ gap: responsive(8) }}
-            >
+            <div className="flex" style={{ gap: responsive(8) }}>
               <button
                 onClick={() => setActiveTab("recently-viewed")}
                 className={`transition-colors ${
@@ -224,7 +221,7 @@ const DashboardContent = () => {
 
             {/* New Project Button */}
             <button
-              onClick={() => router.push('/project/new')}
+              onClick={() => router.push("/project/new")}
               className="bg-blue-600 hover:bg-blue-700 text-white transition-colors flex items-center"
               style={{
                 padding: `${responsive(8)} ${responsive(16)}`,
@@ -236,7 +233,8 @@ const DashboardContent = () => {
               <span>+</span>
               <span>New Project</span>
             </button>
-          </div>          {/* Project Cards */}
+          </div>{" "}
+          {/* Project Cards */}
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <div className="text-center">

@@ -44,7 +44,11 @@ export function IDEFabricCanvas({
     const newGridVisible = !gridVisible;
     setGridVisible(newGridVisible);
     if (fabricCanvas) {
-      const gridPattern = createGridPattern(fabricCanvas, gridSize, currentZoom);
+      const gridPattern = createGridPattern(
+        fabricCanvas,
+        gridSize,
+        currentZoom
+      );
       if (gridPattern) {
         fabricCanvas.backgroundColor = gridPattern;
         fabricCanvas.renderAll();
@@ -118,7 +122,11 @@ export function IDEFabricCanvas({
           console.log("✅ Canvas restoration completed");
 
           // Reapply grid pattern after restoration
-          const gridPattern = createGridPattern(fabricCanvas, gridSize, currentZoom);
+          const gridPattern = createGridPattern(
+            fabricCanvas,
+            gridSize,
+            currentZoom
+          );
           if (gridPattern) {
             console.log("Reapplying grid pattern after restoration");
             fabricCanvas.backgroundColor = gridPattern;
@@ -133,7 +141,11 @@ export function IDEFabricCanvas({
           console.error("❌ Canvas restoration failed:", error);
 
           // Still apply grid even if restoration failed
-          const gridPattern = createGridPattern(fabricCanvas, gridSize, currentZoom);
+          const gridPattern = createGridPattern(
+            fabricCanvas,
+            gridSize,
+            currentZoom
+          );
           if (gridPattern) {
             console.log("Applying grid pattern after restoration failure");
             fabricCanvas.backgroundColor = gridPattern;
@@ -150,7 +162,11 @@ export function IDEFabricCanvas({
   const gridSize = 10; // Grid spacing in pixels
 
   // Helper function to create background grid pattern
-  const createGridPattern = (canvas: fabric.Canvas, gridSize: number, zoom: number = 1) => {
+  const createGridPattern = (
+    canvas: fabric.Canvas,
+    gridSize: number,
+    zoom: number = 1
+  ) => {
     console.log("Creating grid pattern with size:", gridSize, "zoom:", zoom);
     // Create a temporary canvas for the pattern
     const patternCanvas = document.createElement("canvas");
@@ -188,7 +204,9 @@ export function IDEFabricCanvas({
       patternCtx.lineTo(gridSize, gridSize);
 
       patternCtx.stroke();
-      console.log(`Grid pattern created with opacity: ${lineOpacity} (manual: ${gridVisible})`);
+      console.log(
+        `Grid pattern created with opacity: ${lineOpacity} (manual: ${gridVisible})`
+      );
     } else {
       console.log("Grid pattern created (invisible at current zoom)");
     }
@@ -275,6 +293,23 @@ export function IDEFabricCanvas({
     // Cleanup function to dispose canvas when component unmounts or useEffect re-runs
     return () => {
       console.log("Disposing canvas in cleanup function");
+
+      // Clean up component event listeners
+      if (componentEventUnsubscribe) {
+        console.log(
+          "🧹 Cleaning up component event listener during canvas disposal"
+        );
+        componentEventUnsubscribe();
+        componentEventUnsubscribe = null;
+      }
+
+      // Reset component handler setup flag
+      isComponentHandlerSetup = false;
+      (canvas as any)._componentHandlersSetup = false;
+
+      // Reset processing flag
+      isProcessingComponent = false;
+
       canvas.dispose();
     };
   }, [rulerSize]);
@@ -284,7 +319,11 @@ export function IDEFabricCanvas({
     if (!fabricCanvas) return;
 
     const updateGrid = () => {
-      const gridPattern = createGridPattern(fabricCanvas, gridSize, currentZoom);
+      const gridPattern = createGridPattern(
+        fabricCanvas,
+        gridSize,
+        currentZoom
+      );
       if (gridPattern) {
         fabricCanvas.backgroundColor = gridPattern;
         fabricCanvas.renderAll();
@@ -315,7 +354,11 @@ export function IDEFabricCanvas({
           setCanvasDimensions({ width: canvasWidth, height: canvasHeight });
 
           // Reapply grid pattern after resize
-          const gridPattern = createGridPattern(fabricCanvas, gridSize, currentZoom);
+          const gridPattern = createGridPattern(
+            fabricCanvas,
+            gridSize,
+            currentZoom
+          );
           if (gridPattern) {
             console.log("Reapplying grid pattern after ResizeObserver resize");
             fabricCanvas.backgroundColor = gridPattern;
@@ -355,7 +398,11 @@ export function IDEFabricCanvas({
           setCanvasDimensions({ width: canvasWidth, height: canvasHeight });
 
           // Reapply grid pattern after resize
-          const gridPattern = createGridPattern(fabricCanvas, gridSize, currentZoom);
+          const gridPattern = createGridPattern(
+            fabricCanvas,
+            gridSize,
+            currentZoom
+          );
           if (gridPattern) {
             console.log("Reapplying grid pattern after window resize");
             fabricCanvas.backgroundColor = gridPattern;
@@ -1331,6 +1378,8 @@ export function IDEFabricCanvas({
 
 // SIMPLE COMPONENT HANDLER - Add this at the end
 let isComponentHandlerSetup = false;
+let componentEventUnsubscribe: (() => void) | null = null;
+let isProcessingComponent = false; // Flag to prevent duplicate component creation
 
 export function setupComponentHandler(canvas: fabric.Canvas) {
   // Use canvas instance ID to prevent duplicate setup for the same canvas
@@ -1339,6 +1388,13 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
 
   if (canvasElement && !canvasElement.id) {
     canvasElement.id = canvasId;
+  }
+
+  // Clean up previous event listener if it exists
+  if (componentEventUnsubscribe) {
+    console.log("🧹 Cleaning up previous component event listener");
+    componentEventUnsubscribe();
+    componentEventUnsubscribe = null;
   }
 
   // Check if this canvas already has component handlers set up
@@ -1354,7 +1410,8 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
   // Mark this canvas as having handlers set up
   (canvas as any)._componentHandlersSetup = true;
 
-  canvasCommandManager.on(
+  // Store the unsubscribe function for cleanup
+  componentEventUnsubscribe = canvasCommandManager.on(
     "component:add",
     (payload: {
       type: string;
@@ -1371,7 +1428,13 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
           `🎯 DEBUG: ===== STARTING COMPONENT CREATION FOR ${componentInfo.name} =====`
         );
 
-        // Get the current canvas from the command manager instead of using closure
+        // Prevent duplicate processing
+        if (isProcessingComponent) {
+          console.log(`⚠️ Component creation already in progress, skipping ${componentInfo.name}`);
+          return;
+        }
+
+        isProcessingComponent = true;
         const currentCanvas = canvasCommandManager.getCanvas();
         if (!currentCanvas) {
           console.error(
@@ -1380,20 +1443,22 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
           return;
         }
 
-        // Check for duplicate components at the same position
+        // Check for duplicate components at the same position (more lenient)
         const existingComponents = currentCanvas
           .getObjects()
           .filter(
             (obj: any) =>
               obj.data?.componentName === componentInfo.name &&
-              Math.abs((obj.left || 0) - (componentInfo.x || 0)) < 10 &&
-              Math.abs((obj.top || 0) - (componentInfo.y || 0)) < 10
+              obj.data?.componentType === componentInfo.type &&
+              Math.abs((obj.left || 0) - (componentInfo.x || 0)) < 5 &&
+              Math.abs((obj.top || 0) - (componentInfo.y || 0)) < 5
           );
 
         if (existingComponents.length > 0) {
           console.log(
-            `⚠️ Duplicate component detected for ${componentInfo.name}, skipping creation`
+            `⚠️ Very similar component detected for ${componentInfo.name} at same position, skipping creation`
           );
+          isProcessingComponent = false; // Reset flag since we're not processing
           return;
         }
 
@@ -1538,6 +1603,12 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
             console.log(
               `🎯 DEBUG: Creating ${pinsFromSVG.length} interactive pins`
             );
+
+            // Generate a single component ID for all pins in this component
+            const componentId = `component_${Date.now()}_${Math.random()
+              .toString(36)
+              .substr(2, 9)}`;
+
             const interactivePins = pinsFromSVG.map((pin, index) => {
               console.log(
                 `🎯 DEBUG: Creating pin ${index + 1} at (${pin.left}, ${
@@ -1566,7 +1637,7 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
               interactivePin.set("pinData", invisiblePinData[index]);
               interactivePin.set("data", {
                 type: "pin",
-                componentId: `component_${Date.now()}`,
+                componentId: componentId,
                 pinId: `pin${index + 1}`,
                 pinNumber: index + 1,
                 isConnectable: true,
@@ -1670,6 +1741,7 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
             componentSandwich.set("invisiblePinData", invisiblePinData);
             componentSandwich.set("data", {
               type: "component",
+              componentId: componentId,
               componentType: componentInfo.type,
               componentName: componentInfo.name,
               pins: interactivePins.map((_, index) => `pin${index + 1}`),
@@ -1762,12 +1834,18 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
             console.log(
               `🎯 DEBUG: ===== COMPONENT CREATION COMPLETED FOR ${componentInfo.name} =====`
             );
+
+            // Reset processing flag
+            isProcessingComponent = false;
           })
           .catch((error) => {
             console.error(
               `❌ INTELLIGENT: Failed to load ${componentInfo.svgPath}:`,
               error
             );
+
+            // Reset processing flag on error
+            isProcessingComponent = false;
 
             // Fallback: Try to create a simple component instead
             console.log(
@@ -1802,6 +1880,9 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
                 `❌ FALLBACK: Failed to create simple component:`,
                 fallbackError
               );
+
+              // Reset processing flag on fallback error
+              isProcessingComponent = false;
             }
           });
       };
