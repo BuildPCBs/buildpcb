@@ -15,6 +15,7 @@ interface UseCanvasHotkeysProps {
   onUndo: () => void;
   onRedo: () => void;
   onRotate?: () => void; // Add rotation function
+  onSave?: () => void; // Add save function
 }
 
 /**
@@ -29,6 +30,7 @@ interface UseCanvasHotkeysProps {
  * - Delete/Backspace: Delete selected objects
  * - Ctrl/Cmd + Z: Undo
  * - Ctrl/Cmd + Y or Ctrl/Cmd + Shift + Z: Redo
+ * - Ctrl/Cmd + S: Save project
  * - R: Rotate selected component 90°
  */
 export function useCanvasHotkeys({
@@ -42,6 +44,7 @@ export function useCanvasHotkeys({
   onUndo,
   onRedo,
   onRotate,
+  onSave,
 }: UseCanvasHotkeysProps) {
   useEffect(() => {
     if (!enabled || !canvas) return;
@@ -79,6 +82,14 @@ export function useCanvasHotkeys({
             e.preventDefault();
             console.log("TRIGGER: Ctrl/Cmd+V shortcut pressed.");
             onPaste();
+            break;
+
+          case "s":
+            e.preventDefault();
+            console.log("TRIGGER: Ctrl/Cmd+S shortcut pressed.");
+            if (onSave) {
+              onSave();
+            }
             break;
 
           case "g":

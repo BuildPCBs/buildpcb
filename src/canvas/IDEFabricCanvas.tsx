@@ -7,6 +7,7 @@ import { useCanvasPan } from "./hooks/useCanvasPan";
 import { useCanvasHotkeys } from "./hooks/useCanvasHotkeys";
 import { useWiringTool } from "./hooks/useWiringTool";
 import { useCanvasViewport } from "./hooks/useCanvasViewport";
+import { useCanvasAutoSave } from "./hooks/useCanvasAutoSave";
 import { canvasCommandManager } from "./canvas-command-manager";
 import { createSimpleComponent } from "./SimpleComponentFactory";
 import { createSVGComponent } from "./SVGComponentFactory";
@@ -14,6 +15,7 @@ import { ContextMenu } from "./ui/ContextMenu";
 import { HorizontalRuler } from "./ui/HorizontalRuler";
 import { VerticalRuler } from "./ui/VerticalRuler";
 import { CanvasProvider } from "../contexts/CanvasContext";
+import { useProjectStore } from "@/store/projectStore";
 
 interface IDEFabricCanvasProps {
   className?: string;
@@ -56,6 +58,15 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
   const wiringTool = useWiringTool({
     canvas: fabricCanvas,
     enabled: !!fabricCanvas,
+  });
+
+  // Project store for auto-save integration
+  const { projectId, projectName, isDirty } = useProjectStore();
+
+  // Auto-save functionality
+  const autoSave = useCanvasAutoSave({
+    canvas: fabricCanvas,
+    enabled: !!projectId, // Only enable when we have a project
   });
 
   // Ruler dimensions and grid settings
@@ -890,6 +901,7 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
     onUndo: handleUndo,
     onRedo: handleRedo,
     onRotate: handleRotate,
+    onSave: autoSave.saveNow,
   });
 
   // Right-click context menu handler - Completely refactored per specification
@@ -1099,6 +1111,36 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
             <div className="text-xs opacity-80 mt-1">
               Press W to toggle • ESC to cancel • Right-click to cancel
             </div>
+          </div>
+        )}
+
+        {/* Auto-save status indicator */}
+        {projectId && (
+          <div className="absolute top-2 left-1/2 transform -translate-x-1/2 bg-gray-800 bg-opacity-90 text-white px-3 py-1 rounded text-xs">
+            <div className="flex items-center gap-2">
+              {autoSave.saving && (
+                <div className="w-2 h-2 bg-yellow-400 rounded-full animate-spin"></div>
+              )}
+              {!autoSave.saving && isDirty && (
+                <div className="w-2 h-2 bg-orange-400 rounded-full"></div>
+              )}
+              {!autoSave.saving && !isDirty && (
+                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+              )}
+              <span>
+                {autoSave.saving && "Saving..."}
+                {!autoSave.saving && isDirty && "Unsaved changes"}
+                {!autoSave.saving && !isDirty && autoSave.lastSaved && 
+                  `Saved ${autoSave.lastSaved.toLocaleTimeString()}`}
+                {!autoSave.saving && !isDirty && !autoSave.lastSaved && 
+                  projectName || "Project"}
+              </span>
+            </div>
+            {autoSave.error && (
+              <div className="text-xs text-red-300 mt-1">
+                Save failed: {autoSave.error}
+              </div>
+            )}
           </div>
         )}
       </div>
