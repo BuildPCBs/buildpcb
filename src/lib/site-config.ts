@@ -1,6 +1,6 @@
 // Environment-specific configuration for metadata
 export const siteConfig = {
-  name: "BuildPCB.ai",
+  name: "BuildPCBs",
   description: "AI-powered IDE for designing electronic circuits and PCBs",
   url: process.env.NEXT_PUBLIC_SITE_URL || "https://ide.buildpcbs.com",
   ogImage: "/link-preview.png",

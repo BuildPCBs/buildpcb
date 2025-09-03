@@ -1,6 +1,6 @@
 // Constants used throughout the application
 
-export const APP_NAME = "BuildPCB.ai";
+export const APP_NAME = "BuildPCBs";
 export const APP_DESCRIPTION =
   "AI-powered IDE for designing electronic circuits and PCBs";
 

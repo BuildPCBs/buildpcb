@@ -30,7 +30,7 @@ export default function LoginPage() {
       {/* Optional: Add some branding or loading state when auth is not open */}
       {!isAuthOpen && (
         <div className="text-center">
-          <h1 className="text-2xl text-gray-900 mb-4">BuildPCB.ai</h1>
+          <h1 className="text-2xl text-gray-900 mb-4">BuildPCBs</h1>
           <p className="text-gray-600">Redirecting...</p>
         </div>
       )}

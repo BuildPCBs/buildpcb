@@ -6,6 +6,7 @@ import { useCanvas } from "../../contexts/CanvasContext";
 import { useCanvasStateSnapshot } from "../../hooks/useCanvasState";
 import type { ChatMessage } from "../../contexts/AIChatContext";
 import { BRAND_COLORS } from "@/lib/constants";
+import { responsive } from "@/lib/responsive";
 
 interface AIChatInterfaceProps {
   className?: string;
@@ -90,11 +91,11 @@ export function AIChatInterface({
         </div>
       )}
 
-      {/* Chat Container - Full width and height with 250px container height */}
+      {/* Chat Container - Full width and responsive height (500px design) */}
       <div
         ref={chatContainerRef}
         className="relative border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm w-full"
-        style={{ height: "250px" }}
+        style={{ height: responsive(400) }}
       >
         {/* Messages Area */}
         <div

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback, useRef } from "react";
+import { useEffect, useCallback, useRef, useState } from "react";
 import * as fabric from "fabric";
 import { useProjectStore } from "@/store/projectStore";
 import { useAutoSave } from "@/hooks/useDatabase";
@@ -38,22 +38,40 @@ export function useCanvasAutoSave({
   const changeTimeout = useRef<NodeJS.Timeout | null>(null);
 
   // Create circuit and canvas data from current canvas state
-  const getCurrentCanvasData = useCallback(() => {
+  const getCurrentCanvasData = useCallback(async () => {
     if (!canvas) return { circuit: null, canvasData: {} };
 
-    const circuit = serializeCanvasToCircuit(canvas);
+    // Use the same canvas data extraction as manual save
+    const { serializeCanvasData } = await import(
+      "@/canvas/utils/canvasSerializer"
+    );
     const canvasData = serializeCanvasData(canvas);
+    const circuit = serializeCanvasToCircuit(canvas);
 
     return { circuit, canvasData };
   }, [canvas]);
 
-  // Use the database auto-save hook
-  const { circuit, canvasData } = getCurrentCanvasData();
+  // Use the database auto-save hook with longer interval
+  const [currentData, setCurrentData] = useState<{
+    circuit: any;
+    canvasData: any;
+  }>({
+    circuit: null,
+    canvasData: {},
+  });
+
+  // Update current data when canvas changes
+  useEffect(() => {
+    if (canvas) {
+      getCurrentCanvasData().then(setCurrentData);
+    }
+  }, [canvas, getCurrentCanvasData]);
+
   const autoSave = useAutoSave(
     projectId,
-    circuit as any,
-    canvasData,
-    autoSaveEnabled ? autoSaveInterval : undefined
+    currentData.circuit,
+    currentData.canvasData,
+    autoSaveEnabled ? Math.max(autoSaveInterval, 60000) : undefined // Minimum 60 seconds
   );
 
   // Track canvas changes and mark project as dirty

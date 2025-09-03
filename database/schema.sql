@@ -1,5 +1,14 @@
--- BuildPCB.ai Database Schema
+-- BuildPCBs Database Schema
 -- This schema supports PCB projects, components, collaboration, and version control
+
+-- Drop existing tables if they exist (for development/testing)
+DROP TABLE IF EXISTS component_usage CASCADE;
+DROP TABLE IF EXISTS project_activity CASCADE;
+DROP TABLE IF EXISTS project_collaborators CASCADE;
+DROP TABLE IF EXISTS project_versions CASCADE;
+DROP TABLE IF EXISTS components CASCADE;
+DROP TABLE IF EXISTS user_preferences CASCADE;
+DROP TABLE IF EXISTS projects CASCADE;
 
 -- 1. PROJECTS TABLE
 -- Stores PCB project metadata
@@ -197,9 +206,84 @@ CREATE POLICY "Users can view versions of accessible projects" ON project_versio
     )
   );
 
--- User preferences: Users can only access their own
-CREATE POLICY "Users can manage their own preferences" ON user_preferences
-  FOR ALL USING (user_id = auth.uid());
+CREATE POLICY "Users can insert versions for their projects" ON project_versions
+  FOR INSERT WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM projects
+      WHERE projects.id = project_versions.project_id
+      AND projects.owner_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can update versions of their projects" ON project_versions
+  FOR UPDATE USING (
+    EXISTS (
+      SELECT 1 FROM projects
+      WHERE projects.id = project_versions.project_id
+      AND projects.owner_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can delete versions of their projects" ON project_versions
+  FOR DELETE USING (
+    EXISTS (
+      SELECT 1 FROM projects
+      WHERE projects.id = project_versions.project_id
+      AND projects.owner_id = auth.uid()
+    )
+  );
+
+-- Project collaborators: Users can manage collaborators for their projects
+CREATE POLICY "Users can view collaborators of accessible projects" ON project_collaborators
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM projects
+      WHERE projects.id = project_collaborators.project_id
+      AND (projects.owner_id = auth.uid() OR projects.is_public = true)
+    )
+  );
+
+CREATE POLICY "Users can manage collaborators for their projects" ON project_collaborators
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM projects
+      WHERE projects.id = project_collaborators.project_id
+      AND projects.owner_id = auth.uid()
+    )
+  );
+
+-- Components: Public read access, authenticated users can contribute
+CREATE POLICY "Anyone can view components" ON components
+  FOR SELECT USING (true);
+
+CREATE POLICY "Authenticated users can create components" ON components
+  FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+
+CREATE POLICY "Users can update their own components" ON components
+  FOR UPDATE USING (created_by = auth.uid());
+
+-- Component usage: Track usage for all authenticated users
+CREATE POLICY "Authenticated users can track component usage" ON component_usage
+  FOR ALL USING (auth.uid() IS NOT NULL);
+
+-- Project activity: Users can view activity for projects they have access to
+CREATE POLICY "Users can view activity for accessible projects" ON project_activity
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM projects
+      WHERE projects.id = project_activity.project_id
+      AND (projects.owner_id = auth.uid() OR projects.is_public = true)
+    )
+  );
+
+CREATE POLICY "Users can insert activity for their projects" ON project_activity
+  FOR INSERT WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM projects
+      WHERE projects.id = project_activity.project_id
+      AND projects.owner_id = auth.uid()
+    )
+  );
 
 -- Functions for updated_at triggers
 CREATE OR REPLACE FUNCTION update_updated_at_column()

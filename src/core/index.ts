@@ -35,7 +35,7 @@ class IDECore {
     this.config = { ...this.getDefaultConfig(), ...config };
 
     try {
-      console.log("Initializing BuildPCB.ai IDE...");
+      console.log("Initializing BuildPCBs IDE...");
 
       // Set debug mode
       if (this.config.debug) {

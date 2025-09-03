@@ -219,8 +219,13 @@ export class DatabaseService {
 
     if (error) throw error;
 
-    // Log activity
-    await this.logActivity(projectId, "project_updated", "Project updated");
+    // Log activity (don't fail the update if activity logging fails)
+    try {
+      await this.logActivity(projectId, "project_updated", "Project updated");
+    } catch (activityError) {
+      console.warn("⚠️ Could not log project update activity:", activityError);
+      // Don't fail the project update if activity logging fails
+    }
 
     return data;
   }
@@ -332,12 +337,20 @@ export class DatabaseService {
     // Update project's updated_at timestamp
     await this.updateProject(projectId, {});
 
-    // Log activity
-    await this.logActivity(
-      projectId,
-      "version_created",
-      `Version ${nextVersionNumber} created`
-    );
+    // Log activity (don't fail the version creation if activity logging fails)
+    try {
+      await this.logActivity(
+        projectId,
+        "version_created",
+        `Version ${nextVersionNumber} created`
+      );
+    } catch (activityError) {
+      console.warn(
+        "⚠️ Could not log version creation activity:",
+        activityError
+      );
+      // Don't fail the version creation if activity logging fails
+    }
 
     return data;
   }
@@ -505,12 +518,20 @@ export class DatabaseService {
 
     if (error) throw error;
 
-    // Log activity
-    await this.logActivity(
-      projectId,
-      "collaborator_added",
-      `Added ${userEmail} as ${permissionLevel}`
-    );
+    // Log activity (don't fail the collaborator addition if activity logging fails)
+    try {
+      await this.logActivity(
+        projectId,
+        "collaborator_added",
+        `Added ${userEmail} as ${permissionLevel}`
+      );
+    } catch (activityError) {
+      console.warn(
+        "⚠️ Could not log collaborator addition activity:",
+        activityError
+      );
+      // Don't fail the collaborator addition if activity logging fails
+    }
   }
 
   // ==================== ACTIVITY LOGGING ====================
@@ -524,21 +545,40 @@ export class DatabaseService {
     description: string,
     metadata: Record<string, any> = {}
   ): Promise<void> {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    try {
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
 
-    const { error } = await supabase.from("project_activity").insert([
-      {
-        project_id: projectId,
-        user_id: user?.id,
-        activity_type: activityType,
-        description,
-        metadata,
-      },
-    ]);
+      if (authError) {
+        console.warn("⚠️ Auth error when logging activity:", authError);
+        return; // Don't fail the operation if we can't log activity
+      }
 
-    if (error) console.error("Failed to log activity:", error);
+      if (!user) {
+        console.warn("⚠️ No user found when logging activity");
+        return; // Don't fail the operation if we can't log activity
+      }
+
+      const { error } = await supabase.from("project_activity").insert([
+        {
+          project_id: projectId,
+          user_id: user.id,
+          activity_type: activityType,
+          description,
+          metadata,
+        },
+      ]);
+
+      if (error) {
+        console.warn("⚠️ Could not log activity:", error);
+        // Don't throw - activity logging should not break the main operation
+      }
+    } catch (err) {
+      console.warn("⚠️ Unexpected error logging activity:", err);
+      // Don't throw - activity logging should not break the main operation
+    }
   }
 
   /**

@@ -15,7 +15,7 @@ import { ContextMenu } from "./ui/ContextMenu";
 import { HorizontalRuler } from "./ui/HorizontalRuler";
 import { VerticalRuler } from "./ui/VerticalRuler";
 import { CanvasProvider } from "../contexts/CanvasContext";
-import { useProjectStore } from "@/store/projectStore";
+import { useProject } from "@/contexts/ProjectContext";
 
 interface IDEFabricCanvasProps {
   className?: string;
@@ -30,6 +30,7 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
     height: 0,
   });
   const [areRulersVisible, setAreRulersVisible] = useState(false);
+  const [restorationInProgress, setRestorationInProgress] = useState(false);
 
   // Context menu and clipboard state - Refactored per specification
   const [menuState, setMenuState] = useState({
@@ -60,14 +61,69 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
     enabled: !!fabricCanvas,
   });
 
-  // Project store for auto-save integration
-  const { projectId, projectName, isDirty } = useProjectStore();
+  const { currentProject, restoreCanvasData } = useProject();
 
   // Auto-save functionality
   const autoSave = useCanvasAutoSave({
     canvas: fabricCanvas,
-    enabled: !!projectId, // Only enable when we have a project
+    enabled: !!currentProject, // Only enable when we have a project
   });
+
+  // Canvas restoration effect - only run once when both canvas and data are ready
+  useEffect(() => {
+    if (
+      fabricCanvas &&
+      currentProject?.canvas_settings &&
+      !restorationInProgress
+    ) {
+      // Check if canvas already has objects (might have been restored already)
+      const existingObjects = fabricCanvas.getObjects();
+      if (existingObjects.length > 0) {
+        console.log("ℹ️ Canvas already has objects, skipping restoration");
+        return;
+      }
+
+      console.log("🔄 Canvas ready, attempting to restore canvas data...");
+      console.log("📊 Canvas data to restore:", {
+        hasObjects: currentProject.canvas_settings.objects?.length || 0,
+        hasViewport: !!currentProject.canvas_settings.viewportTransform,
+        zoom: currentProject.canvas_settings.zoom,
+      });
+
+      // Prevent multiple restorations
+      setRestorationInProgress(true);
+
+      restoreCanvasData(fabricCanvas)
+        .then(() => {
+          console.log("✅ Canvas restoration completed");
+
+          // Reapply grid pattern after restoration
+          const gridPattern = createGridPattern(fabricCanvas, gridSize);
+          if (gridPattern) {
+            console.log("Reapplying grid pattern after restoration");
+            fabricCanvas.backgroundColor = gridPattern;
+          } else {
+            console.log("Failed to recreate grid pattern after restoration");
+          }
+
+          fabricCanvas.renderAll();
+          setRestorationInProgress(false);
+        })
+        .catch((error) => {
+          console.error("❌ Canvas restoration failed:", error);
+
+          // Still apply grid even if restoration failed
+          const gridPattern = createGridPattern(fabricCanvas, gridSize);
+          if (gridPattern) {
+            console.log("Applying grid pattern after restoration failure");
+            fabricCanvas.backgroundColor = gridPattern;
+            fabricCanvas.renderAll();
+          }
+
+          setRestorationInProgress(false);
+        });
+    }
+  }, [fabricCanvas, currentProject?.canvas_settings, restoreCanvasData]);
 
   // Ruler dimensions and grid settings
   const rulerSize = 30;
@@ -75,6 +131,7 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
 
   // Helper function to create background grid pattern
   const createGridPattern = (canvas: fabric.Canvas, gridSize: number) => {
+    console.log("Creating grid pattern with size:", gridSize);
     // Create a temporary canvas for the pattern
     const patternCanvas = document.createElement("canvas");
     const patternCtx = patternCanvas.getContext("2d");
@@ -85,8 +142,8 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
     patternCanvas.height = gridSize;
 
     // Draw grid lines
-    patternCtx.strokeStyle = "#E0E0E0";
-    patternCtx.lineWidth = 0.5;
+    patternCtx.strokeStyle = "#CCCCCC"; // Make grid lines more visible
+    patternCtx.lineWidth = 1; // Thicker lines
     patternCtx.beginPath();
 
     // Vertical line
@@ -100,10 +157,13 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
     patternCtx.stroke();
 
     // Create Fabric.js pattern
-    return new fabric.Pattern({
+    const pattern = new fabric.Pattern({
       source: patternCanvas,
       repeat: "repeat",
     });
+
+    console.log("Grid pattern created successfully");
+    return pattern;
   };
 
   // Context menu paste handler - uses right-click position
@@ -117,6 +177,13 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
   useEffect(() => {
     if (!canvasRef.current || !containerRef.current) return;
 
+    // Check if canvas element already has a Fabric.js instance
+    const existingCanvas = (canvasRef.current as any).fabric;
+    if (existingCanvas) {
+      console.log("Disposing existing canvas before creating new one");
+      existingCanvas.dispose();
+    }
+
     // Get initial container dimensions
     const container = containerRef.current;
     const rect = container.getBoundingClientRect();
@@ -125,16 +192,27 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
     const canvasWidth = rect.width - rulerSize;
     const canvasHeight = rect.height - rulerSize;
 
+    console.log(
+      `Creating new canvas with dimensions: ${canvasWidth}x${canvasHeight}`
+    );
+
     const canvas = new fabric.Canvas(canvasRef.current, {
       width: canvasWidth,
       height: canvasHeight,
       backgroundColor: "#FFFFFF", // White background for better grid visibility
     });
 
-    // Create and apply grid pattern
+    // Create and apply grid pattern immediately
     const gridPattern = createGridPattern(canvas, gridSize);
     if (gridPattern) {
+      console.log("Applying initial grid pattern to canvas");
       canvas.backgroundColor = gridPattern;
+      canvas.renderAll();
+      console.log("Grid pattern applied and canvas rendered");
+    } else {
+      console.log("Failed to create initial grid pattern");
+      // Fallback: ensure white background
+      canvas.backgroundColor = "#FFFFFF";
       canvas.renderAll();
     }
 
@@ -147,9 +225,15 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
     // Setup component handler with the new canvas
     setupComponentHandler(canvas);
 
-    // Cleanup function to prevent memory leaks
+    // Final render to ensure everything is visible
+    setTimeout(() => {
+      canvas.renderAll();
+      console.log("Final canvas render completed");
+    }, 100);
+
+    // Cleanup function to dispose canvas when component unmounts or useEffect re-runs
     return () => {
-      canvasCommandManager.setCanvas(null);
+      console.log("Disposing canvas in cleanup function");
       canvas.dispose();
     };
   }, [rulerSize]);
@@ -173,6 +257,14 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
             height: canvasHeight,
           });
           setCanvasDimensions({ width: canvasWidth, height: canvasHeight });
+
+          // Reapply grid pattern after resize
+          const gridPattern = createGridPattern(fabricCanvas, gridSize);
+          if (gridPattern) {
+            console.log("Reapplying grid pattern after ResizeObserver resize");
+            fabricCanvas.backgroundColor = gridPattern;
+          }
+
           fabricCanvas.renderAll();
 
           console.log(`Canvas resized to: ${canvasWidth}x${canvasHeight}`);
@@ -205,6 +297,14 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
             height: canvasHeight,
           });
           setCanvasDimensions({ width: canvasWidth, height: canvasHeight });
+
+          // Reapply grid pattern after resize
+          const gridPattern = createGridPattern(fabricCanvas, gridSize);
+          if (gridPattern) {
+            console.log("Reapplying grid pattern after window resize");
+            fabricCanvas.backgroundColor = gridPattern;
+          }
+
           fabricCanvas.renderAll();
         }
       }
@@ -1137,29 +1237,29 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
         )}
 
         {/* Auto-save status indicator */}
-        {projectId && (
+        {currentProject && (
           <div className="absolute top-2 left-1/2 transform -translate-x-1/2 bg-gray-800 bg-opacity-90 text-white px-3 py-1 rounded text-xs">
             <div className="flex items-center gap-2">
               {autoSave.saving && (
                 <div className="w-2 h-2 bg-yellow-400 rounded-full animate-spin"></div>
               )}
-              {!autoSave.saving && isDirty && (
+              {!autoSave.saving && autoSave.isDirty && (
                 <div className="w-2 h-2 bg-orange-400 rounded-full"></div>
               )}
-              {!autoSave.saving && !isDirty && (
+              {!autoSave.saving && !autoSave.isDirty && (
                 <div className="w-2 h-2 bg-green-400 rounded-full"></div>
               )}
               <span>
                 {autoSave.saving && "Saving..."}
-                {!autoSave.saving && isDirty && "Unsaved changes"}
+                {!autoSave.saving && autoSave.isDirty && "Unsaved changes"}
                 {!autoSave.saving &&
-                  !isDirty &&
+                  !autoSave.isDirty &&
                   autoSave.lastSaved &&
                   `Saved ${autoSave.lastSaved.toLocaleTimeString()}`}
                 {(!autoSave.saving &&
-                  !isDirty &&
+                  !autoSave.isDirty &&
                   !autoSave.lastSaved &&
-                  projectName) ||
+                  currentProject.name) ||
                   "Project"}
               </span>
             </div>
@@ -1179,10 +1279,26 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
 let isComponentHandlerSetup = false;
 
 export function setupComponentHandler(canvas: fabric.Canvas) {
-  // Remove the guard to allow re-setup with new canvas instances
-  if (isComponentHandlerSetup) return;
+  // Use canvas instance ID to prevent duplicate setup for the same canvas
+  const canvasElement = canvas.getElement();
+  const canvasId = canvasElement?.id || `canvas-${Date.now()}`;
+
+  if (canvasElement && !canvasElement.id) {
+    canvasElement.id = canvasId;
+  }
+
+  // Check if this canvas already has component handlers set up
+  if ((canvas as any)._componentHandlersSetup) {
+    console.log(
+      "Component handlers already set up for this canvas, skipping..."
+    );
+    return;
+  }
 
   console.log("🔄 Setting up SVG component handler with fresh canvas...");
+
+  // Mark this canvas as having handlers set up
+  (canvas as any)._componentHandlersSetup = true;
 
   canvasCommandManager.on(
     "component:add",
@@ -1197,12 +1313,33 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
 
       // New intelligent component creation logic
       const createComponent = (componentInfo: typeof payload) => {
-        console.log(`🎯 DEBUG: ===== STARTING COMPONENT CREATION FOR ${componentInfo.name} =====`);
+        console.log(
+          `🎯 DEBUG: ===== STARTING COMPONENT CREATION FOR ${componentInfo.name} =====`
+        );
 
         // Get the current canvas from the command manager instead of using closure
         const currentCanvas = canvasCommandManager.getCanvas();
         if (!currentCanvas) {
-          console.error(`❌ ERROR: No canvas available from command manager for component ${componentInfo.name}`);
+          console.error(
+            `❌ ERROR: No canvas available from command manager for component ${componentInfo.name}`
+          );
+          return;
+        }
+
+        // Check for duplicate components at the same position
+        const existingComponents = currentCanvas
+          .getObjects()
+          .filter(
+            (obj: any) =>
+              obj.data?.componentName === componentInfo.name &&
+              Math.abs((obj.left || 0) - (componentInfo.x || 0)) < 10 &&
+              Math.abs((obj.top || 0) - (componentInfo.y || 0)) < 10
+          );
+
+        if (existingComponents.length > 0) {
+          console.log(
+            `⚠️ Duplicate component detected for ${componentInfo.name}, skipping creation`
+          );
           return;
         }
 
@@ -1210,17 +1347,25 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
         console.log(`🎯 DEBUG: Canvas exists: ${!!currentCanvas}`);
         console.log(`🎯 DEBUG: Canvas width: ${currentCanvas.width}`);
         console.log(`🎯 DEBUG: Canvas height: ${currentCanvas.height}`);
-        console.log(`🎯 DEBUG: Canvas objects count: ${currentCanvas.getObjects().length}`);
-        console.log(`🎯 DEBUG: Canvas disposed: ${currentCanvas.disposed || false}`);
+        console.log(
+          `🎯 DEBUG: Canvas objects count: ${currentCanvas.getObjects().length}`
+        );
+        console.log(
+          `🎯 DEBUG: Canvas disposed: ${currentCanvas.disposed || false}`
+        );
 
         // Additional canvas validation
         if (currentCanvas.disposed) {
-          console.error(`❌ ERROR: Current canvas is disposed when creating component ${componentInfo.name}`);
+          console.error(
+            `❌ ERROR: Current canvas is disposed when creating component ${componentInfo.name}`
+          );
           return;
         }
 
         if (!currentCanvas.getElement()) {
-          console.error(`❌ ERROR: Current canvas element is not available when creating component ${componentInfo.name}`);
+          console.error(
+            `❌ ERROR: Current canvas element is not available when creating component ${componentInfo.name}`
+          );
           return;
         }
 
@@ -1245,7 +1390,7 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
                 top: obj?.top,
                 visible: obj?.visible,
                 opacity: obj?.opacity,
-                hasEl: !!obj?.el
+                hasEl: !!obj?.el,
               });
 
               if (obj && obj.id === "pin") {
@@ -1274,45 +1419,77 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
             }));
 
             // THE FILLING: Main component symbol (the SVG shape)
-            console.log(`🎯 DEBUG: Creating SVG symbol with ${symbolParts.length} parts`);
-            console.log(`🎯 DEBUG: Symbol parts:`, symbolParts.map((part, i) => ({
-              index: i,
-              type: part?.type,
-              id: (part as any)?.id,
-              hasEl: !!(part as any)?.el
-            })));
+            console.log(
+              `🎯 DEBUG: Creating SVG symbol with ${symbolParts.length} parts`
+            );
+            console.log(
+              `🎯 DEBUG: Symbol parts:`,
+              symbolParts.map((part, i) => ({
+                index: i,
+                type: part?.type,
+                id: (part as any)?.id,
+                hasEl: !!(part as any)?.el,
+              }))
+            );
 
             const svgSymbol = new fabric.Group(symbolParts, {
               originX: "center",
               originY: "center",
             });
 
-            console.log(`🎯 DEBUG: SVG Symbol created with ${symbolParts.length} parts`);
-            console.log(`🎯 DEBUG: SVG Symbol bounds:`, svgSymbol.getBoundingRect());
+            console.log(
+              `🎯 DEBUG: SVG Symbol created with ${symbolParts.length} parts`
+            );
+            console.log(
+              `🎯 DEBUG: SVG Symbol bounds:`,
+              svgSymbol.getBoundingRect()
+            );
             console.log(`🎯 DEBUG: Symbol parts:`, symbolParts);
 
             // DEBUG: Ensure all symbol parts are visible
             symbolParts.forEach((part, index) => {
               if (part.opacity === 0 || part.opacity === undefined) {
-                part.set('opacity', 1);
-                console.log(`🎯 DEBUG: Set opacity to 1 for symbol part ${index}`);
+                part.set("opacity", 1);
+                console.log(
+                  `🎯 DEBUG: Set opacity to 1 for symbol part ${index}`
+                );
               }
               if (part.visible === false) {
-                part.set('visible', true);
-                console.log(`🎯 DEBUG: Set visible to true for symbol part ${index}`);
+                part.set("visible", true);
+                console.log(
+                  `🎯 DEBUG: Set visible to true for symbol part ${index}`
+                );
               }
             });
-            svgSymbol.set('opacity', 1);
-            svgSymbol.set('visible', true);
+            svgSymbol.set("opacity", 1);
+            svgSymbol.set("visible", true);
 
-            console.log(`🎯 DEBUG: SVG Symbol created with ${symbolParts.length} parts`);
-            console.log(`🎯 DEBUG: SVG Symbol bounds:`, svgSymbol.getBoundingRect());
-            console.log(`🎯 DEBUG: Symbol parts:`, symbolParts.map(part => ({ type: part.type, visible: part.visible, opacity: part.opacity })));
+            console.log(
+              `🎯 DEBUG: SVG Symbol created with ${symbolParts.length} parts`
+            );
+            console.log(
+              `🎯 DEBUG: SVG Symbol bounds:`,
+              svgSymbol.getBoundingRect()
+            );
+            console.log(
+              `🎯 DEBUG: Symbol parts:`,
+              symbolParts.map((part) => ({
+                type: part.type,
+                visible: part.visible,
+                opacity: part.opacity,
+              }))
+            );
 
             // TOP BREAD: Visible, interactive pin circles (transparent green)
-            console.log(`🎯 DEBUG: Creating ${pinsFromSVG.length} interactive pins`);
+            console.log(
+              `🎯 DEBUG: Creating ${pinsFromSVG.length} interactive pins`
+            );
             const interactivePins = pinsFromSVG.map((pin, index) => {
-              console.log(`🎯 DEBUG: Creating pin ${index + 1} at (${pin.left}, ${pin.top})`);
+              console.log(
+                `🎯 DEBUG: Creating pin ${index + 1} at (${pin.left}, ${
+                  pin.top
+                })`
+              );
 
               const interactivePin = new fabric.Circle({
                 radius: 4,
@@ -1366,16 +1543,25 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
                   componentX = (centerX - vpt[4]) / zoom;
                   componentY = (centerY - vpt[5]) / zoom;
 
-                  console.log(`📍 Component positioned at center: (${componentX.toFixed(0)}, ${componentY.toFixed(0)})`);
+                  console.log(
+                    `📍 Component positioned at center: (${componentX.toFixed(
+                      0
+                    )}, ${componentY.toFixed(0)})`
+                  );
                 } else {
                   // Fallback: use canvas viewport center
-                  console.log(`📍 Using viewport center (canvas element unavailable)`);
+                  console.log(
+                    `📍 Using viewport center (canvas element unavailable)`
+                  );
                   const vpCenter = currentCanvas.getVpCenter();
                   componentX = vpCenter.x;
                   componentY = vpCenter.y;
                 }
               } catch (error) {
-                console.error(`❌ ERROR: Failed to get canvas position:`, error);
+                console.error(
+                  `❌ ERROR: Failed to get canvas position:`,
+                  error
+                );
                 // Ultimate fallback: use canvas viewport center
                 const vpCenter = currentCanvas.getVpCenter();
                 componentX = vpCenter.x;
@@ -1402,14 +1588,28 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
 
             // DEBUG: Log component positioning
             const vpCenter = canvas.getVpCenter();
-            console.log(`📍 Canvas center: (${vpCenter.x.toFixed(0)}, ${vpCenter.y.toFixed(0)})`);
-            console.log(`📍 Component position: (${componentSandwich.left?.toFixed(0)}, ${componentSandwich.top?.toFixed(0)})`);
+            console.log(
+              `📍 Canvas center: (${vpCenter.x.toFixed(
+                0
+              )}, ${vpCenter.y.toFixed(0)})`
+            );
+            console.log(
+              `📍 Component position: (${componentSandwich.left?.toFixed(
+                0
+              )}, ${componentSandwich.top?.toFixed(0)})`
+            );
 
             // Check if component is within visible bounds
             const bounds = componentSandwich.getBoundingRect();
             const canvasWidth = canvas.getWidth();
             const canvasHeight = canvas.getHeight();
-            console.log(`📐 Component bounds: (${bounds.left.toFixed(0)}, ${bounds.top.toFixed(0)}) ${bounds.width.toFixed(0)}x${bounds.height.toFixed(0)}`);
+            console.log(
+              `📐 Component bounds: (${bounds.left.toFixed(
+                0
+              )}, ${bounds.top.toFixed(0)}) ${bounds.width.toFixed(
+                0
+              )}x${bounds.height.toFixed(0)}`
+            );
 
             // Store the invisible pin data and component metadata
             componentSandwich.set("componentType", componentInfo.type);
@@ -1423,40 +1623,81 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
             });
 
             // 5. Add the COMPONENT SANDWICH to the canvas - physically impossible to separate
-            console.log(`🎯 Adding ${componentInfo.name} to canvas (${currentCanvas.getObjects().length} objects currently)`);
+            console.log(
+              `🎯 Adding ${componentInfo.name} to canvas (${
+                currentCanvas.getObjects().length
+              } objects currently)`
+            );
 
             currentCanvas.add(componentSandwich);
             currentCanvas.renderAll();
 
-            console.log(`✅ ${componentInfo.name} added to canvas (${currentCanvas.getObjects().length} total objects)`);
+            console.log(
+              `✅ ${componentInfo.name} added to canvas (${
+                currentCanvas.getObjects().length
+              } total objects)`
+            );
 
             // Check component properties
-            console.log(`📐 Component bounds: (${bounds.left.toFixed(0)}, ${bounds.top.toFixed(0)}) ${bounds.width.toFixed(0)}x${bounds.height.toFixed(0)}`);
+            console.log(
+              `📐 Component bounds: (${bounds.left.toFixed(
+                0
+              )}, ${bounds.top.toFixed(0)}) ${bounds.width.toFixed(
+                0
+              )}x${bounds.height.toFixed(0)}`
+            );
 
             // Check if component is within canvas viewport
             const viewportBounds = {
-              left: -currentCanvas.viewportTransform[4] / currentCanvas.getZoom(),
-              top: -currentCanvas.viewportTransform[5] / currentCanvas.getZoom(),
-              right: (-currentCanvas.viewportTransform[4] + currentCanvas.getWidth()) / currentCanvas.getZoom(),
-              bottom: (-currentCanvas.viewportTransform[5] + currentCanvas.getHeight()) / currentCanvas.getZoom()
+              left:
+                -currentCanvas.viewportTransform[4] / currentCanvas.getZoom(),
+              top:
+                -currentCanvas.viewportTransform[5] / currentCanvas.getZoom(),
+              right:
+                (-currentCanvas.viewportTransform[4] +
+                  currentCanvas.getWidth()) /
+                currentCanvas.getZoom(),
+              bottom:
+                (-currentCanvas.viewportTransform[5] +
+                  currentCanvas.getHeight()) /
+                currentCanvas.getZoom(),
             };
             const componentBounds = componentSandwich.getBoundingRect();
-            const isVisible = componentBounds.left < viewportBounds.right &&
-                            (componentBounds.left + componentBounds.width) > viewportBounds.left &&
-                            componentBounds.top < viewportBounds.bottom &&
-                            (componentBounds.top + componentBounds.height) > viewportBounds.top;
+            const isVisible =
+              componentBounds.left < viewportBounds.right &&
+              componentBounds.left + componentBounds.width >
+                viewportBounds.left &&
+              componentBounds.top < viewportBounds.bottom &&
+              componentBounds.top + componentBounds.height > viewportBounds.top;
             console.log(`🎯 DEBUG: Viewport bounds:`, viewportBounds);
             console.log(`🎯 DEBUG: Is component within viewport: ${isVisible}`);
 
             // Check if component is still there after a short delay
             setTimeout(() => {
-              console.log(`🎯 DEBUG: Component still in canvas after delay: ${currentCanvas.getObjects().includes(componentSandwich)}`);
-              console.log(`🎯 DEBUG: Total objects after delay: ${currentCanvas.getObjects().length}`);
+              console.log(
+                `🎯 DEBUG: Component still in canvas after delay: ${currentCanvas
+                  .getObjects()
+                  .includes(componentSandwich)}`
+              );
+              console.log(
+                `🎯 DEBUG: Total objects after delay: ${
+                  currentCanvas.getObjects().length
+                }`
+              );
               if (currentCanvas.getObjects().includes(componentSandwich)) {
-                console.log(`🎯 DEBUG: Component bounds after delay:`, componentSandwich.getBoundingRect());
-                console.log(`🎯 DEBUG: Component position after delay: left=${componentSandwich.left}, top=${componentSandwich.top}`);
-                console.log(`🎯 DEBUG: Component visible after delay: ${componentSandwich.visible}`);
-                console.log(`🎯 DEBUG: Component opacity after delay: ${componentSandwich.opacity}`);
+                console.log(
+                  `🎯 DEBUG: Component bounds after delay:`,
+                  componentSandwich.getBoundingRect()
+                );
+                console.log(
+                  `🎯 DEBUG: Component position after delay: left=${componentSandwich.left}, top=${componentSandwich.top}`
+                );
+                console.log(
+                  `🎯 DEBUG: Component visible after delay: ${componentSandwich.visible}`
+                );
+                console.log(
+                  `🎯 DEBUG: Component opacity after delay: ${componentSandwich.opacity}`
+                );
               }
             }, 100);
 
@@ -1464,7 +1705,9 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
               `🥪 COMPONENT SANDWICH: Added ${componentInfo.name} with ${interactivePins.length} permanently attached pins!`
             );
 
-            console.log(`🎯 DEBUG: ===== COMPONENT CREATION COMPLETED FOR ${componentInfo.name} =====`);
+            console.log(
+              `🎯 DEBUG: ===== COMPONENT CREATION COMPLETED FOR ${componentInfo.name} =====`
+            );
           })
           .catch((error) => {
             console.error(
@@ -1473,7 +1716,9 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
             );
 
             // Fallback: Try to create a simple component instead
-            console.log(`🔄 FALLBACK: Attempting to create simple component for ${componentInfo.name}`);
+            console.log(
+              `🔄 FALLBACK: Attempting to create simple component for ${componentInfo.name}`
+            );
             try {
               const simpleComponent = new fabric.Rect({
                 left: 200,
@@ -1495,9 +1740,14 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
               currentCanvas.add(simpleComponent);
               currentCanvas.renderAll();
 
-              console.log(`✅ FALLBACK: Simple component created for ${componentInfo.name}`);
+              console.log(
+                `✅ FALLBACK: Simple component created for ${componentInfo.name}`
+              );
             } catch (fallbackError) {
-              console.error(`❌ FALLBACK: Failed to create simple component:`, fallbackError);
+              console.error(
+                `❌ FALLBACK: Failed to create simple component:`,
+                fallbackError
+              );
             }
           });
       };

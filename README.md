@@ -1,8 +1,8 @@
-# BuildPCB.ai
+# BuildPCBs
 
 <div align="center">
 
-![BuildPCB.ai Logo](https://buildpcbs.com/logo.png)
+![BuildPCBs Logo](https://buildpcbs.com/logo.png)
 
 **🚀 AI-Powered PCB Design IDE**
 
@@ -20,7 +20,7 @@ _"The Figma for Electronics Design - Where AI meets PCB Creation"_
 
 ## 🌟 Overview
 
-BuildPCB.ai is an intuitive browser-based PCB design tool built with modern web technologies. Our focus is on creating a responsive, user-friendly interface for electronic circuit design that makes PCB creation accessible to everyone from beginners to professionals. Using Fabric.js for canvas rendering and Next.js for a fast, responsive interface, we're building a tool that bridges the gap between simplicity and professional capabilities.
+BuildPCBs is an intuitive browser-based PCB design tool built with modern web technologies. Our focus is on creating a responsive, user-friendly interface for electronic circuit design that makes PCB creation accessible to everyone from beginners to professionals. Using Fabric.js for canvas rendering and Next.js for a fast, responsive interface, we're building a tool that bridges the gap between simplicity and professional capabilities.
 
 ### 🎯 **Our Mission**
 
@@ -301,7 +301,7 @@ const WiringToolDemo = ({ canvas }) => {
 
 ## 👥 Team & Development
 
-BuildPCB.ai is developed by a dedicated team of engineers and designers passionate about revolutionizing electronics design.
+BuildPCBs is developed by a dedicated team of engineers and designers passionate about revolutionizing electronics design.
 
 ### 🛠️ **Development Standards**
 
@@ -404,36 +404,36 @@ pnpm build
 
 ## 📄 License & Terms
 
-This project is **proprietary software** owned and licensed by **BuildPCB.ai Team**. All rights reserved.
+This project is **proprietary software** owned and licensed by **BuildPCBs Team**. All rights reserved.
 
 ### 📋 **License Terms**
 
 - This software is not open source
-- Commercial use requires proper licensing from BuildPCB.ai
+- Commercial use requires proper licensing from BuildPCBs
 - Redistribution and modification are not permitted without authorization
 - For licensing inquiries, contact: [licensing@buildpcbs.com](mailto:licensing@buildpcbs.com)
 
 ### 🔒 **Intellectual Property**
 
-All code, designs, algorithms, and documentation are the exclusive property of BuildPCB.ai and are protected by applicable copyright and intellectual property laws.
+All code, designs, algorithms, and documentation are the exclusive property of BuildPCBs and are protected by applicable copyright and intellectual property laws.
 
 ## 🙏 Acknowledgments
 
 - **Electronics Engineers** providing valuable feedback and guidance
 - **Beta Users** helping us improve the platform with real-world testing
 - **Technology Partners** enabling our advanced features
-- **BuildPCB.ai Team** for their dedication to innovation in electronics design
+- **BuildPCBs Team** for their dedication to innovation in electronics design
 
 ---
 
 <div align="center">
 
-**Built with ❤️ by the [@BuildPCB.ai Team](https://github.com/Mbdulrohim)**
+**Built with ❤️ by the [@BuildPCBs Team](https://github.com/Mbdulrohim)**
 
 _Making electronics design accessible to everyone_
 
 ⭐ **Star this repo if you found it helpful!** ⭐
 
-**© 2025 BuildPCB.ai - All Rights Reserved**
+**© 2025 BuildPCBs - All Rights Reserved**
 
 </div>

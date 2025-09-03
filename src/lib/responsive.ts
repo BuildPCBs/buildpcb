@@ -1,5 +1,5 @@
 /**
- * Responsive utility functions for BuildPCB.ai
+ * Responsive utility functions for BuildPCBs
  * All values should be relative to the design dimensions (1280x832)
  * These utilities convert design values to truly responsive CSS units
  */

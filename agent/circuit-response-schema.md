@@ -14,6 +14,24 @@ interface CircuitResponse {
     version: string;
     explanation: string;
   };
+  canvasReferences?: CanvasReference[]; // clickable references to canvas elements
+  sessionContext?: {
+    circuitId?: string;
+    isRestoration?: boolean;
+    previousState?: string; // snapshot ID if this is a continuation
+  };
+}
+
+interface CanvasReference {
+  id: string;
+  type: "component" | "connection" | "area" | "section";
+  targetId: string;
+  displayText: string;
+  action: "highlight" | "zoom" | "select" | "trace";
+  position: {
+    start: number;
+    end: number;
+  };
 }
 
 interface FullCircuit {
@@ -200,3 +218,9 @@ const SYMBOL_LIBRARY = {
 - **Full Circuit**: Render entire circuit from JSON
 - **Edit Mode**: Apply patch operations and update only affected elements
 - **Progressive Loading**: Large circuits render in chunks to maintain performance
+
+## Related Documentation
+
+- **[Circuit State Management](./circuit-state-management.md)** - How circuit states are saved, restored, and maintained across sessions
+- **[Restore Endpoint](./restore-endpoint-docs.md)** - API documentation for state restoration and recovery
+- **[Canvas Reference System](./canvas-reference-system.md)** - Interactive references between AI responses and canvas elements

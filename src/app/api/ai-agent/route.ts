@@ -46,7 +46,10 @@ export const POST = withAuth(
         );
       }
 
-      console.log("✅ OpenAI API key found, length:", process.env.OPENAI_API_KEY.length);
+      console.log(
+        "✅ OpenAI API key found, length:",
+        process.env.OPENAI_API_KEY.length
+      );
 
       const body: ChatRequest = await request.json();
       const { message, canvasState, conversationHistory = [] } = body;
@@ -61,7 +64,7 @@ export const POST = withAuth(
       console.log("📝 Processing message:", message.substring(0, 100) + "...");
 
       // Build conversation context for OpenAI
-      const systemPrompt = `You are an AI assistant for BuildPCB.ai, "The Figma + Cursor for Electronics Design."
+      const systemPrompt = `You are an AI assistant for BuildPCBs, "The Figma + Cursor for Electronics Design."
 
 Your role is to help users design electronic circuits through intelligent component selection, placement, and connection recommendations.
 
@@ -113,27 +116,33 @@ Respond in JSON format following the CircuitResponse schema. If it's a simple qu
       // Try with a more robust configuration and error handling
       let completion;
       try {
-        completion = await openai.chat.completions.create({
-          model: "gpt-4o-mini", // Use gpt-4o-mini instead of gpt-4o for better reliability
-          messages,
-          temperature: 0.7,
-          max_tokens: 2000,
-          response_format: { type: "json_object" },
-        }, {
-          timeout: 30000, // 30 second timeout
-        });
+        completion = await openai.chat.completions.create(
+          {
+            model: "gpt-4o-mini", // Use gpt-4o-mini instead of gpt-4o for better reliability
+            messages,
+            temperature: 0.7,
+            max_tokens: 2000,
+            response_format: { type: "json_object" },
+          },
+          {
+            timeout: 30000, // 30 second timeout
+          }
+        );
       } catch (modelError) {
         console.warn("⚠️ gpt-4o-mini failed, trying gpt-3.5-turbo...");
         // Fallback to gpt-3.5-turbo if gpt-4o-mini fails
-        completion = await openai.chat.completions.create({
-          model: "gpt-3.5-turbo",
-          messages,
-          temperature: 0.7,
-          max_tokens: 2000,
-          response_format: { type: "json_object" },
-        }, {
-          timeout: 30000,
-        });
+        completion = await openai.chat.completions.create(
+          {
+            model: "gpt-3.5-turbo",
+            messages,
+            temperature: 0.7,
+            max_tokens: 2000,
+            response_format: { type: "json_object" },
+          },
+          {
+            timeout: 30000,
+          }
+        );
       }
 
       console.log("✅ OpenAI response received");
@@ -180,25 +189,29 @@ Respond in JSON format following the CircuitResponse schema. If it's a simple qu
       if (error instanceof Error) {
         console.error("Error message:", error.message);
         console.error("Error stack:", error.stack);
-        
-        if (error.message.includes("ENOTFOUND") || error.message.includes("Connection error")) {
+
+        if (
+          error.message.includes("ENOTFOUND") ||
+          error.message.includes("Connection error")
+        ) {
           console.error("🌐 Network connectivity issue detected");
           console.error("🔍 Possible causes:");
           console.error("  - Internet connection problems");
           console.error("  - DNS resolution issues");
           console.error("  - Firewall/proxy blocking api.openai.com");
           console.error("  - OpenAI API service outage");
-          
+
           return NextResponse.json(
             {
               error: "Network connectivity issue",
-              details: "Unable to reach OpenAI API. Please check your internet connection and try again.",
+              details:
+                "Unable to reach OpenAI API. Please check your internet connection and try again.",
               type: "NETWORK_ERROR",
             },
             { status: 503 }
           );
         }
-        
+
         if (error.message.includes("API key")) {
           return NextResponse.json(
             {
@@ -227,7 +240,7 @@ export async function GET() {
   try {
     // Test connectivity to OpenAI
     console.log("🔍 Testing OpenAI connectivity...");
-    
+
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json({
         message: "AI Agent API is running",
@@ -270,7 +283,7 @@ export async function GET() {
       });
     } catch (testError) {
       console.error("❌ OpenAI connectivity test failed:", testError);
-      
+
       return NextResponse.json({
         message: "AI Agent API is running",
         status: "DEGRADED",
@@ -284,7 +297,7 @@ export async function GET() {
     }
   } catch (error) {
     console.error("❌ Health check error:", error);
-    
+
     return NextResponse.json({
       message: "AI Agent API is running",
       status: "ERROR",

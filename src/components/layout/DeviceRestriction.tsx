@@ -16,7 +16,7 @@ export function DeviceRestriction() {
             className="text-gray-600 leading-relaxed"
             style={{ fontSize: responsiveFontSize(16) }}
           >
-            BuildPCB.ai IDE requires a desktop or laptop computer with a minimum
+            BuildPCBs IDE requires a desktop or laptop computer with a minimum
             screen width for optimal circuit design experience.
           </p>
           <p

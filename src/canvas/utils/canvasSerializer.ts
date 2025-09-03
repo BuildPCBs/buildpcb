@@ -51,14 +51,31 @@ export function serializeCanvasToCircuit(
 
   // Extract connections from canvas objects (wires)
   const connections: Connection[] = objects
-    .filter((obj) => obj.type === "line" || obj.type === "path")
+    .filter(
+      (obj) =>
+        obj.type === "line" || obj.type === "path" || obj.type === "polyline"
+    )
+    .filter((obj) => (obj as any).wireType === "connection")
     .map((obj, index) => {
-      const wireData = (obj as any).wireData || {};
+      const wireObj = obj as any;
+      const wireData = wireObj.wireData || {};
 
       return {
-        id: wireData.id || `conn_${index}`,
-        from: wireData.from || { componentId: "", pin: "" },
-        to: wireData.to || { componentId: "", pin: "" },
+        id: wireData.id || wireObj.id || `conn_${index}`,
+        from: wireData.from || {
+          componentId: wireObj.startComponentId || "",
+          pin:
+            wireObj.startPinIndex !== undefined
+              ? wireObj.startPinIndex.toString()
+              : "",
+        },
+        to: wireData.to || {
+          componentId: wireObj.endComponentId || "",
+          pin:
+            wireObj.endPinIndex !== undefined
+              ? wireObj.endPinIndex.toString()
+              : "",
+        },
         type: wireData.type || ("wire" as const),
         properties: wireData.properties || {},
       };
@@ -120,7 +137,44 @@ export function loadCanvasFromData(
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     try {
+      console.log("🔄 Loading canvas from data:", {
+        objectCount: canvasData.objects?.length || 0,
+        hasViewport: !!canvasData.viewportTransform,
+        zoom: canvasData.zoom,
+      });
+
       canvas.loadFromJSON(canvasData, () => {
+        console.log(
+          "📊 Canvas loaded, objects on canvas:",
+          canvas.getObjects().length
+        );
+
+        // Preserve the grid background if it was set
+        const currentBg = canvas.backgroundColor;
+        if (!currentBg || typeof currentBg === "string") {
+          // Create and apply grid pattern if background is not already a pattern
+          const patternCanvas = document.createElement("canvas");
+          const patternCtx = patternCanvas.getContext("2d");
+          if (patternCtx) {
+            patternCanvas.width = 10;
+            patternCanvas.height = 10;
+            patternCtx.strokeStyle = "#CCCCCC";
+            patternCtx.lineWidth = 1;
+            patternCtx.beginPath();
+            patternCtx.moveTo(10, 0);
+            patternCtx.lineTo(10, 10);
+            patternCtx.moveTo(0, 10);
+            patternCtx.lineTo(10, 10);
+            patternCtx.stroke();
+
+            const gridPattern = new fabric.Pattern({
+              source: patternCanvas,
+              repeat: "repeat",
+            });
+            canvas.backgroundColor = gridPattern;
+          }
+        }
+
         // Restore viewport settings
         if (canvasData.viewport) {
           if (canvasData.viewport.zoom) {
@@ -129,13 +183,19 @@ export function loadCanvasFromData(
           if (canvasData.viewport.transform) {
             canvas.setViewportTransform(canvasData.viewport.transform);
           }
+        } else if (canvasData.viewportTransform) {
+          canvas.setViewportTransform(canvasData.viewportTransform);
+        }
+        if (canvasData.zoom) {
+          canvas.setZoom(canvasData.zoom);
         }
 
         canvas.renderAll();
+        console.log("✅ Canvas restoration completed");
         resolve();
       });
     } catch (error) {
-      console.error("Failed to load canvas from data:", error);
+      console.error("❌ Failed to load canvas from data:", error);
       reject(error);
     }
   });

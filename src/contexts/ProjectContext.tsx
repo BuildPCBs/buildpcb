@@ -29,6 +29,7 @@ interface ProjectContextType {
     canvasData: Record<string, any>
   ) => Promise<void>;
   renameProject: (newName: string) => Promise<void>;
+  restoreCanvasData: (canvas: any) => Promise<void>;
 
   // Project info
   isNewProject: boolean;
@@ -92,10 +93,12 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
         setIsFirstTimeUser(false);
 
         // Load the circuit data for this project
-        const circuitData = await ProjectService.loadProjectCircuit(project.id);
+        const latestVersion = await DatabaseService.getLatestVersion(
+          project.id
+        );
 
-        // If no circuit data exists, create an empty one
-        const circuit: Circuit = circuitData || {
+        // If no version data exists, create an empty circuit
+        const circuit: Circuit = latestVersion?.circuit_data || {
           mode: "full",
           components: [],
           connections: [],
@@ -103,6 +106,21 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
         };
 
         setCurrentCircuit(circuit);
+
+        // Store canvas data for later restoration (when canvas is ready)
+        // Prioritize project-level canvas_settings if available, otherwise use version data
+        const canvasData =
+          project.canvas_settings || latestVersion?.canvas_data;
+        if (canvasData) {
+          setCurrentProject((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  canvas_settings: canvasData,
+                }
+              : null
+          );
+        }
 
         // Update last opened timestamp
         await DatabaseService.updateLastOpened(project.id);
@@ -220,18 +238,43 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
       }
 
       try {
-        const updatedProject = await ProjectService.renameProject(
-          currentProject.id,
-          newName
-        );
-        setCurrentProject(updatedProject);
-        setIsNewProject(false); // Once renamed, it's no longer "new"
-
-        console.log("✅ Project renamed to:", newName);
+        await DatabaseService.updateProject(currentProject.id, {
+          name: newName,
+        });
+        setCurrentProject((prev) => (prev ? { ...prev, name: newName } : null));
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : "Failed to rename project";
         throw new Error(errorMessage);
+      }
+    },
+    [currentProject]
+  );
+
+  const restoreCanvasData = useCallback(
+    async (canvas: any) => {
+      if (!currentProject?.canvas_settings) {
+        console.log("ℹ️ No canvas data to restore");
+        return;
+      }
+
+      try {
+        console.log("🔄 Restoring canvas data:", {
+          hasObjects: currentProject.canvas_settings.objects?.length || 0,
+          hasViewport: !!currentProject.canvas_settings.viewportTransform,
+          zoom: currentProject.canvas_settings.zoom,
+        });
+
+        // Import the canvas restoration function
+        const { loadCanvasFromData } = await import(
+          "@/canvas/utils/canvasSerializer"
+        );
+
+        await loadCanvasFromData(canvas, currentProject.canvas_settings);
+
+        console.log("✅ Canvas data restored successfully");
+      } catch (error) {
+        console.error("❌ Failed to restore canvas data:", error);
       }
     },
     [currentProject]
@@ -246,6 +289,7 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
     loadSpecificProject,
     saveProject,
     renameProject,
+    restoreCanvasData,
     isNewProject,
     isFirstTimeUser,
   };

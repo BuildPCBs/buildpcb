@@ -4,6 +4,9 @@ import { useState, useEffect } from "react";
 import { UserIcon, ChartIcon, CloudIcon } from "@/components/icons";
 import { ActivityAnalyticsPanel } from "./ActivityAnalyticsPanel";
 import { r, responsive, responsiveSquare } from "@/lib/responsive";
+import { useProject } from "@/contexts/ProjectContext";
+import { Circuit } from "@/lib/schemas/circuit";
+import { canvasCommandManager } from "@/canvas/canvas-command-manager";
 
 interface TopToolbarProps {
   className?: string;
@@ -12,19 +15,76 @@ interface TopToolbarProps {
 export function TopToolbar({ className = "" }: TopToolbarProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [showAnalyticsPanel, setShowAnalyticsPanel] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  // Simulate autosave status
+  // Get project and canvas contexts
+  const { currentProject, currentCircuit, saveProject } = useProject();
+
+  // Track last save time for better status display
+  const [lastSaveTime, setLastSaveTime] = useState<Date | null>(null);
+
+  // Add keyboard shortcut for saving (Ctrl+S / Cmd+S)
   useEffect(() => {
-    const interval = setInterval(() => {
-      setIsSaving((prev) => !prev);
-    }, 3000);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === "s") {
+        event.preventDefault();
+        if (currentProject && !isSaving) {
+          handleExport();
+        }
+      }
+    };
 
-    return () => clearInterval(interval);
-  }, []);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [currentProject, isSaving]);
 
-  const handleExport = () => {
-    console.log("Export clicked - handling export functionality");
-    // Add actual export functionality here
+  const handleExport = async () => {
+    if (!currentProject) {
+      setSaveError("No project loaded");
+      return;
+    }
+
+    // Get canvas from command manager instead of context
+    const canvas = canvasCommandManager.getCanvas();
+    if (!canvas) {
+      setSaveError(
+        "Canvas not initialized yet. Please wait a moment and try again."
+      );
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      setSaveError(null);
+
+      // Get canvas data using the same method as auto-save
+      const { serializeCanvasData } = await import(
+        "@/canvas/utils/canvasSerializer"
+      );
+      const canvasData = serializeCanvasData(canvas);
+
+      // Get circuit data - use current circuit or create empty one
+      const circuitData: Circuit = currentCircuit || {
+        mode: "full",
+        components: [],
+        connections: [],
+      };
+
+      // Save the project
+      await saveProject(circuitData, canvasData);
+
+      // Update last save time
+      setLastSaveTime(new Date());
+
+      console.log("✅ Project saved successfully");
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to save project";
+      setSaveError(errorMessage);
+      console.error("❌ Error saving project:", error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleUserClick = () => {
@@ -90,7 +150,17 @@ export function TopToolbar({ className = "" }: TopToolbarProps) {
         {/* Right Side Export Button */}
         <button
           onClick={handleExport}
-          className="flex items-center justify-center text-white bg-[#0038DF] hover:bg-[#0032c6] transition-colors"
+          disabled={isSaving || !currentProject}
+          title={
+            navigator.platform.includes("Mac")
+              ? "Export (⌘S)"
+              : "Export (Ctrl+S)"
+          }
+          className={`flex items-center justify-center text-white transition-colors ${
+            isSaving || !currentProject
+              ? "bg-gray-400 cursor-not-allowed"
+              : "bg-[#0038DF] hover:bg-[#0032c6]"
+          }`}
           style={{
             ...r({
               width: 83,
@@ -102,7 +172,7 @@ export function TopToolbar({ className = "" }: TopToolbarProps) {
           }}
         >
           <span className="font-medium" style={{ fontSize: responsive(10) }}>
-            Export
+            {isSaving ? "Saving..." : "Export"}
           </span>
         </button>
       </div>
@@ -129,20 +199,63 @@ export function TopToolbar({ className = "" }: TopToolbarProps) {
         />
 
         {/* Saving Text */}
-        <span
-          className={`font-medium ${
-            isSaving ? "text-[#0038DF]" : "text-gray-500"
-          } transition-colors`}
+        <div className="flex flex-col items-start">
+          <span
+            className={`font-medium ${
+              isSaving ? "text-[#0038DF]" : "text-gray-500"
+            } transition-colors`}
+            style={{
+              fontSize: responsive(8),
+              lineHeight: "120%",
+              letterSpacing: "-0.5%",
+              fontWeight: 500,
+            }}
+          >
+            {isSaving ? "Saving..." : lastSaveTime ? "Saved" : "Ready"}
+          </span>
+          {lastSaveTime && !isSaving && (
+            <span
+              className="text-gray-400"
+              style={{
+                fontSize: responsive(6),
+                lineHeight: "100%",
+              }}
+            >
+              {lastSaveTime.toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Error Notification */}
+      {saveError && (
+        <div
+          className="fixed bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg"
           style={{
-            fontSize: responsive(8),
-            lineHeight: "120%",
-            letterSpacing: "-0.5%",
-            fontWeight: 500,
+            ...r({
+              top: 95,
+              right: 32,
+            }),
+            maxWidth: "300px",
+            zIndex: 10,
           }}
         >
-          {isSaving ? "Saving..." : "Saved"}
-        </span>
-      </div>
+          <div className="flex items-center">
+            <span className="text-sm font-medium">
+              Save failed: {saveError}
+            </span>
+            <button
+              onClick={() => setSaveError(null)}
+              className="ml-2 text-red-500 hover:text-red-700"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Analytics Panel Overlay - Triggered by Chart Icon Click */}
       {showAnalyticsPanel && (
