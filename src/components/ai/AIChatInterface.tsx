@@ -2,6 +2,8 @@
 
 import { useRef, useEffect } from "react";
 import { useAIChat } from "../../contexts/AIChatContext";
+import { useCanvas } from "../../contexts/CanvasContext";
+import { useCanvasStateSnapshot } from "../../hooks/useCanvasState";
 import type { ChatMessage } from "../../contexts/AIChatContext";
 import { BRAND_COLORS } from "@/lib/constants";
 
@@ -16,6 +18,10 @@ export function AIChatInterface({
 }: AIChatInterfaceProps) {
   const { messages, isThinking, currentMessageIndex, setCurrentMessageIndex } =
     useAIChat();
+
+  // Get canvas state for AI context
+  const { canvas } = useCanvas();
+  const canvasState = useCanvasStateSnapshot(canvas);
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);

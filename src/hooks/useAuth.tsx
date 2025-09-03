@@ -159,6 +159,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isAuthenticated = !!user;
 
+  // Get access token for API calls
+  const getToken = async (): Promise<string | null> => {
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error || !session) {
+        console.error('Error getting session for token:', error);
+        return null;
+      }
+      return session.access_token;
+    } catch (error) {
+      console.error('Error getting access token:', error);
+      return null;
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -172,6 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signInWithOtp,
         verifyOtp,
         signOut,
+        getToken,
         // Legacy methods for backward compatibility
         login,
         logout,

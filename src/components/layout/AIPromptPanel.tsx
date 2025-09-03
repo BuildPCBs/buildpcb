@@ -4,6 +4,8 @@ import { useState } from "react";
 import { ThinkingIndicator } from "./ThinkingIndicator";
 import { PromptEntry } from "./PromptEntry";
 import { useAIChat } from "../../contexts/AIChatContext";
+import { useCanvas } from "../../contexts/CanvasContext";
+import { useCanvasStateSnapshot } from "../../hooks/useCanvasState";
 
 interface AIPromptPanelProps {
   className?: string;
@@ -22,18 +24,23 @@ export function AIPromptPanel({
     handlePromptSubmit: contextHandlePromptSubmit,
   } = useAIChat();
 
+  // Get canvas state for AI context
+  const { canvas } = useCanvas();
+  const canvasState = useCanvasStateSnapshot(canvas);
+
   // Use context isThinking, then external isThinking, then local state
   const currentIsThinking = contextIsThinking || isThinking || localIsThinking;
 
   const handlePromptSubmit = async (prompt: string) => {
     console.log("AI Prompt submitted:", prompt);
+    console.log("Canvas state for AI:", canvasState);
 
     if (onPromptSubmit) {
       // Use external handler if provided
       await onPromptSubmit(prompt);
     } else {
-      // Use context handler
-      await contextHandlePromptSubmit(prompt);
+      // Use context handler with canvas state
+      await contextHandlePromptSubmit(prompt, canvasState);
     }
   };
 

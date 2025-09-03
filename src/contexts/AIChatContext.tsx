@@ -4,10 +4,10 @@ import React, {
   createContext,
   useContext,
   useState,
-  useRef,
   ReactNode,
   useEffect,
 } from "react";
+import { useAuth } from "../hooks/useAuth";
 
 export interface ChatMessage {
   id: string;
@@ -26,7 +26,7 @@ interface AIChatContextType {
   setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   setIsThinking: (thinking: boolean) => void;
   setCurrentMessageIndex: (index: number) => void;
-  handlePromptSubmit: (prompt: string) => Promise<void>;
+  handlePromptSubmit: (prompt: string, canvasState?: any) => Promise<void>;
 }
 
 const AIChatContext = createContext<AIChatContextType | undefined>(undefined);
@@ -51,12 +51,13 @@ export function AIChatProvider({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isThinking, setIsThinking] = useState(false);
   const [currentMessageIndex, setCurrentMessageIndex] = useState(-1);
-
-  const addMessage = (message: ChatMessage) => {
+  
+  // Get auth token for API calls
+  const { getToken, isAuthenticated } = useAuth();  const addMessage = (message: ChatMessage) => {
     setMessages((prev) => [...prev, message]);
   };
 
-  const handlePromptSubmit = async (prompt: string) => {
+  const handlePromptSubmit = async (prompt: string, canvasState?: any) => {
     if (!prompt.trim()) return;
 
     // Add user message
@@ -84,15 +85,27 @@ export function AIChatProvider({
     addMessage(receivingMessage);
 
     try {
-      // Call our AI Agent API
+      // Check authentication
+      if (!isAuthenticated) {
+        throw new Error("Authentication required");
+      }
+
+      // Get auth token
+      const token = await getToken();
+      if (!token) {
+        throw new Error("Failed to get authentication token");
+      }
+
+      // Call our AI Agent API with authentication
       const response = await fetch("/api/ai-agent", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
         },
         body: JSON.stringify({
           message: prompt,
-          canvasState: null, // TODO: Get from canvas context
+          canvasState: canvasState || null, // Use passed canvas state or null
           conversationHistory: messages,
           sessionId: "main-session",
         }),

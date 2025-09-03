@@ -81,7 +81,9 @@ export default function RootLayout({
     <html lang="en">
       <body className={dm_sans.className}>
         <AuthProvider>
-          {children}
+          <RouteGuard>
+            {children}
+          </RouteGuard>
           <AuthOverlayWrapper />
         </AuthProvider>
       </body>

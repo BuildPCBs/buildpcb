@@ -12,19 +12,23 @@ interface RouteGuardProps {
 
 // List of routes that require authentication
 const PROTECTED_ROUTES = [
+  '/', // IDE route - main application
   '/dashboard',
   '/profile', 
   '/projects',
-  '/settings'
+  '/settings',
+  '/test', // Test pages require auth
+  '/fabric-test' // Development test pages require auth
 ];
 
 // List of public routes that don't require auth
 const PUBLIC_ROUTES = [
-  '/',
   '/login',
+  '/signup',
   '/about',
   '/contact',
-  '/fabric-test' // Allow fabric test page
+  '/forgot-password',
+  '/reset-password'
 ];
 
 export function RouteGuard({ 

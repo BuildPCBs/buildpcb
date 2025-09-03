@@ -22,13 +22,16 @@ export function ThinkingIndicator({
           height: 25,
           borderRadius: 6,
           bottom: 137, // 32 (bottom margin) + 97 (prompt height) + 8 (gap)
+          right: 32, // Same right margin as toolbar
+          borderWidth: 1,
         }),
-        right: responsive(32), // Same right margin as toolbar
         backgroundColor: "#FFF5D1",
         border: "1px solid #D6A800",
-        borderWidth: responsive(1),
         zIndex: 10,
-        padding: `0 ${responsive(12)}`,
+        paddingTop: 0,
+        paddingBottom: 0,
+        paddingLeft: responsive(12),
+        paddingRight: responsive(12),
       }}
     >
       {/* Animated Three-Dot Loader */}

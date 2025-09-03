@@ -14,6 +14,7 @@ export interface AuthContextType {
   signInWithOtp: (email: string) => Promise<{ error: any }>
   verifyOtp: (email: string, token: string) => Promise<{ error: any }>
   signOut: () => Promise<{ error: any }>
+  getToken: () => Promise<string | null>
   // Legacy methods for backward compatibility
   login: () => void
   logout: () => Promise<{ error: any }>

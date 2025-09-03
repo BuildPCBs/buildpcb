@@ -10,3 +10,5 @@ export {
 } from "./useUtils";
 export { usePreventBrowserZoom } from "./usePreventBrowserZoom";
 export { useOverrideBrowserControls } from "./useOverrideBrowserControls";
+export { useCanvasState, useCanvasStateSnapshot } from "./useCanvasState";
+export type { CanvasState, ComponentData, ConnectionData, CanvasMetadata } from "./useCanvasState";

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
+import { withAuth, AuthenticatedUser } from "@/lib/api-auth";
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -31,8 +32,10 @@ interface CircuitResponse {
   };
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withAuth(async (request: NextRequest, user: AuthenticatedUser) => {
   try {
+    console.log(`🤖 AI Agent API called by user: ${user.email}`);
+    
     const body: ChatRequest = await request.json();
     const { message, canvasState, conversationHistory = [] } = body;
 
@@ -141,7 +144,7 @@ Respond in JSON format following the CircuitResponse schema. If it's a simple qu
       { status: 500 }
     );
   }
-}
+});
 
 export async function GET() {
   return NextResponse.json({

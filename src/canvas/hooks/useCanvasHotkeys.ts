@@ -47,14 +47,20 @@ export function useCanvasHotkeys({
     if (!enabled || !canvas) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Check if we're in an input field - don't trigger shortcuts
+      // Enhanced input field detection - don't trigger shortcuts when typing
       const activeElement = document.activeElement;
       if (
         activeElement &&
         (activeElement.tagName === "INPUT" ||
           activeElement.tagName === "TEXTAREA" ||
-          (activeElement as HTMLElement).contentEditable === "true")
+          activeElement.tagName === "SELECT" ||
+          (activeElement as HTMLElement).contentEditable === "true" ||
+          (activeElement as HTMLElement).isContentEditable ||
+          activeElement.closest('[contenteditable="true"]') ||
+          activeElement.closest('input') ||
+          activeElement.closest('textarea'))
       ) {
+        console.log("🔇 Hotkeys disabled - user is typing in:", activeElement.tagName);
         return;
       }
 

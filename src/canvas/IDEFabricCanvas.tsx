@@ -13,6 +13,7 @@ import { createSVGComponent } from "./SVGComponentFactory";
 import { ContextMenu } from "./ui/ContextMenu";
 import { HorizontalRuler } from "./ui/HorizontalRuler";
 import { VerticalRuler } from "./ui/VerticalRuler";
+import { CanvasProvider } from "../contexts/CanvasContext";
 
 interface IDEFabricCanvasProps {
   className?: string;
@@ -981,125 +982,127 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
   }, [fabricCanvas]);
 
   return (
-    <div
-      ref={containerRef}
-      className={`w-full h-full canvas-container ${className}`}
-      style={{ width: "100%", height: "100%" }}
-    >
-      {/* Rulers Layout - Only visible when manipulating objects */}
-      <div className="relative w-full h-full">
-        {areRulersVisible && (
-          <>
-            {/* Top-left corner space */}
-            <div
-              className="absolute top-0 left-0 border-b border-r border-gray-300"
-              style={{
-                width: rulerSize,
-                height: rulerSize,
-                background: "linear-gradient(135deg, #fafafa 0%, #f0f0f0 100%)",
-                zIndex: 10,
-              }}
-            />
-
-            {/* Horizontal Ruler */}
-            <div
-              className="absolute top-0"
-              style={{
-                left: rulerSize,
-                width: canvasDimensions.width,
-                height: rulerSize,
-                zIndex: 10,
-              }}
-            >
-              <HorizontalRuler
-                width={canvasDimensions.width}
-                height={rulerSize}
-                viewportTransform={viewportState.viewportTransform}
-                zoom={viewportState.zoom}
+    <CanvasProvider canvas={fabricCanvas}>
+      <div
+        ref={containerRef}
+        className={`w-full h-full canvas-container ${className}`}
+        style={{ width: "100%", height: "100%" }}
+      >
+        {/* Rulers Layout - Only visible when manipulating objects */}
+        <div className="relative w-full h-full">
+          {areRulersVisible && (
+            <>
+              {/* Top-left corner space */}
+              <div
+                className="absolute top-0 left-0 border-b border-r border-gray-300"
+                style={{
+                  width: rulerSize,
+                  height: rulerSize,
+                  background: "linear-gradient(135deg, #fafafa 0%, #f0f0f0 100%)",
+                  zIndex: 10,
+                }}
               />
-            </div>
 
-            {/* Vertical Ruler */}
-            <div
-              className="absolute left-0"
-              style={{
-                top: rulerSize,
-                width: rulerSize,
-                height: canvasDimensions.height,
-                zIndex: 10,
-              }}
-            >
-              <VerticalRuler
-                width={rulerSize}
-                height={canvasDimensions.height}
-                viewportTransform={viewportState.viewportTransform}
-                zoom={viewportState.zoom}
-              />
-            </div>
-          </>
+              {/* Horizontal Ruler */}
+              <div
+                className="absolute top-0"
+                style={{
+                  left: rulerSize,
+                  width: canvasDimensions.width,
+                  height: rulerSize,
+                  zIndex: 10,
+                }}
+              >
+                <HorizontalRuler
+                  width={canvasDimensions.width}
+                  height={rulerSize}
+                  viewportTransform={viewportState.viewportTransform}
+                  zoom={viewportState.zoom}
+                />
+              </div>
+
+              {/* Vertical Ruler */}
+              <div
+                className="absolute left-0"
+                style={{
+                  top: rulerSize,
+                  width: rulerSize,
+                  height: canvasDimensions.height,
+                  zIndex: 10,
+                }}
+              >
+                <VerticalRuler
+                  width={rulerSize}
+                  height={canvasDimensions.height}
+                  viewportTransform={viewportState.viewportTransform}
+                  zoom={viewportState.zoom}
+                />
+              </div>
+            </>
+          )}
+
+          {/* Main Canvas */}
+          <div
+            className="absolute"
+            style={{
+              top: areRulersVisible ? rulerSize : 0,
+              left: areRulersVisible ? rulerSize : 0,
+              width: areRulersVisible ? canvasDimensions.width : "100%",
+              height: areRulersVisible ? canvasDimensions.height : "100%",
+            }}
+          >
+            <canvas ref={canvasRef} />
+          </div>
+        </div>
+
+        {/* Context Menu - PART 2: Direct Function Connection Test */}
+        <ContextMenu
+          visible={menuState.visible}
+          top={menuState.y}
+          left={menuState.x}
+          menuType={menuState.type}
+          canPaste={clipboard !== null}
+          onClose={() => setMenuState((prev) => ({ ...prev, visible: false }))}
+          onGroup={handleGroup}
+          onUngroup={handleUngroup}
+          onDelete={handleDelete}
+          onCopy={handleCopy}
+          onPaste={handleContextPaste}
+        />
+
+        {/* Optional debug info */}
+        {panState.isPanMode && (
+          <div className="absolute top-2 left-2 bg-black bg-opacity-75 text-white px-2 py-1 rounded text-xs">
+            Pan Mode {panState.isDragging ? "- Dragging" : ""}
+          </div>
         )}
 
-        {/* Main Canvas */}
-        <div
-          className="absolute"
-          style={{
-            top: areRulersVisible ? rulerSize : 0,
-            left: areRulersVisible ? rulerSize : 0,
-            width: areRulersVisible ? canvasDimensions.width : "100%",
-            height: areRulersVisible ? canvasDimensions.height : "100%",
-          }}
-        >
-          <canvas ref={canvasRef} />
+        {/* Grid and Snap indicator */}
+        <div className="absolute bottom-2 left-2 bg-green-600 bg-opacity-90 text-white px-2 py-1 rounded text-xs">
+          Grid: {gridSize}px • INTELLIGENT SVG • R=rotate • W=wire
         </div>
-      </div>
 
-      {/* Context Menu - PART 2: Direct Function Connection Test */}
-      <ContextMenu
-        visible={menuState.visible}
-        top={menuState.y}
-        left={menuState.x}
-        menuType={menuState.type}
-        canPaste={clipboard !== null}
-        onClose={() => setMenuState((prev) => ({ ...prev, visible: false }))}
-        onGroup={handleGroup}
-        onUngroup={handleUngroup}
-        onDelete={handleDelete}
-        onCopy={handleCopy}
-        onPaste={handleContextPaste}
-      />
-
-      {/* Optional debug info */}
-      {panState.isPanMode && (
-        <div className="absolute top-2 left-2 bg-black bg-opacity-75 text-white px-2 py-1 rounded text-xs">
-          Pan Mode {panState.isDragging ? "- Dragging" : ""}
-        </div>
-      )}
-
-      {/* Grid and Snap indicator */}
-      <div className="absolute bottom-2 left-2 bg-green-600 bg-opacity-90 text-white px-2 py-1 rounded text-xs">
-        Grid: {gridSize}px • INTELLIGENT SVG • R=rotate • W=wire
-      </div>
-
-      {/* Wire mode indicator - Professional-grade wiring tool */}
-      {wiringTool.isWireMode && (
-        <div className="absolute top-2 right-2 bg-blue-600 bg-opacity-90 text-white px-3 py-2 rounded text-sm font-medium">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-            <span>
-              {wiringTool.wireState === "idle" &&
-                "Wire Mode - Click pin to start"}
-              {wiringTool.wireState === "drawing" &&
-                "Drawing - Click to add waypoint"}
-              {wiringTool.wireState === "finishing" &&
-                "Finishing - Click pin to complete"}
-            </span>
+        {/* Wire mode indicator - Professional-grade wiring tool */}
+        {wiringTool.isWireMode && (
+          <div className="absolute top-2 right-2 bg-blue-600 bg-opacity-90 text-white px-3 py-2 rounded text-sm font-medium">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+              <span>
+                {wiringTool.wireState === "idle" &&
+                  "Wire Mode - Click pin to start"}
+                {wiringTool.wireState === "drawing" &&
+                  "Drawing - Click to add waypoint"}
+                {wiringTool.wireState === "finishing" &&
+                  "Finishing - Click pin to complete"}
+              </span>
+            </div>
+            <div className="text-xs opacity-80 mt-1">
+              Press W to toggle • ESC to cancel • Right-click to cancel
+            </div>
           </div>
-          <div className="text-xs opacity-80 mt-1">
-            Press W to toggle • ESC to cancel • Right-click to cancel
-          </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </CanvasProvider>
   );
 }
 

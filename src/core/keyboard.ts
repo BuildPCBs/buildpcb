@@ -116,6 +116,23 @@ class KeyboardManager {
   }
 
   private checkShortcuts(event: KeyboardEvent) {
+    // Enhanced input field detection - don't trigger shortcuts when typing
+    const activeElement = document.activeElement;
+    if (
+      activeElement &&
+      (activeElement.tagName === "INPUT" ||
+        activeElement.tagName === "TEXTAREA" ||
+        activeElement.tagName === "SELECT" ||
+        (activeElement as HTMLElement).contentEditable === "true" ||
+        (activeElement as HTMLElement).isContentEditable ||
+        activeElement.closest('[contenteditable="true"]') ||
+        activeElement.closest('input') ||
+        activeElement.closest('textarea'))
+    ) {
+      console.log("🔇 Global shortcuts disabled - user is typing in:", activeElement.tagName);
+      return;
+    }
+
     const currentKeys = Array.from(this.pressedKeys).sort();
     const shortcutKey = currentKeys.join("+");
 
