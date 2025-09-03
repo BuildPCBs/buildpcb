@@ -68,7 +68,7 @@ export function AIPromptPanel({
   return (
     <div className={`relative ${className}`}>
       {/* Thinking Indicator */}
-      <ThinkingIndicator isVisible={currentIsThinking} />
+      {/* <ThinkingIndicator isVisible={currentIsThinking} /> */}
 
       {/* Prompt Entry */}
       <PromptEntry
