@@ -65,11 +65,13 @@ export function PromptEntry({
     >
       {/* Main Prompt Box */}
       <div
-        className="relative border border-gray-300 h-full"
+        className="relative h-full"
         style={{
           borderRadius: responsive(12),
           borderWidth: responsive(1),
-          backgroundColor: "#FFFFFF", // White background as requested
+          borderColor: "#DDDDDD", // Border color
+          borderStyle: "solid",
+          backgroundColor: "#F5F5F5", // Light gray fill as requested
         }}
       >
         {/* Prompt Text Area */}
@@ -83,7 +85,7 @@ export function PromptEntry({
             className="w-full h-full resize-none border-none rounded-xl transition-all focus:outline-none focus:ring-0 focus:border-gray-400"
             style={{
               backgroundColor: "transparent",
-              color: "#999999",
+              color: prompt.trim() ? "#000000" : "#999999", // Black when typing, gray placeholder
               fontSize: responsive(12),
               padding: `${responsive(12)} ${responsive(12)} ${responsive(
                 45

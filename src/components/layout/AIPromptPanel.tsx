@@ -3,23 +3,38 @@
 import { useState } from "react";
 import { ThinkingIndicator } from "./ThinkingIndicator";
 import { PromptEntry } from "./PromptEntry";
+import { useAIChat } from "../../contexts/AIChatContext";
 
 interface AIPromptPanelProps {
   className?: string;
+  onPromptSubmit?: (prompt: string) => Promise<void>;
+  isThinking?: boolean;
 }
 
-export function AIPromptPanel({ className = "" }: AIPromptPanelProps) {
-  const [isThinking, setIsThinking] = useState(false);
+export function AIPromptPanel({
+  className = "",
+  onPromptSubmit,
+  isThinking = false,
+}: AIPromptPanelProps) {
+  const [localIsThinking, setLocalIsThinking] = useState(false);
+  const {
+    isThinking: contextIsThinking,
+    handlePromptSubmit: contextHandlePromptSubmit,
+  } = useAIChat();
+
+  // Use context isThinking, then external isThinking, then local state
+  const currentIsThinking = contextIsThinking || isThinking || localIsThinking;
 
   const handlePromptSubmit = async (prompt: string) => {
     console.log("AI Prompt submitted:", prompt);
-    setIsThinking(true);
 
-    // Simulate AI thinking time
-    setTimeout(() => {
-      setIsThinking(false);
-      console.log("AI finished thinking");
-    }, 3000);
+    if (onPromptSubmit) {
+      // Use external handler if provided
+      await onPromptSubmit(prompt);
+    } else {
+      // Use context handler
+      await contextHandlePromptSubmit(prompt);
+    }
   };
 
   const handleMicClick = () => {
@@ -40,7 +55,7 @@ export function AIPromptPanel({ className = "" }: AIPromptPanelProps) {
   return (
     <div className={`relative ${className}`}>
       {/* Thinking Indicator */}
-      <ThinkingIndicator isVisible={isThinking} />
+      <ThinkingIndicator isVisible={currentIsThinking} />
 
       {/* Prompt Entry */}
       <PromptEntry
@@ -48,7 +63,7 @@ export function AIPromptPanel({ className = "" }: AIPromptPanelProps) {
         onMicClick={handleMicClick}
         onDotsClick={handleDotsClick}
         onSendClick={handleSendClick}
-        isThinking={isThinking}
+        isThinking={currentIsThinking}
       />
     </div>
   );

@@ -3,16 +3,19 @@
 import { SchemaPanel } from "./SchemaPanel";
 import { TopToolbar } from "./TopToolbar";
 import { AIPromptPanel } from "./AIPromptPanel";
+import { AIChatInterface } from "../ai/AIChatInterface";
 import { DeviceRestriction } from "./DeviceRestriction";
 import { IDEFabricCanvas } from "@/canvas";
 import { useOverrideBrowserControls } from "@/hooks/useOverrideBrowserControls";
+import { AIChatProvider } from "../../contexts/AIChatContext";
+import { responsive } from "@/lib/responsive";
 
 export function IDECanvas() {
   // Override all browser mouse/keyboard controls
   useOverrideBrowserControls();
 
   return (
-    <>
+    <AIChatProvider>
       {/* Show restriction message on smaller screens */}
       <DeviceRestriction />
 
@@ -33,6 +36,23 @@ export function IDECanvas() {
 
           {/* Top Toolbar positioned absolutely on top of canvas */}
           <TopToolbar />
+
+          {/* AI Chat Interface - positioned above PromptEntry */}
+          <div
+            className="absolute z-20"
+            style={{
+              bottom: responsive(180), // 32 (prompt bottom) + 97 (prompt height) + 25 (thinking height) + 15 (spacing: 10 + 5)
+              right: responsive(32), // Match PromptEntry's responsive(32)
+              width: responsive(338), // Match PromptEntry's exact width
+            }}
+          >
+            <AIChatInterface
+              onCircuitUpdate={(changes) => {
+                console.log("Circuit changes from AI:", changes);
+                // TODO: Apply circuit changes to canvas
+              }}
+            />
+          </div>
         </div>
 
         {/* AI Prompt Panel - Fixed at bottom, always visible */}
@@ -40,6 +60,6 @@ export function IDECanvas() {
           <AIPromptPanel />
         </div>
       </div>
-    </>
+    </AIChatProvider>
   );
 }
