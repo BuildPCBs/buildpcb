@@ -69,13 +69,71 @@ export class DatabaseService {
    * Get all projects for the current user
    */
   static async getUserProjects(): Promise<Project[]> {
+    console.log("🔍 Getting user projects...");
+
+    // Check if user is authenticated
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+    if (userError) {
+      console.error("❌ Auth error getting user:", userError);
+      throw new Error(`Authentication error: ${userError.message}`);
+    }
+
+    if (!user) {
+      console.error("❌ No authenticated user found");
+      throw new Error("User not authenticated");
+    }
+
+    console.log("✅ User authenticated:", user.email);
+
     const { data, error } = await supabase
       .from("projects")
       .select("*")
       .order("updated_at", { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error("❌ Database error getting projects:", error);
+      throw new Error(`Database error: ${error.message}`);
+    }
+
+    console.log("✅ Projects retrieved:", data?.length || 0, "projects");
     return data || [];
+  }
+
+  /**
+   * Get a specific project by ID
+   */
+  static async getProject(projectId: string): Promise<Project | null> {
+    console.log("🔍 Getting project by ID:", projectId);
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+    if (userError || !user) {
+      throw new Error("User not authenticated");
+    }
+
+    const { data, error } = await supabase
+      .from("projects")
+      .select("*")
+      .eq("id", projectId)
+      .single();
+
+    if (error) {
+      if (error.code === "PGRST116") {
+        // No rows returned
+        console.log("❌ Project not found:", projectId);
+        return null;
+      }
+      console.error("❌ Database error getting project:", error);
+      throw new Error(`Database error: ${error.message}`);
+    }
+
+    console.log("✅ Project retrieved:", data.name);
+    return data;
   }
 
   /**
@@ -97,10 +155,18 @@ export class DatabaseService {
    * Create a new project
    */
   static async createProject(projectData: Partial<Project>): Promise<Project> {
+    console.log("🆕 Creating new project...", { name: projectData.name });
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
+
+    if (!user) {
+      console.error("❌ No authenticated user for project creation");
+      throw new Error("User not authenticated");
+    }
+
+    console.log("✅ User authenticated for project creation:", user.email);
 
     const { data, error } = await supabase
       .from("projects")
@@ -113,10 +179,23 @@ export class DatabaseService {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error("❌ Database error creating project:", error);
+      throw new Error(`Failed to create project: ${error.message}`);
+    }
+
+    console.log("✅ Project created successfully:", data.name, "ID:", data.id);
 
     // Log activity
-    await this.logActivity(data.id, "project_created", "Project created");
+    try {
+      await this.logActivity(data.id, "project_created", "Project created");
+    } catch (activityError) {
+      console.warn(
+        "⚠️ Could not log project creation activity:",
+        activityError
+      );
+      // Don't fail the project creation if activity logging fails
+    }
 
     return data;
   }

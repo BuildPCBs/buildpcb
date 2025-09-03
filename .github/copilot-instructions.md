@@ -97,8 +97,8 @@ Expected: A working component selector that allows dragging components onto the 
 - Never mention tool names to you (e.g., don't say "I'll use the replace_string_in_file tool")
 - Focus on what I'm doing, not how I'm doing it
 - Use tools efficiently - read large chunks rather than many small reads
-
-**Code Presentation**:
+- Never create fallback services, we should fix the exact one we want to use
+  **Code Presentation**:
 
 - Use proper markdown formatting
 - Wrap filenames and symbols in backticks: `ComponentFactory.tsx`

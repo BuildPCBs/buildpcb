@@ -21,8 +21,8 @@ export function ThinkingIndicator({
           width: 338,
           height: 25,
           borderRadius: 6,
-          bottom: 137, // 32 (bottom margin) + 97 (prompt height) + 8 (gap)
-          right: 32, // Same right margin as toolbar
+          bottom: responsive(137), // 32 (bottom margin) + 97 (prompt height) + 8 (gap)
+          right: responsive(32), // Same right margin as toolbar
           borderWidth: 1,
         }),
         backgroundColor: "#FFF5D1",

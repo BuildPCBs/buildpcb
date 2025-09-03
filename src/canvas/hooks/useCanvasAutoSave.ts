@@ -4,7 +4,10 @@ import { useEffect, useCallback, useRef } from "react";
 import * as fabric from "fabric";
 import { useProjectStore } from "@/store/projectStore";
 import { useAutoSave } from "@/hooks/useDatabase";
-import { serializeCanvasToCircuit, serializeCanvasData } from "@/canvas/utils/canvasSerializer";
+import {
+  serializeCanvasToCircuit,
+  serializeCanvasData,
+} from "@/canvas/utils/canvasSerializer";
 
 interface UseCanvasAutoSaveOptions {
   canvas: fabric.Canvas | null;
@@ -38,10 +41,35 @@ export function useCanvasAutoSave({
   const getCurrentCanvasData = useCallback(() => {
     if (!canvas) return { circuit: null, canvasData: {} };
 
-    const circuit = serializeCanvasToCircuit(canvas);
-    const canvasData = serializeCanvasData(canvas);
+    try {
+      const circuit = serializeCanvasToCircuit(canvas);
+      const canvasData = serializeCanvasData(canvas);
 
-    return { circuit, canvasData };
+      // Validate that we have meaningful data before saving
+      if (!circuit || !circuit.components || circuit.components.length === 0) {
+        console.log("🔄 Auto-save: No components to save yet, skipping");
+        return { circuit: null, canvasData: {} };
+      }
+
+      // Check if all components have required metadata
+      const incompleteComponents = circuit.components.filter(
+        (comp) =>
+          !comp.id || !comp.type || !comp.category || !comp.specifications
+      );
+
+      if (incompleteComponents.length > 0) {
+        console.log(
+          "🔄 Auto-save: Some components missing metadata, skipping save"
+        );
+        console.log("Incomplete components:", incompleteComponents);
+        return { circuit: null, canvasData: {} };
+      }
+
+      return { circuit, canvasData };
+    } catch (error) {
+      console.error("❌ Auto-save: Failed to serialize canvas data:", error);
+      return { circuit: null, canvasData: {} };
+    }
   }, [canvas]);
 
   // Use the database auto-save hook
@@ -65,14 +93,17 @@ export function useCanvasAutoSave({
     changeTimeout.current = setTimeout(() => {
       try {
         const currentState = JSON.stringify(canvas.toJSON());
-        
+
         if (currentState !== lastCanvasState.current) {
           console.log("🎨 Canvas changed, marking project as dirty");
           lastCanvasState.current = currentState;
           markDirty();
         }
       } catch (error) {
-        console.error("Failed to serialize canvas for change detection:", error);
+        console.error(
+          "Failed to serialize canvas for change detection:",
+          error
+        );
       }
     }, 500); // 500ms debounce
   }, [canvas, projectId, markDirty]);
@@ -84,13 +115,13 @@ export function useCanvasAutoSave({
     console.log("🔄 Setting up canvas auto-save listeners");
 
     // Canvas modification events with proper typing
-    canvas.on('object:added', handleCanvasChange);
-    canvas.on('object:removed', handleCanvasChange);
-    canvas.on('object:modified', handleCanvasChange);
-    canvas.on('object:moving', handleCanvasChange);
-    canvas.on('object:scaling', handleCanvasChange);
-    canvas.on('object:rotating', handleCanvasChange);
-    canvas.on('path:created', handleCanvasChange);
+    canvas.on("object:added", handleCanvasChange);
+    canvas.on("object:removed", handleCanvasChange);
+    canvas.on("object:modified", handleCanvasChange);
+    canvas.on("object:moving", handleCanvasChange);
+    canvas.on("object:scaling", handleCanvasChange);
+    canvas.on("object:rotating", handleCanvasChange);
+    canvas.on("path:created", handleCanvasChange);
 
     // Initialize last state
     try {
@@ -100,14 +131,14 @@ export function useCanvasAutoSave({
     }
 
     return () => {
-      canvas.off('object:added', handleCanvasChange);
-      canvas.off('object:removed', handleCanvasChange);
-      canvas.off('object:modified', handleCanvasChange);
-      canvas.off('object:moving', handleCanvasChange);
-      canvas.off('object:scaling', handleCanvasChange);
-      canvas.off('object:rotating', handleCanvasChange);
-      canvas.off('path:created', handleCanvasChange);
-      
+      canvas.off("object:added", handleCanvasChange);
+      canvas.off("object:removed", handleCanvasChange);
+      canvas.off("object:modified", handleCanvasChange);
+      canvas.off("object:moving", handleCanvasChange);
+      canvas.off("object:scaling", handleCanvasChange);
+      canvas.off("object:rotating", handleCanvasChange);
+      canvas.off("path:created", handleCanvasChange);
+
       if (changeTimeout.current) {
         clearTimeout(changeTimeout.current);
       }
@@ -145,10 +176,10 @@ export function useCanvasAutoSave({
     saving: autoSave.saving,
     error: autoSave.error,
     isDirty,
-    
+
     // Manual controls
     saveNow,
-    
+
     // Current data (for debugging)
     getCurrentCanvasData,
   };

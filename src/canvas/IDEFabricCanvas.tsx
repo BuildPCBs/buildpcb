@@ -63,6 +63,15 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
   // Project store for auto-save integration
   const { projectId, projectName, isDirty } = useProjectStore();
 
+  // Debug: Log store state
+  useEffect(() => {
+    console.log("🎯 CANVAS: Store state changed:", {
+      projectId,
+      projectName,
+      isDirty,
+    });
+  }, [projectId, projectName, isDirty]);
+
   // Auto-save functionality
   const autoSave = useCanvasAutoSave({
     canvas: fabricCanvas,
@@ -216,6 +225,21 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
       window.removeEventListener("resize", handleWindowResize);
     };
   }, [fabricCanvas, rulerSize]);
+
+  // Handle canvas offset recalculation when ruler visibility changes
+  useEffect(() => {
+    if (!fabricCanvas) return;
+
+    // Recalculate canvas offset when ruler visibility changes
+    // This prevents fabric.js from losing track of object positions
+    setTimeout(() => {
+      fabricCanvas.calcOffset();
+      fabricCanvas.renderAll();
+      console.log(
+        "🔄 CANVAS: Recalculated offset due to ruler visibility change"
+      );
+    }, 0);
+  }, [fabricCanvas, areRulersVisible]);
 
   // PART 2: Component-Wire Follow Logic + Ruler Visibility + Snap-to-Grid + Alignment Guides
   useEffect(() => {
@@ -730,33 +754,53 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
       // Check if this is a component that needs pin recreation
       const componentData = cloned.data;
       const componentType = cloned.componentType;
-      
-      if (componentData && componentData.type === "component" && componentType) {
-        console.log(`🔄 Pasted component detected: ${componentData.componentName || componentType}`);
-        
+
+      if (
+        componentData &&
+        componentData.type === "component" &&
+        componentType
+      ) {
+        console.log(
+          `🔄 Pasted component detected: ${
+            componentData.componentName || componentType
+          }`
+        );
+
         // Dynamically import the appropriate pin recreation function based on component characteristics
         const recreateComponentPins = async () => {
           try {
             // Try SVG factory first (most feature-complete)
-            const { recreateComponentPins: svgRecreate } = await import("./SVGComponentFactory");
+            const { recreateComponentPins: svgRecreate } = await import(
+              "./SVGComponentFactory"
+            );
             let recreatedComponent = svgRecreate(cloned, fabricCanvas);
-            
+
             // If that didn't work, try intelligent factory
             if (!recreatedComponent || recreatedComponent === cloned) {
-              const { recreateIntelligentComponentPins } = await import("./IntelligentComponentFactory");
-              recreatedComponent = recreateIntelligentComponentPins(cloned, fabricCanvas);
+              const { recreateIntelligentComponentPins } = await import(
+                "./IntelligentComponentFactory"
+              );
+              recreatedComponent = recreateIntelligentComponentPins(
+                cloned,
+                fabricCanvas
+              );
             }
-            
+
             // If that didn't work, try simple factory
             if (!recreatedComponent || recreatedComponent === cloned) {
-              const { recreateSimpleComponentPins } = await import("./SimpleComponentFactory");
-              recreatedComponent = recreateSimpleComponentPins(cloned, fabricCanvas);
+              const { recreateSimpleComponentPins } = await import(
+                "./SimpleComponentFactory"
+              );
+              recreatedComponent = recreateSimpleComponentPins(
+                cloned,
+                fabricCanvas
+              );
             }
-            
+
             fabricCanvas.add(recreatedComponent);
             fabricCanvas.setActiveObject(recreatedComponent);
             fabricCanvas.renderAll();
-            
+
             console.log(
               `--- ACTION SUCCESS: handlePaste with pin recreation at position (${pastePos.x}, ${pastePos.y}) ---`
             );
@@ -766,13 +810,13 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
             fabricCanvas.add(cloned);
             fabricCanvas.setActiveObject(cloned);
             fabricCanvas.renderAll();
-            
+
             console.log(
               `--- ACTION SUCCESS: handlePaste (fallback) at position (${pastePos.x}, ${pastePos.y}) ---`
             );
           }
         };
-        
+
         recreateComponentPins();
       } else {
         // Regular object - just add it
@@ -962,7 +1006,8 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
     const handleClick = (e: MouseEvent) => {
       // Close context menu on any regular click, but not on right-click
       // Right-click (button 2) should not close the menu that it just opened
-      if (e.button === 0) { // Only close on left-click
+      if (e.button === 0) {
+        // Only close on left-click
         setMenuState((prev) => ({ ...prev, visible: false }));
       }
     };
@@ -1010,7 +1055,8 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
                 style={{
                   width: rulerSize,
                   height: rulerSize,
-                  background: "linear-gradient(135deg, #fafafa 0%, #f0f0f0 100%)",
+                  background:
+                    "linear-gradient(135deg, #fafafa 0%, #f0f0f0 100%)",
                   zIndex: 10,
                 }}
               />
@@ -1130,10 +1176,15 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
               <span>
                 {autoSave.saving && "Saving..."}
                 {!autoSave.saving && isDirty && "Unsaved changes"}
-                {!autoSave.saving && !isDirty && autoSave.lastSaved && 
+                {!autoSave.saving &&
+                  !isDirty &&
+                  autoSave.lastSaved &&
                   `Saved ${autoSave.lastSaved.toLocaleTimeString()}`}
-                {!autoSave.saving && !isDirty && !autoSave.lastSaved && 
-                  projectName || "Project"}
+                {(!autoSave.saving &&
+                  !isDirty &&
+                  !autoSave.lastSaved &&
+                  projectName) ||
+                  "Project"}
               </span>
             </div>
             {autoSave.error && (
@@ -1166,14 +1217,30 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
       y?: number;
     }) => {
       console.log("🎯 SVG: Component command received for", payload.name);
+      console.log("🔍 CANVAS STATE: Canvas exists?", !!canvas, "Canvas size:", {
+        width: canvas?.getWidth(),
+        height: canvas?.getHeight(),
+        objects: canvas?.getObjects().length,
+      });
 
       // New intelligent component creation logic
       const createComponent = (componentInfo: typeof payload) => {
-        if (!canvas) return;
+        if (!canvas) {
+          console.error(
+            "❌ CANVAS: No canvas reference available for component creation!"
+          );
+          return;
+        }
 
         console.log(
           `🧠 INTELLIGENT: Creating ${componentInfo.name} with new intelligent SVG parsing`
         );
+        console.log("🔍 CANVAS: Using canvas with dimensions:", {
+          width: canvas.getWidth(),
+          height: canvas.getHeight(),
+          zoom: canvas.getZoom(),
+          objectCount: canvas.getObjects().length,
+        });
 
         fetch(componentInfo.svgPath)
           .then((response) => response.text())
@@ -1216,6 +1283,26 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
             const svgSymbol = new fabric.Group(symbolParts, {
               originX: "center",
               originY: "center",
+            });
+
+            // Debug: Log SVG symbol details
+            console.log("🔍 DEBUG: SVG Symbol details:", {
+              symbolParts: symbolParts.length,
+              symbolBounds: {
+                width: svgSymbol.width,
+                height: svgSymbol.height,
+                left: svgSymbol.left,
+                top: svgSymbol.top,
+              },
+              symbolPartsDetails: symbolParts.map((part) => ({
+                type: part.type,
+                width: part.width,
+                height: part.height,
+                left: part.left,
+                top: part.top,
+                visible: part.visible,
+                opacity: part.opacity,
+              })),
             });
 
             // TOP BREAD: Visible, interactive pin circles (transparent green)
@@ -1280,7 +1367,63 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
 
             // 5. Add the COMPONENT SANDWICH to the canvas - physically impossible to separate
             canvas.add(componentSandwich);
+
+            // QUICK FIX: Force center and zoom to fit after adding component
+            setTimeout(() => {
+              // Reset viewport to see all objects
+              canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
+
+              // Center the canvas on all objects
+              const allObjects = canvas.getObjects();
+              if (allObjects.length > 0) {
+                canvas.centerObjectH(componentSandwich);
+                canvas.centerObjectV(componentSandwich);
+              }
+
+              canvas.renderAll();
+              console.log(
+                "🎯 QUICK FIX: Reset viewport and centered component"
+              );
+            }, 50);
+
             canvas.renderAll();
+
+            // Debug: Log canvas state
+            console.log("🔍 DEBUG: Canvas objects after adding component:", {
+              totalObjects: canvas.getObjects().length,
+              componentPosition: {
+                left: componentSandwich.left,
+                top: componentSandwich.top,
+                width: componentSandwich.width,
+                height: componentSandwich.height,
+                scaleX: componentSandwich.scaleX,
+                scaleY: componentSandwich.scaleY,
+                visible: componentSandwich.visible,
+                opacity: componentSandwich.opacity,
+              },
+              canvasSize: {
+                width: canvas.getWidth(),
+                height: canvas.getHeight(),
+              },
+              viewportCenter: canvas.getVpCenter(),
+              zoom: canvas.getZoom(),
+              viewportTransform: canvas.viewportTransform,
+              // Check if component is actually within visible bounds
+              isWithinBounds: {
+                leftInBounds:
+                  (componentSandwich.left || 0) >= 0 &&
+                  (componentSandwich.left || 0) <= canvas.getWidth(),
+                topInBounds:
+                  (componentSandwich.top || 0) >= 0 &&
+                  (componentSandwich.top || 0) <= canvas.getHeight(),
+              },
+            });
+
+            // Force a manual re-render attempt
+            setTimeout(() => {
+              canvas.renderAll();
+              console.log("🔄 Force re-render completed");
+            }, 100);
 
             console.log(
               `🥪 COMPONENT SANDWICH: Added ${componentInfo.name} with ${interactivePins.length} permanently attached pins!`

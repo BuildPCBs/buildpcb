@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect } from 'react';
-import { useAuth } from '@/hooks/useAuth';
-import { usePathname } from 'next/navigation';
+import { useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { usePathname } from "next/navigation";
 
 interface RouteGuardProps {
   children: React.ReactNode;
@@ -10,69 +10,44 @@ interface RouteGuardProps {
   redirectTo?: string;
 }
 
-// List of routes that require authentication
-const PROTECTED_ROUTES = [
-  '/', // IDE route - main application
-  '/dashboard',
-  '/profile', 
-  '/projects',
-  '/settings',
-  '/test', // Test pages require auth
-  '/fabric-test' // Development test pages require auth
-];
-
-// List of public routes that don't require auth
+// List of public routes that don't require auth (everything else is protected)
 const PUBLIC_ROUTES = [
-  '/login',
-  '/signup',
-  '/about',
-  '/contact',
-  '/forgot-password',
-  '/reset-password'
+  "/login",
+  "/signup",
+  "/about",
+  "/contact",
+  "/forgot-password",
+  "/reset-password",
 ];
 
-export function RouteGuard({ 
-  children, 
+export function RouteGuard({
+  children,
   requireAuth = true,
-  redirectTo 
+  redirectTo,
 }: RouteGuardProps) {
   const { isAuthenticated, isLoading, showAuthOverlay } = useAuth();
   const pathname = usePathname();
 
   useEffect(() => {
-    // Don't wait for loading to complete - check auth in the background
-    const checkAuth = () => {
-      // Check if current route requires authentication
-      const isProtectedRoute = PROTECTED_ROUTES.some(route => 
-        pathname.startsWith(route)
-      );
-      
-      // Check if it's the IDE route (any path that's not explicitly public)
-      const isIDERoute = !PUBLIC_ROUTES.some(route => 
-        pathname === route || pathname.startsWith(route)
-      );
+    // Don't check auth while still loading
+    if (isLoading) return;
 
-      const isPublicRoute = PUBLIC_ROUTES.some(route => 
-        pathname === route || pathname.startsWith(route)
-      );
+    // Check if current route is explicitly public
+    const isPublicRoute = PUBLIC_ROUTES.some(
+      (route) => pathname === route || pathname.startsWith(route)
+    );
 
-      // If it's a protected route or IDE route and user is not authenticated
-      if ((requireAuth || isProtectedRoute || isIDERoute) && !isPublicRoute && !isAuthenticated && !isLoading) {
-        console.log('Protected/IDE route accessed without auth:', pathname);
-        showAuthOverlay();
-      }
-    };
+    // Skip auth check for public routes only
+    if (isPublicRoute) return;
 
-    // Check immediately if not loading, or after a short delay if loading
-    if (!isLoading) {
-      checkAuth();
-    } else {
-      const timer = setTimeout(checkAuth, 1000); // Check after 1 second even if still loading
-      return () => clearTimeout(timer);
+    // ALL other routes require authentication (this is an IDE)
+    if (!isAuthenticated) {
+      console.log("Protected IDE route accessed without auth:", pathname);
+      showAuthOverlay();
     }
   }, [isAuthenticated, isLoading, pathname, requireAuth, showAuthOverlay]);
 
-  // Always render children - don't block on loading
+  // Always render children - auth overlay will handle blocking
   return <>{children}</>;
 }
 

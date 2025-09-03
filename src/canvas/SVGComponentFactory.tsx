@@ -58,6 +58,78 @@ const componentConfig = {
   "temperature-sensor": { width: 45, height: 40, pinDistance: 28, pinCount: 3 },
 };
 
+// Helper function to determine component category
+function getCategoryForComponent(componentType: string): string {
+  const categoryMap: Record<string, string> = {
+    resistor: "passive",
+    capacitor: "passive",
+    inductor: "passive",
+    led: "semiconductor",
+    diode: "semiconductor",
+    transistor: "semiconductor",
+    battery: "power",
+    switch: "control",
+    connector: "connector",
+    pushbutton: "control",
+    crystal: "timing",
+    opamp: "analog-ic",
+    sensor: "sensor",
+    motor: "actuator",
+    voltage_regulator: "power",
+    arduino: "microcontroller",
+    buzzer: "actuator",
+    "display-lcd": "display",
+    fuse: "protection",
+    microcontroller: "microcontroller",
+    "photo-resistor": "sensor",
+    potentiometer: "passive",
+    relay: "control",
+    "servo-motor": "actuator",
+    "temperature-sensor": "sensor",
+  };
+  return categoryMap[componentType] || "general";
+}
+
+// Helper function to generate default specifications
+function getDefaultSpecifications(componentType: string): Record<string, any> {
+  const specMap: Record<string, Record<string, any>> = {
+    resistor: { resistance: "1kΩ", tolerance: "5%", power: "0.25W" },
+    capacitor: { capacitance: "10µF", voltage: "16V", type: "ceramic" },
+    led: { color: "red", voltage: "2.0V", current: "20mA" },
+    diode: { voltage: "0.7V", current: "1A", type: "silicon" },
+    transistor: { type: "NPN", voltage: "40V", current: "200mA" },
+    inductor: { inductance: "1mH", current: "1A", tolerance: "10%" },
+    battery: { voltage: "9V", type: "alkaline", capacity: "500mAh" },
+    switch: { type: "SPST", voltage: "250V", current: "1A" },
+    connector: { pins: 2, spacing: "2.54mm", type: "header" },
+    pushbutton: { type: "momentary", voltage: "12V", current: "50mA" },
+    crystal: { frequency: "16MHz", tolerance: "20ppm", type: "quartz" },
+    opamp: { type: "general-purpose", voltage: "±15V", bandwidth: "1MHz" },
+    sensor: { type: "digital", voltage: "3.3V", interface: "I2C" },
+    motor: { voltage: "12V", current: "500mA", type: "DC" },
+    voltage_regulator: { input: "12V", output: "5V", current: "1A" },
+    arduino: { microcontroller: "ATmega328P", voltage: "5V", pins: 20 },
+    buzzer: { voltage: "5V", frequency: "2kHz", type: "piezo" },
+    "display-lcd": { size: "16x2", voltage: "5V", interface: "parallel" },
+    fuse: { rating: "1A", voltage: "250V", type: "fast-blow" },
+    microcontroller: { architecture: "ARM", voltage: "3.3V", pins: 16 },
+    "photo-resistor": {
+      resistance: "10kΩ",
+      sensitivity: "visible",
+      type: "CdS",
+    },
+    potentiometer: { resistance: "10kΩ", taper: "linear", power: "0.5W" },
+    relay: { voltage: "12V", current: "10A", type: "SPDT" },
+    "servo-motor": { voltage: "6V", torque: "1.5kg-cm", angle: "180°" },
+    "temperature-sensor": {
+      range: "-40°C to 125°C",
+      accuracy: "±0.5°C",
+      interface: "analog",
+    },
+  };
+  return specMap[componentType] || { type: "generic", voltage: "5V" };
+}
+
 // Create functional pins for the component
 function createComponentPins(config: any, componentId: string) {
   const pins: fabric.Circle[] = [];
@@ -145,10 +217,15 @@ function createComponentPins(config: any, componentId: string) {
         originX: "center",
         originY: "center",
         left: -config.width / 2 - 5,
-        top: -config.height / 3 + (i * config.height / 4),
+        top: -config.height / 3 + (i * config.height) / 4,
       });
       leftPin.set("pin", true);
-      leftPin.set("data", { type: "pin", componentId, pinId: `pin${i + 1}`, pinNumber: i + 1 });
+      leftPin.set("data", {
+        type: "pin",
+        componentId,
+        pinId: `pin${i + 1}`,
+        pinNumber: i + 1,
+      });
 
       // Right side pins
       const rightPin = new fabric.Circle({
@@ -159,10 +236,15 @@ function createComponentPins(config: any, componentId: string) {
         originX: "center",
         originY: "center",
         left: config.width / 2 + 5,
-        top: -config.height / 3 + (i * config.height / 4),
+        top: -config.height / 3 + (i * config.height) / 4,
       });
       rightPin.set("pin", true);
-      rightPin.set("data", { type: "pin", componentId, pinId: `pin${i + 5}`, pinNumber: i + 5 });
+      rightPin.set("data", {
+        type: "pin",
+        componentId,
+        pinId: `pin${i + 5}`,
+        pinNumber: i + 5,
+      });
 
       pins.push(leftPin, rightPin);
     }
@@ -178,10 +260,15 @@ function createComponentPins(config: any, componentId: string) {
         originX: "center",
         originY: "center",
         left: -config.width / 2 - 5,
-        top: -config.height / 2 + 5 + (i * (config.height - 10) / 7),
+        top: -config.height / 2 + 5 + (i * (config.height - 10)) / 7,
       });
       leftPin.set("pin", true);
-      leftPin.set("data", { type: "pin", componentId, pinId: `pin${i + 1}`, pinNumber: i + 1 });
+      leftPin.set("data", {
+        type: "pin",
+        componentId,
+        pinId: `pin${i + 1}`,
+        pinNumber: i + 1,
+      });
 
       // Right side pins
       const rightPin = new fabric.Circle({
@@ -192,10 +279,15 @@ function createComponentPins(config: any, componentId: string) {
         originX: "center",
         originY: "center",
         left: config.width / 2 + 5,
-        top: -config.height / 2 + 5 + (i * (config.height - 10) / 7),
+        top: -config.height / 2 + 5 + (i * (config.height - 10)) / 7,
       });
       rightPin.set("pin", true);
-      rightPin.set("data", { type: "pin", componentId, pinId: `pin${i + 9}`, pinNumber: i + 9 });
+      rightPin.set("data", {
+        type: "pin",
+        componentId,
+        pinId: `pin${i + 9}`,
+        pinNumber: i + 9,
+      });
 
       pins.push(leftPin, rightPin);
     }
@@ -211,10 +303,15 @@ function createComponentPins(config: any, componentId: string) {
         originX: "center",
         originY: "center",
         left: -config.width / 2 - 5,
-        top: -config.height / 2 + 5 + (i * (config.height - 10) / 9),
+        top: -config.height / 2 + 5 + (i * (config.height - 10)) / 9,
       });
       leftPin.set("pin", true);
-      leftPin.set("data", { type: "pin", componentId, pinId: `pin${i + 1}`, pinNumber: i + 1 });
+      leftPin.set("data", {
+        type: "pin",
+        componentId,
+        pinId: `pin${i + 1}`,
+        pinNumber: i + 1,
+      });
 
       // Right side pins
       const rightPin = new fabric.Circle({
@@ -225,10 +322,15 @@ function createComponentPins(config: any, componentId: string) {
         originX: "center",
         originY: "center",
         left: config.width / 2 + 5,
-        top: -config.height / 2 + 5 + (i * (config.height - 10) / 9),
+        top: -config.height / 2 + 5 + (i * (config.height - 10)) / 9,
       });
       rightPin.set("pin", true);
-      rightPin.set("data", { type: "pin", componentId, pinId: `pin${i + 11}`, pinNumber: i + 11 });
+      rightPin.set("data", {
+        type: "pin",
+        componentId,
+        pinId: `pin${i + 11}`,
+        pinNumber: i + 11,
+      });
 
       pins.push(leftPin, rightPin);
     }
@@ -239,7 +341,7 @@ function createComponentPins(config: any, componentId: string) {
     for (let i = 0; i < config.pinCount; i++) {
       const isLeftSide = i < pinsPerSide;
       const sideIndex = isLeftSide ? i : i - pinsPerSide;
-      
+
       const pin = new fabric.Circle({
         radius: 3,
         fill: "#10B981",
@@ -248,10 +350,18 @@ function createComponentPins(config: any, componentId: string) {
         originX: "center",
         originY: "center",
         left: isLeftSide ? -config.width / 2 - 5 : config.width / 2 + 5,
-        top: -config.height / 2 + 10 + (sideIndex * (config.height - 20) / (pinsPerSide - 1)),
+        top:
+          -config.height / 2 +
+          10 +
+          (sideIndex * (config.height - 20)) / (pinsPerSide - 1),
       });
       pin.set("pin", true);
-      pin.set("data", { type: "pin", componentId, pinId: `pin${i + 1}`, pinNumber: i + 1 });
+      pin.set("data", {
+        type: "pin",
+        componentId,
+        pinId: `pin${i + 1}`,
+        pinNumber: i + 1,
+      });
       pins.push(pin);
     }
   }
@@ -390,8 +500,29 @@ export const createSVGComponent = (
           top: componentInfo.y || fabricCanvas.getVpCenter().y,
         });
 
-        // Add component metadata
+        // Add component metadata with complete database schema
         component.set("componentType", componentInfo.type);
+        component.set("componentData", {
+          id: componentId,
+          name: componentInfo.name,
+          type: componentInfo.type,
+          category: getCategoryForComponent(componentInfo.type),
+          specifications: getDefaultSpecifications(componentInfo.type),
+          availability: "in-stock" as const,
+          properties: {
+            manufacturer: "Generic",
+            part_number: `${componentInfo.type.toUpperCase()}-001`,
+            datasheet_url: null,
+          },
+          pins: pins.map((_, index) => ({
+            id: `pin${index + 1}`,
+            pinNumber: index + 1,
+            name: `Pin ${index + 1}`,
+            type: "generic",
+          })),
+        });
+
+        // Legacy data field for backward compatibility
         component.set("data", {
           type: "component",
           componentType: componentInfo.type,
@@ -441,17 +572,23 @@ export const recreateComponentPins = (
 
   const componentData = (component as any).data;
   const componentType = (component as any).componentType;
-  
+
   if (!componentData || componentData.type !== "component" || !componentType) {
     console.log("🔄 Not a component, skipping pin recreation");
     return component;
   }
 
-  console.log(`🔄 Recreating pins for ${componentData.componentName || componentType}`);
+  console.log(
+    `🔄 Recreating pins for ${componentData.componentName || componentType}`
+  );
 
-  const config = componentConfig[componentType as keyof typeof componentConfig] || componentConfig.resistor;
-  const newComponentId = `component_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  
+  const config =
+    componentConfig[componentType as keyof typeof componentConfig] ||
+    componentConfig.resistor;
+  const newComponentId = `component_${Date.now()}_${Math.random()
+    .toString(36)
+    .substr(2, 9)}`;
+
   // Get existing objects from the component (excluding old pins)
   const existingObjects = component.getObjects().filter((obj: any) => {
     // Keep everything except old pins
@@ -489,7 +626,9 @@ export const recreateComponentPins = (
     centeredRotation: true,
   });
 
-  console.log(`✅ Pin recreation: Added ${newPins.length} functional pins to pasted component`);
+  console.log(
+    `✅ Pin recreation: Added ${newPins.length} functional pins to pasted component`
+  );
   return newComponent;
 }; // Fallback to simple component if SVG loading fails
 function createFallbackComponent(
@@ -530,6 +669,27 @@ function createFallbackComponent(
   });
 
   component.set("componentType", componentInfo.type);
+  component.set("componentData", {
+    id: componentId,
+    name: componentInfo.name,
+    type: componentInfo.type,
+    category: getCategoryForComponent(componentInfo.type),
+    specifications: getDefaultSpecifications(componentInfo.type),
+    availability: "in-stock" as const,
+    properties: {
+      manufacturer: "Generic",
+      part_number: `${componentInfo.type.toUpperCase()}-001`,
+      datasheet_url: null,
+    },
+    pins: pins.map((_, index) => ({
+      id: `pin${index + 1}`,
+      pinNumber: index + 1,
+      name: `Pin ${index + 1}`,
+      type: "generic",
+    })),
+  });
+
+  // Legacy data field for backward compatibility
   component.set("data", {
     type: "component",
     componentType: componentInfo.type,

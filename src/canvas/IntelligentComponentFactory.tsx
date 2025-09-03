@@ -1,5 +1,77 @@
 import * as fabric from "fabric";
 
+// Helper function to determine component category
+function getCategoryForComponent(componentType: string): string {
+  const categoryMap: Record<string, string> = {
+    resistor: "passive",
+    capacitor: "passive",
+    inductor: "passive",
+    led: "semiconductor",
+    diode: "semiconductor",
+    transistor: "semiconductor",
+    battery: "power",
+    switch: "control",
+    connector: "connector",
+    pushbutton: "control",
+    crystal: "timing",
+    opamp: "analog-ic",
+    sensor: "sensor",
+    motor: "actuator",
+    voltage_regulator: "power",
+    arduino: "microcontroller",
+    buzzer: "actuator",
+    "display-lcd": "display",
+    fuse: "protection",
+    microcontroller: "microcontroller",
+    "photo-resistor": "sensor",
+    potentiometer: "passive",
+    relay: "control",
+    "servo-motor": "actuator",
+    "temperature-sensor": "sensor",
+  };
+  return categoryMap[componentType] || "general";
+}
+
+// Helper function to generate default specifications
+function getDefaultSpecifications(componentType: string): Record<string, any> {
+  const specMap: Record<string, Record<string, any>> = {
+    resistor: { resistance: "1kΩ", tolerance: "5%", power: "0.25W" },
+    capacitor: { capacitance: "10µF", voltage: "16V", type: "ceramic" },
+    led: { color: "red", voltage: "2.0V", current: "20mA" },
+    diode: { voltage: "0.7V", current: "1A", type: "silicon" },
+    transistor: { type: "NPN", voltage: "40V", current: "200mA" },
+    inductor: { inductance: "1mH", current: "1A", tolerance: "10%" },
+    battery: { voltage: "9V", type: "alkaline", capacity: "500mAh" },
+    switch: { type: "SPST", voltage: "250V", current: "1A" },
+    connector: { pins: 2, spacing: "2.54mm", type: "header" },
+    pushbutton: { type: "momentary", voltage: "12V", current: "50mA" },
+    crystal: { frequency: "16MHz", tolerance: "20ppm", type: "quartz" },
+    opamp: { type: "general-purpose", voltage: "±15V", bandwidth: "1MHz" },
+    sensor: { type: "digital", voltage: "3.3V", interface: "I2C" },
+    motor: { voltage: "12V", current: "500mA", type: "DC" },
+    voltage_regulator: { input: "12V", output: "5V", current: "1A" },
+    arduino: { microcontroller: "ATmega328P", voltage: "5V", pins: 20 },
+    buzzer: { voltage: "5V", frequency: "2kHz", type: "piezo" },
+    "display-lcd": { size: "16x2", voltage: "5V", interface: "parallel" },
+    fuse: { rating: "1A", voltage: "250V", type: "fast-blow" },
+    microcontroller: { architecture: "ARM", voltage: "3.3V", pins: 16 },
+    "photo-resistor": {
+      resistance: "10kΩ",
+      sensitivity: "visible",
+      type: "CdS",
+    },
+    potentiometer: { resistance: "10kΩ", taper: "linear", power: "0.5W" },
+    relay: { voltage: "12V", current: "10A", type: "SPDT" },
+    "servo-motor": { voltage: "6V", torque: "1.5kg-cm", angle: "180°" },
+    "temperature-sensor": {
+      range: "-40°C to 125°C",
+      accuracy: "±0.5°C",
+      interface: "analog",
+    },
+  };
+  return specMap[componentType] || { type: "generic", voltage: "5V" };
+}
+
 // Intelligent SVG Component Factory - Reads pins from SVG data
 export const createIntelligentComponent = (
   fabricCanvas: fabric.Canvas,
@@ -123,6 +195,29 @@ export const createIntelligentComponent = (
 
         // Add component metadata that the wiring tool expects
         finalComponent.set("componentType", componentInfo.type);
+
+        const componentId = `component_${Date.now()}`;
+        finalComponent.set("componentData", {
+          id: componentId,
+          name: componentInfo.name,
+          type: componentInfo.type,
+          category: getCategoryForComponent(componentInfo.type),
+          specifications: getDefaultSpecifications(componentInfo.type),
+          availability: "in-stock" as const,
+          properties: {
+            manufacturer: "Generic",
+            part_number: `${componentInfo.type.toUpperCase()}-001`,
+            datasheet_url: null,
+          },
+          pins: interactivePins.map((_, index) => ({
+            id: `pin${index + 1}`,
+            pinNumber: index + 1,
+            name: `Pin ${index + 1}`,
+            type: "generic",
+          })),
+        });
+
+        // Legacy data field for backward compatibility
         finalComponent.set("data", {
           type: "component",
           componentType: componentInfo.type,
@@ -162,7 +257,7 @@ export const createIntelligentComponent = (
     });
 };
 
-// Function to recreate pins for pasted intelligent components  
+// Function to recreate pins for pasted intelligent components
 export const recreateIntelligentComponentPins = (
   component: fabric.Group,
   fabricCanvas: fabric.Canvas
@@ -171,16 +266,22 @@ export const recreateIntelligentComponentPins = (
 
   const componentData = (component as any).data;
   const componentType = (component as any).componentType;
-  
+
   if (!componentData || componentData.type !== "component" || !componentType) {
     console.log("🔄 Not an intelligent component, skipping pin recreation");
     return component;
   }
 
-  console.log(`🔄 Recreating intelligent pins for ${componentData.componentName || componentType}`);
+  console.log(
+    `🔄 Recreating intelligent pins for ${
+      componentData.componentName || componentType
+    }`
+  );
 
-  const newComponentId = `component_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  
+  const newComponentId = `component_${Date.now()}_${Math.random()
+    .toString(36)
+    .substr(2, 9)}`;
+
   // Get existing objects from the component (excluding old pins)
   const existingObjects = component.getObjects().filter((obj: any) => {
     // Keep everything except old pins
@@ -190,9 +291,9 @@ export const recreateIntelligentComponentPins = (
   // Try to recreate pins based on component size and type
   const componentBounds = component.getBoundingRect();
   const pinCount = componentData.pins ? componentData.pins.length : 2;
-  
+
   const newPins: fabric.Circle[] = [];
-  
+
   if (pinCount <= 2) {
     // Simple 2-pin layout
     for (let i = 0; i < pinCount; i++) {
@@ -206,7 +307,7 @@ export const recreateIntelligentComponentPins = (
         left: i === 0 ? -componentBounds.width / 4 : componentBounds.width / 4,
         top: 0,
       });
-      
+
       pin.set("pin", true);
       pin.set("data", {
         type: "pin",
@@ -215,7 +316,7 @@ export const recreateIntelligentComponentPins = (
         pinNumber: i + 1,
         isConnectable: true,
       });
-      
+
       newPins.push(pin);
     }
   } else {
@@ -224,7 +325,7 @@ export const recreateIntelligentComponentPins = (
     for (let i = 0; i < pinCount; i++) {
       const isLeftSide = i < pinsPerSide;
       const sideIndex = isLeftSide ? i : i - pinsPerSide;
-      
+
       const pin = new fabric.Circle({
         radius: 3,
         fill: "#10B981",
@@ -232,10 +333,15 @@ export const recreateIntelligentComponentPins = (
         strokeWidth: 1,
         originX: "center",
         originY: "center",
-        left: isLeftSide ? -componentBounds.width / 2 - 5 : componentBounds.width / 2 + 5,
-        top: -componentBounds.height / 2 + 10 + (sideIndex * (componentBounds.height - 20) / (pinsPerSide - 1)),
+        left: isLeftSide
+          ? -componentBounds.width / 2 - 5
+          : componentBounds.width / 2 + 5,
+        top:
+          -componentBounds.height / 2 +
+          10 +
+          (sideIndex * (componentBounds.height - 20)) / (pinsPerSide - 1),
       });
-      
+
       pin.set("pin", true);
       pin.set("data", {
         type: "pin",
@@ -244,7 +350,7 @@ export const recreateIntelligentComponentPins = (
         pinNumber: i + 1,
         isConnectable: true,
       });
-      
+
       newPins.push(pin);
     }
   }
@@ -260,6 +366,28 @@ export const recreateIntelligentComponentPins = (
 
   // Restore component metadata with new ID
   newComponent.set("componentType", componentType);
+
+  newComponent.set("componentData", {
+    id: newComponentId,
+    name: componentData.componentName || componentType,
+    type: componentType,
+    category: getCategoryForComponent(componentType),
+    specifications: getDefaultSpecifications(componentType),
+    availability: "in-stock" as const,
+    properties: {
+      manufacturer: "Generic",
+      part_number: `${componentType.toUpperCase()}-001`,
+      datasheet_url: null,
+    },
+    pins: newPins.map((_, index) => ({
+      id: `pin${index + 1}`,
+      pinNumber: index + 1,
+      name: `Pin ${index + 1}`,
+      type: "generic",
+    })),
+  });
+
+  // Legacy data field for backward compatibility
   newComponent.set("data", {
     type: "component",
     componentType: componentType,
@@ -277,6 +405,8 @@ export const recreateIntelligentComponentPins = (
     centeredRotation: true,
   });
 
-  console.log(`✅ Intelligent pin recreation: Added ${newPins.length} functional pins to pasted component`);
+  console.log(
+    `✅ Intelligent pin recreation: Added ${newPins.length} functional pins to pasted component`
+  );
   return newComponent;
 };

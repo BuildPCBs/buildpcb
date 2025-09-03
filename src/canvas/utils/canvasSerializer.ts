@@ -18,46 +18,62 @@ interface CanvasComponent {
 /**
  * Serialize Fabric.js canvas to Circuit format
  */
-export function serializeCanvasToCircuit(canvas: fabric.Canvas | null): Partial<Circuit> | null {
+export function serializeCanvasToCircuit(
+  canvas: fabric.Canvas | null
+): Partial<Circuit> | null {
   if (!canvas) return null;
 
   const objects = canvas.getObjects();
-  
+
   // Extract components from canvas objects
   const components: CanvasComponent[] = objects
-    .filter((obj) => obj.type !== 'line' && obj.type !== 'path') // Exclude wires
+    .filter((obj) => obj.type !== "line" && obj.type !== "path") // Exclude wires
     .map((obj, index) => {
-      // Get component metadata from fabric object
-      const componentData = (obj as any).componentData || {};
-      
-      return {
-        id: componentData.id || `comp_${index}`,
-        name: componentData.name || `Component ${index + 1}`,
-        type: componentData.type || 'unknown',
-        category: componentData.category || 'general',
-        specifications: componentData.specifications || {},
-        availability: componentData.availability || 'in-stock' as const,
-        position: {
-          x: obj.left || 0,
-          y: obj.top || 0,
-        },
-        rotation: obj.angle || 0,
-        properties: componentData.properties || {},
-        pins: componentData.pins || [],
-      };
+      // Try to get complete component metadata from fabric object
+      const componentData = (obj as any).componentData;
+
+      if (componentData) {
+        // Use complete metadata if available
+        return {
+          ...componentData,
+          position: {
+            x: obj.left || 0,
+            y: obj.top || 0,
+          },
+          rotation: obj.angle || 0,
+        };
+      } else {
+        // Fallback to legacy incomplete metadata (for backward compatibility)
+        const legacyData = (obj as any).data || {};
+        return {
+          id: legacyData.id || `comp_${index}`,
+          name: legacyData.componentName || `Component ${index + 1}`,
+          type: legacyData.componentType || "unknown",
+          category: "general",
+          specifications: {},
+          availability: "in-stock" as const,
+          position: {
+            x: obj.left || 0,
+            y: obj.top || 0,
+          },
+          rotation: obj.angle || 0,
+          properties: {},
+          pins: legacyData.pins || [],
+        };
+      }
     });
 
   // Extract connections from canvas objects (wires)
   const connections: Connection[] = objects
-    .filter((obj) => obj.type === 'line' || obj.type === 'path')
+    .filter((obj) => obj.type === "line" || obj.type === "path")
     .map((obj, index) => {
       const wireData = (obj as any).wireData || {};
-      
+
       return {
         id: wireData.id || `conn_${index}`,
-        from: wireData.from || { componentId: '', pin: '' },
-        to: wireData.to || { componentId: '', pin: '' },
-        type: wireData.type || 'wire' as const,
+        from: wireData.from || { componentId: "", pin: "" },
+        to: wireData.to || { componentId: "", pin: "" },
+        type: wireData.type || ("wire" as const),
         properties: wireData.properties || {},
       };
     });
@@ -86,7 +102,9 @@ export function serializeCanvasToCircuit(canvas: fabric.Canvas | null): Partial<
 /**
  * Serialize Fabric.js canvas to raw canvas data format
  */
-export function serializeCanvasData(canvas: fabric.Canvas | null): Record<string, any> {
+export function serializeCanvasData(
+  canvas: fabric.Canvas | null
+): Record<string, any> {
   if (!canvas) return {};
 
   try {
@@ -126,7 +144,7 @@ export function loadCanvasFromData(
             canvas.setViewportTransform(canvasData.viewport.transform);
           }
         }
-        
+
         canvas.renderAll();
         resolve();
       });
@@ -149,7 +167,7 @@ export function generateCanvasThumbnail(
 
   try {
     return canvas.toDataURL({
-      format: 'jpeg',
+      format: "jpeg",
       quality: 0.8,
       multiplier: Math.min(
         width / canvas.getWidth(),

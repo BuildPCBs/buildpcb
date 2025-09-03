@@ -1,5 +1,77 @@
 import * as fabric from "fabric";
 
+// Helper function to determine component category
+function getCategoryForComponent(componentType: string): string {
+  const categoryMap: Record<string, string> = {
+    resistor: "passive",
+    capacitor: "passive",
+    inductor: "passive",
+    led: "semiconductor",
+    diode: "semiconductor",
+    transistor: "semiconductor",
+    battery: "power",
+    switch: "control",
+    connector: "connector",
+    pushbutton: "control",
+    crystal: "timing",
+    opamp: "analog-ic",
+    sensor: "sensor",
+    motor: "actuator",
+    voltage_regulator: "power",
+    arduino: "microcontroller",
+    buzzer: "actuator",
+    "display-lcd": "display",
+    fuse: "protection",
+    microcontroller: "microcontroller",
+    "photo-resistor": "sensor",
+    potentiometer: "passive",
+    relay: "control",
+    "servo-motor": "actuator",
+    "temperature-sensor": "sensor",
+  };
+  return categoryMap[componentType] || "general";
+}
+
+// Helper function to generate default specifications
+function getDefaultSpecifications(componentType: string): Record<string, any> {
+  const specMap: Record<string, Record<string, any>> = {
+    resistor: { resistance: "1kΩ", tolerance: "5%", power: "0.25W" },
+    capacitor: { capacitance: "10µF", voltage: "16V", type: "ceramic" },
+    led: { color: "red", voltage: "2.0V", current: "20mA" },
+    diode: { voltage: "0.7V", current: "1A", type: "silicon" },
+    transistor: { type: "NPN", voltage: "40V", current: "200mA" },
+    inductor: { inductance: "1mH", current: "1A", tolerance: "10%" },
+    battery: { voltage: "9V", type: "alkaline", capacity: "500mAh" },
+    switch: { type: "SPST", voltage: "250V", current: "1A" },
+    connector: { pins: 2, spacing: "2.54mm", type: "header" },
+    pushbutton: { type: "momentary", voltage: "12V", current: "50mA" },
+    crystal: { frequency: "16MHz", tolerance: "20ppm", type: "quartz" },
+    opamp: { type: "general-purpose", voltage: "±15V", bandwidth: "1MHz" },
+    sensor: { type: "digital", voltage: "3.3V", interface: "I2C" },
+    motor: { voltage: "12V", current: "500mA", type: "DC" },
+    voltage_regulator: { input: "12V", output: "5V", current: "1A" },
+    arduino: { microcontroller: "ATmega328P", voltage: "5V", pins: 20 },
+    buzzer: { voltage: "5V", frequency: "2kHz", type: "piezo" },
+    "display-lcd": { size: "16x2", voltage: "5V", interface: "parallel" },
+    fuse: { rating: "1A", voltage: "250V", type: "fast-blow" },
+    microcontroller: { architecture: "ARM", voltage: "3.3V", pins: 16 },
+    "photo-resistor": {
+      resistance: "10kΩ",
+      sensitivity: "visible",
+      type: "CdS",
+    },
+    potentiometer: { resistance: "10kΩ", taper: "linear", power: "0.5W" },
+    relay: { voltage: "12V", current: "10A", type: "SPDT" },
+    "servo-motor": { voltage: "6V", torque: "1.5kg-cm", angle: "180°" },
+    "temperature-sensor": {
+      range: "-40°C to 125°C",
+      accuracy: "±0.5°C",
+      interface: "analog",
+    },
+  };
+  return specMap[componentType] || { type: "generic", voltage: "5V" };
+}
+
 // Component styling configuration
 const componentStyles = {
   resistor: {
@@ -161,6 +233,27 @@ export const createSimpleComponent = (
 
   // Add component metadata that the wiring tool expects
   component.set("componentType", componentInfo.type); // This is what the wiring tool looks for!
+
+  const componentId = `component_${Date.now()}`;
+  component.set("componentData", {
+    id: componentId,
+    name: componentInfo.name,
+    type: componentInfo.type,
+    category: getCategoryForComponent(componentInfo.type),
+    specifications: getDefaultSpecifications(componentInfo.type),
+    availability: "in-stock" as const,
+    properties: {
+      manufacturer: "Generic",
+      part_number: `${componentInfo.type.toUpperCase()}-001`,
+      datasheet_url: null,
+    },
+    pins: [
+      { id: "pin1", pinNumber: 1, name: "Pin 1", type: "generic" },
+      { id: "pin2", pinNumber: 2, name: "Pin 2", type: "generic" },
+    ],
+  });
+
+  // Legacy data field for backward compatibility
   component.set("data", {
     type: "component",
     componentType: componentInfo.type,
@@ -194,17 +287,25 @@ export const recreateSimpleComponentPins = (
 
   const componentData = (component as any).data;
   const componentType = (component as any).componentType;
-  
+
   if (!componentData || componentData.type !== "component" || !componentType) {
     console.log("🔄 Not a simple component, skipping pin recreation");
     return component;
   }
 
-  console.log(`🔄 Recreating simple pins for ${componentData.componentName || componentType}`);
+  console.log(
+    `🔄 Recreating simple pins for ${
+      componentData.componentName || componentType
+    }`
+  );
 
-  const style = componentStyles[componentType as keyof typeof componentStyles] || componentStyles.resistor;
-  const newComponentId = `component_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  
+  const style =
+    componentStyles[componentType as keyof typeof componentStyles] ||
+    componentStyles.resistor;
+  const newComponentId = `component_${Date.now()}_${Math.random()
+    .toString(36)
+    .substr(2, 9)}`;
+
   // Get existing objects from the component (excluding old pins)
   const existingObjects = component.getObjects().filter((obj: any) => {
     // Keep everything except old pins
@@ -263,6 +364,26 @@ export const recreateSimpleComponentPins = (
 
   // Restore component metadata with new ID
   newComponent.set("componentType", componentType);
+
+  newComponent.set("componentData", {
+    id: newComponentId,
+    name: componentData.componentName || componentType,
+    type: componentType,
+    category: getCategoryForComponent(componentType),
+    specifications: getDefaultSpecifications(componentType),
+    availability: "in-stock" as const,
+    properties: {
+      manufacturer: "Generic",
+      part_number: `${componentType.toUpperCase()}-001`,
+      datasheet_url: null,
+    },
+    pins: [
+      { id: "pin1", pinNumber: 1, name: "Pin 1", type: "generic" },
+      { id: "pin2", pinNumber: 2, name: "Pin 2", type: "generic" },
+    ],
+  });
+
+  // Legacy data field for backward compatibility
   newComponent.set("data", {
     type: "component",
     componentType: componentType,
@@ -280,6 +401,8 @@ export const recreateSimpleComponentPins = (
     centeredRotation: true,
   });
 
-  console.log(`✅ Simple pin recreation: Added functional pins to pasted component`);
+  console.log(
+    `✅ Simple pin recreation: Added functional pins to pasted component`
+  );
   return newComponent;
 };
