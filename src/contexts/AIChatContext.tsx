@@ -16,6 +16,7 @@ export interface ChatMessage {
   timestamp: Date;
   circuitChanges?: any[];
   status?: "sending" | "receiving" | "parsing" | "complete" | "error";
+  isEditing?: boolean;
 }
 
 interface AIChatContextType {
@@ -26,7 +27,14 @@ interface AIChatContextType {
   setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   setIsThinking: (thinking: boolean) => void;
   setCurrentMessageIndex: (index: number) => void;
-  handlePromptSubmit: (prompt: string, canvasState?: any) => Promise<void>;
+  handlePromptSubmit: (
+    prompt: string,
+    canvasState?: any,
+    canvas?: any
+  ) => Promise<void>;
+  startEditingMessage: (messageId: string) => void;
+  saveEditedMessage: (messageId: string, newContent: string) => void;
+  cancelEditingMessage: (messageId: string) => void;
 }
 
 const AIChatContext = createContext<AIChatContextType | undefined>(undefined);
@@ -51,13 +59,18 @@ export function AIChatProvider({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isThinking, setIsThinking] = useState(false);
   const [currentMessageIndex, setCurrentMessageIndex] = useState(-1);
-  
+
   // Get auth token for API calls
-  const { getToken, isAuthenticated } = useAuth();  const addMessage = (message: ChatMessage) => {
+  const { getToken, isAuthenticated } = useAuth();
+  const addMessage = (message: ChatMessage) => {
     setMessages((prev) => [...prev, message]);
   };
 
-  const handlePromptSubmit = async (prompt: string, canvasState?: any) => {
+  const handlePromptSubmit = async (
+    prompt: string,
+    canvasState?: any,
+    canvas?: any
+  ) => {
     if (!prompt.trim()) return;
 
     // Add user message
@@ -101,7 +114,7 @@ export function AIChatProvider({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           message: prompt,
@@ -130,13 +143,94 @@ export function AIChatProvider({
 
       const aiResponseData = await response.json();
 
+      // Debug logging
+      console.log("🤖 Raw AI API response:", aiResponseData);
+      console.log("📊 Response mode:", aiResponseData.mode);
+      console.log("📦 Has circuit:", !!aiResponseData.circuit);
+      console.log("📝 Has text response:", !!aiResponseData.textResponse);
+      console.log("📋 Metadata:", aiResponseData.metadata);
+
       // Simulate parsing delay for better UX
       await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Import circuit response parser
+      const { parseCircuitResponse, applyCircuitToCanvas } = await import(
+        "../lib/circuitResponseParser"
+      );
+
+      // Parse the circuit response
+      const parsedResponse = parseCircuitResponse(aiResponseData);
+
+      console.log("🔧 Parsed response result:", parsedResponse);
+      console.log("✅ Is valid:", parsedResponse.isValid);
+      console.log("📋 Operations to apply:", parsedResponse.operations.length);
+      console.log("❌ Errors:", parsedResponse.errors);
+
+      // Apply circuit changes to canvas if we have a canvas
+      let circuitApplicationResult = null;
+      console.log("🔍 Starting canvas application check...");
+      console.log("📊 Parsed response operations:", parsedResponse.operations.length);
+      console.log("✅ Response valid:", parsedResponse.isValid);
+      console.log("🎨 Canvas object exists:", !!canvas);
+
+      if (
+        parsedResponse.isValid &&
+        parsedResponse.operations.length > 0 &&
+        canvas
+      ) {
+        console.log("🎨 Canvas object received:", !!canvas);
+        console.log("🎨 Canvas type:", canvas?.constructor?.name);
+        console.log("🎨 Canvas ready state:", canvas ? "Ready" : "Not ready");
+        console.log("📋 Operations to apply:", parsedResponse.operations);
+
+        // Check if canvas is actually ready to use
+        if (canvas && typeof canvas.add === 'function' && typeof canvas.renderAll === 'function') {
+          console.log("✅ Canvas is fully initialized and ready to use");
+
+          // Add a small delay to ensure canvas is fully ready
+          await new Promise(resolve => setTimeout(resolve, 100));
+
+          try {
+            console.log("🚀 Calling applyCircuitToCanvas...");
+            circuitApplicationResult = await applyCircuitToCanvas(
+              parsedResponse,
+              canvas
+            );
+            console.log(
+              "✅ Circuit changes applied to canvas:",
+              circuitApplicationResult
+            );
+          } catch (applyError) {
+            console.error("❌ Failed to apply circuit changes:", applyError);
+            console.error("❌ Error details:", {
+              message: applyError instanceof Error ? applyError.message : 'Unknown error',
+              stack: applyError instanceof Error ? applyError.stack : 'No stack trace',
+              canvas: !!canvas,
+              operations: parsedResponse.operations.length
+            });
+          }
+        } else {
+          console.log("⚠️ Canvas is not fully initialized yet, skipping application");
+          console.log("Canvas methods check:", {
+            hasAdd: typeof canvas?.add === 'function',
+            hasRenderAll: typeof canvas?.renderAll === 'function'
+          });
+        }
+      } else {
+        console.log("⚠️ Skipping canvas application:");
+        console.log("  - Response valid:", parsedResponse.isValid);
+        console.log("  - Operations count:", parsedResponse.operations.length);
+        console.log("  - Canvas available:", !!canvas);
+        if (!parsedResponse.isValid) {
+          console.log("  - Validation errors:", parsedResponse.errors);
+        }
+      }
 
       // Update with final response
       const finalContent =
         aiResponseData.textResponse ||
         aiResponseData.metadata?.explanation ||
+        parsedResponse.explanation ||
         "I've processed your request.";
 
       setMessages((prev) =>
@@ -149,6 +243,7 @@ export function AIChatProvider({
                 circuitChanges: aiResponseData.circuit
                   ? [aiResponseData.circuit]
                   : [],
+                circuitApplication: circuitApplicationResult,
               }
             : msg
         )
@@ -182,12 +277,31 @@ export function AIChatProvider({
     }
   };
 
-  // Update current message index when new messages are added
-  useEffect(() => {
-    if (messages.length > 0) {
-      setCurrentMessageIndex(messages.length - 1);
-    }
-  }, [messages.length]);
+  const startEditingMessage = (messageId: string) => {
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === messageId ? { ...msg, isEditing: true } : msg
+      )
+    );
+  };
+
+  const saveEditedMessage = (messageId: string, newContent: string) => {
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === messageId
+          ? { ...msg, content: newContent, isEditing: false }
+          : msg
+      )
+    );
+  };
+
+  const cancelEditingMessage = (messageId: string) => {
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === messageId ? { ...msg, isEditing: false } : msg
+      )
+    );
+  };
 
   const value: AIChatContextType = {
     messages,
@@ -198,6 +312,9 @@ export function AIChatProvider({
     setIsThinking,
     setCurrentMessageIndex,
     handlePromptSubmit,
+    startEditingMessage,
+    saveEditedMessage,
+    cancelEditingMessage,
   };
 
   return (

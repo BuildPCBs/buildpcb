@@ -2,7 +2,7 @@
 
 ## What's This About?
 
-This folder contains the complete documentation for BuildPCB.ai's AI agent system - the brain behind our "Figma + Cursor for Electronics Design" platform. Think of this as your roadmap to understanding how our AI helps users design PCBs.
+This folder contains the complete documentation for BuildPCB.ai's AI agent system - the brain behind our professional PCB design platform. Think of this as your roadmap to understanding how our AI empowers engineers to design complex circuits with enterprise-grade tools and automation.
 
 ## Quick Navigation
 
@@ -15,11 +15,15 @@ This folder contains the complete documentation for BuildPCB.ai's AI agent syste
 
 - **[Circuit Response Schema](./circuit-response-schema.md)** - The exact format for all AI responses
 - **[Circuit State Management](./circuit-state-management.md)** - How we save and load circuit data across sessions
+- **[Circuit Validation Rules](./circuit-validation-rules.md)** - Professional design verification standards
+- **[Context Management System](./context-management-system.md)** - Managing conversation state across HTTP requests
 
 ### 🔄 **System Operations**
 
 - **[Restore Endpoint Documentation](./restore-endpoint-docs.md)** - API for undoing changes and recovering data
 - **[Canvas Reference System](./canvas-reference-system.md)** - Making AI responses clickable to highlight parts on screen
+- **[Context Management Strategy](./CONTEXT_MANAGEMENT_STRATEGY.md)** - AI chat context packaging strategy
+- **[Error Handling Guidelines](./error-handling-guidelines.md)** - Robust error management and recovery
 
 ## The Big Picture
 
@@ -39,13 +43,13 @@ Canvas Updates ← [Canvas References] ← AI Response
 
 _The personality and rules for our AI_
 
-- How to select the right components
-- What explanations to provide
-- Educational approach to circuit design
+- How to select the right components for professional applications
+- What explanations to provide for engineering decisions
+- Professional approach to circuit design for industry use
 - Integration with Fabric.js canvas
 - Quality standards and error handling
 
-**Key Point**: This makes our AI helpful, not just technically correct.
+**Key Point**: This makes our AI a powerful tool for professional engineers, not just technically correct.
 
 #### 📝 **User Input Parser**
 
@@ -54,7 +58,7 @@ _Understanding what users really want_
 - Decides if user wants to create new circuit or edit existing
 - Figures out when to just answer questions vs. trigger the AI agent
 - Handles context from previous conversations
-- Manages different types of requests (generation, modification, learning)
+- Manages different types of requests (generation, modification, analysis)
 
 **Key Point**: Prevents the AI from overreacting to simple questions.
 
@@ -69,16 +73,54 @@ _The exact format for everything the AI outputs_
 
 **Key Point**: Ensures AI responses always work with our frontend.
 
-#### 💾 **Circuit State Management**
+#### � **Circuit Validation Rules**
 
-_Keeping track of user's work across sessions_
+_Professional design verification standards_
 
-- How circuit data gets saved automatically
-- Loading previous work when user returns
-- Handling multiple people editing same circuit
-- Preventing data loss during crashes
+- Real-time electrical rule checking (ERC)
+- Design rule checking (DRC) for manufacturing
+- Industry-specific compliance (automotive, medical, industrial)
+- Component compatibility and rating verification
+- Thermal management and signal integrity analysis
 
-**Key Point**: Users never lose their work, conversations continue seamlessly.
+**Key Point**: Ensures all designs meet professional engineering standards and regulatory requirements.
+
+#### 🆔 **Context Management System**
+
+_Managing conversation state across HTTP requests_
+
+- Unique conversation ID generation and management
+- Multi-layer storage strategy (memory, Redis, database)
+- Context lifecycle management for sessions
+- Real-time collaboration and conflict resolution
+- Security, privacy, and performance optimization
+- Comprehensive error handling and recovery
+
+**Key Point**: Solves the HTTP statelessness challenge, ensuring zero data loss and seamless user experience.
+
+#### 🧠 **Context Management Strategy**
+
+_AI chat context packaging strategy_
+
+- How to package canvas state into AI requests
+- Conversation history management
+- Session tracking across stateless HTTP calls
+- Context payload optimization
+- Real-time context synchronization
+
+**Key Point**: Ensures AI has complete context for intelligent responses despite HTTP statelessness.
+
+#### 🚨 **Error Handling Guidelines**
+
+_Robust error management and recovery_
+
+- Comprehensive error classification and severity levels
+- AI agent failure recovery strategies
+- Canvas integration error handling
+- User communication and recovery options
+- Performance monitoring and continuous improvement
+
+**Key Point**: Maintains system reliability and provides clear paths to resolution for professional users.
 
 #### ⏪ **Restore Endpoint Documentation**
 
@@ -176,4 +218,4 @@ Each file is designed to be read independently, but they're most powerful when u
 
 ---
 
-_This documentation supports BuildPCB.ai's mission to make electronics design as intuitive as graphic design, powered by AI that actually understands circuits._
+_This documentation supports BuildPCB.ai's mission to deliver enterprise-grade PCB design tools that rival the best CAD software, powered by AI that understands professional engineering requirements._

@@ -64,41 +64,66 @@ export const POST = withAuth(
       console.log("📝 Processing message:", message.substring(0, 100) + "...");
 
       // Build conversation context for OpenAI
-      const systemPrompt = `You are an AI assistant for BuildPCBs, "The Figma + Cursor for Electronics Design."
+      const systemPrompt = `You are BuildPCB, "The Figma + Cursor for Electronics Design."
 
-Your role is to help users design electronic circuits through intelligent component selection, placement, and connection recommendations.
+I can build circuits by adding components, connecting them with wires, explaining how circuits work, and helping you create exactly what you need.
+
+CRITICAL: You MUST respond with VALID JSON that follows this exact schema:
+
+{
+  "mode": "full" | "edit" | "text-only",
+  "circuit": {
+    "id": "unique-circuit-id",
+    "name": "Circuit Name",
+    "description": "Brief description",
+    "components": [
+      {
+        "id": "component-id",
+        "type": "resistor" | "capacitor" | "led" | "transistor" | "ic" | "microcontroller" | "sensor" | "switch" | "connector" | "battery" | "voltage_regulator",
+        "value": "10kΩ" | "10µF" | "3.3V" | etc,
+        "position": {"x": 100, "y": 100},
+        "connections": [
+          {"id": "pin1", "name": "pin1", "netId": "net1", "type": "input"},
+          {"id": "pin2", "name": "pin2", "netId": "net2", "type": "output"}
+        ],
+        "datasheet": "https://example.com/datasheet",
+        "explanation": "Why I chose this component and its purpose"
+      }
+    ],
+    "connections": [
+      {
+        "id": "wire-id",
+        "from": {"componentId": "comp1", "pin": "pin1"},
+        "to": {"componentId": "comp2", "pin": "pin2"},
+        "type": "wire"
+      }
+    ]
+  },
+  "metadata": {
+    "timestamp": "2025-09-03T10:00:00.000Z",
+    "version": "1.0",
+    "explanation": "Brief explanation of what was done"
+  }
+}
 
 RESPONSE PRINCIPLES:
-1. Always follow the Circuit JSON Schema
-2. Include required fields: id, type, value, position, connections, datasheet, explanation
-3. Educational approach - explain WHY you chose each component
-4. Practical engineering - suggest realistic component values and ratings
-5. Use standard component values (E12 series for resistors, common capacitor values)
+1. Always respond with VALID JSON - no markdown, no extra text
+2. For circuit requests: use mode "full" and include circuit object
+3. For simple questions: use mode "text-only" with textResponse field
+4. Include ALL required fields for each component
+5. Use realistic component values (E12 series for resistors: 1.0, 1.2, 1.5, 1.8, 2.2, 2.7, 3.3, 3.9, 4.7, 5.6, 6.8, 8.2)
+6. Position components at reasonable coordinates (x,y between 50-500)
 
-COMPONENT SELECTION CRITERIA:
-- Functionality first
-- Availability and cost effectiveness
-- Reliability with appropriate ratings
-- Beginner friendly for educational projects
-
-CIRCUIT DESIGN GUIDELINES:
-- Place related components near each other
-- Keep signal paths short and direct
-- Separate analog and digital sections
-- Consider thermal management for power components
-- Plan for easy debugging access points
+COMPONENT TYPES: resistor, capacitor, inductor, led, diode, transistor, ic, microcontroller, sensor, switch, button, connector, battery, voltage_regulator
 
 INPUT CLASSIFICATION:
-Determine if the user wants:
-1. Circuit Generation - new circuit design
-2. Circuit Modification - edit existing circuit
-3. Component Query - asking about specific components
-4. Educational - learning about electronics
-5. Text Response Only - simple questions not requiring circuit changes
+- "Add a resistor" → mode: "full", create circuit with resistor
+- "What's a capacitor?" → mode: "text-only", explain capacitor
+- "Connect LED to battery" → mode: "full", create circuit with LED and battery connected
 
 Current canvas state: ${JSON.stringify(canvasState || "empty")}
 
-Respond in JSON format following the CircuitResponse schema. If it's a simple question, use mode: "text-only". If generating/modifying circuits, use mode: "full" or "edit".`;
+IMPORTANT: Your response must be PURE JSON with no additional text, markdown, or formatting.`;
 
       const messages = [
         { role: "system" as const, content: systemPrompt },
@@ -118,14 +143,14 @@ Respond in JSON format following the CircuitResponse schema. If it's a simple qu
       try {
         completion = await openai.chat.completions.create(
           {
-            model: "gpt-4o-mini", // Use gpt-4o-mini instead of gpt-4o for better reliability
+            model: "o3", //
             messages,
-            temperature: 0.7,
-            max_tokens: 2000,
+            // temperature: 0.7,
+            // max_tokens: 2000,
             response_format: { type: "json_object" },
           },
           {
-            timeout: 30000, // 30 second timeout
+            // timeout: 30000, // 30 second timeout
           }
         );
       } catch (modelError) {
@@ -133,14 +158,14 @@ Respond in JSON format following the CircuitResponse schema. If it's a simple qu
         // Fallback to gpt-3.5-turbo if gpt-4o-mini fails
         completion = await openai.chat.completions.create(
           {
-            model: "gpt-3.5-turbo",
+            model: "o3",
             messages,
-            temperature: 0.7,
-            max_tokens: 2000,
+            // temperature: 0.7,
+            // max_tokens: 2000,
             response_format: { type: "json_object" },
           },
           {
-            timeout: 30000,
+            // timeout: 30000,
           }
         );
       }
@@ -158,28 +183,85 @@ Respond in JSON format following the CircuitResponse schema. If it's a simple qu
       try {
         parsedResponse = JSON.parse(aiResponse);
         console.log("✅ AI response parsed successfully");
+        console.log("📊 Response mode:", parsedResponse.mode);
+        console.log("📦 Has circuit:", !!parsedResponse.circuit);
+        console.log("📝 Has text response:", !!parsedResponse.textResponse);
       } catch (parseError) {
-        console.warn("⚠️ JSON parsing failed, using fallback format");
-        // Fallback to text-only response if JSON parsing fails
-        parsedResponse = {
-          mode: "text-only",
-          textResponse: aiResponse,
-          metadata: {
-            timestamp: new Date().toISOString(),
-            version: "1.0",
-            explanation: "AI response (fallback format)",
-          },
-        };
+        console.error("❌ JSON parsing failed!");
+        console.error("🔍 Raw AI response:", aiResponse);
+        console.error("🔍 Parse error:", parseError);
+
+        // Try to extract JSON from markdown code blocks
+        const jsonMatch = aiResponse.match(
+          /```(?:json)?\s*(\{[\s\S]*?\})\s*```/
+        );
+        if (jsonMatch) {
+          console.log("🔧 Found JSON in markdown, attempting extraction...");
+          try {
+            parsedResponse = JSON.parse(jsonMatch[1]);
+            console.log("✅ Successfully extracted JSON from markdown");
+          } catch (extractError) {
+            console.error(
+              "❌ Failed to extract JSON from markdown:",
+              extractError
+            );
+            parsedResponse = {
+              mode: "text-only",
+              textResponse: aiResponse,
+              metadata: {
+                timestamp: new Date().toISOString(),
+                version: "1.0",
+                explanation: "AI response (JSON parsing failed)",
+              },
+            };
+          }
+        } else {
+          console.log("🔧 Using fallback text-only response");
+          parsedResponse = {
+            mode: "text-only",
+            textResponse: aiResponse,
+            metadata: {
+              timestamp: new Date().toISOString(),
+              version: "1.0",
+              explanation: "AI response (fallback format)",
+            },
+          };
+        }
       }
 
-      // Ensure metadata is present
+      // Ensure metadata is present and has proper explanation
       if (!parsedResponse.metadata) {
         parsedResponse.metadata = {
           timestamp: new Date().toISOString(),
           version: "1.0",
-          explanation: parsedResponse.textResponse || "AI circuit response",
+          explanation:
+            parsedResponse.textResponse ||
+            (parsedResponse.circuit
+              ? `Created circuit with ${
+                  parsedResponse.circuit.components?.length || 0
+                } components`
+              : "AI circuit response"),
         };
+      } else if (
+        !parsedResponse.metadata.explanation ||
+        parsedResponse.metadata.explanation === "AI circuit response"
+      ) {
+        // Fix the generic fallback explanation
+        parsedResponse.metadata.explanation =
+          parsedResponse.textResponse ||
+          (parsedResponse.circuit
+            ? `Created circuit with ${
+                parsedResponse.circuit.components?.length || 0
+              } components`
+            : "Circuit design assistance");
       }
+
+      console.log("📤 Final response:", {
+        mode: parsedResponse.mode,
+        hasCircuit: !!parsedResponse.circuit,
+        hasText: !!parsedResponse.textResponse,
+        explanation: parsedResponse.metadata.explanation,
+      });
 
       return NextResponse.json(parsedResponse);
     } catch (error) {

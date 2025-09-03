@@ -307,7 +307,7 @@ interface ContextAwareReference {
     zoomLevel: number;
     selectedComponents: string[];
     visibleArea: BoundingBox;
-    userExperience: "beginner" | "intermediate" | "expert";
+    userExperience: "junior" | "senior" | "expert";
   };
   adaptedAction: CanvasAction;
 }
@@ -342,7 +342,7 @@ AI should strategically use references to:
 1. **Guide attention** to relevant components
 2. **Explain relationships** between parts
 3. **Demonstrate concepts** through interaction
-4. **Facilitate learning** by connecting theory to visual
+4. **Facilitate understanding** by connecting theory to visual
 
 ### Smart Reference Selection
 
@@ -350,7 +350,7 @@ AI should strategically use references to:
 interface SmartReferenceStrategy {
   prioritizeNewComponents: boolean; // Highlight recently added parts
   emphasizeProblemAreas: boolean; // Focus on issues or modifications
-  supportLearningFlow: boolean; // Guide through circuit understanding
+  supportLearningFlow: boolean; // Guide through circuit analysis
   minimizeDistraction: boolean; // Don't over-reference simple parts
 }
 ```

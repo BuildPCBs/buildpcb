@@ -19,9 +19,10 @@ import { useProject } from "@/contexts/ProjectContext";
 
 interface IDEFabricCanvasProps {
   className?: string;
+  onCanvasReady?: (canvas: any) => void;
 }
 
-export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
+export function IDEFabricCanvas({ className = "", onCanvasReady }: IDEFabricCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [fabricCanvas, setFabricCanvas] = useState<fabric.Canvas | null>(null);
@@ -218,6 +219,11 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
 
     setFabricCanvas(canvas);
     setCanvasDimensions({ width: canvasWidth, height: canvasHeight });
+
+    // Notify parent that canvas is ready
+    if (onCanvasReady) {
+      onCanvasReady(canvas);
+    }
 
     // Register canvas with command manager
     canvasCommandManager.setCanvas(canvas);
@@ -1115,12 +1121,11 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
   }, [fabricCanvas]);
 
   return (
-    <CanvasProvider canvas={fabricCanvas}>
-      <div
-        ref={containerRef}
-        className={`w-full h-full canvas-container ${className}`}
-        style={{ width: "100%", height: "100%" }}
-      >
+    <div
+      ref={containerRef}
+      className={`w-full h-full canvas-container ${className}`}
+      style={{ width: "100%", height: "100%" }}
+    >
         {/* Rulers Layout - Only visible when manipulating objects */}
         <div className="relative w-full h-full">
           {areRulersVisible && (
@@ -1271,7 +1276,6 @@ export function IDEFabricCanvas({ className = "" }: IDEFabricCanvasProps) {
           </div>
         )}
       </div>
-    </CanvasProvider>
   );
 }
 

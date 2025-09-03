@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { useAIChat } from "../../contexts/AIChatContext";
 import { useCanvas } from "../../contexts/CanvasContext";
 import { useCanvasStateSnapshot } from "../../hooks/useCanvasState";
@@ -17,8 +17,15 @@ export function AIChatInterface({
   className = "",
   onCircuitUpdate,
 }: AIChatInterfaceProps) {
-  const { messages, isThinking, currentMessageIndex, setCurrentMessageIndex } =
-    useAIChat();
+  const {
+    messages,
+    isThinking,
+    currentMessageIndex,
+    setCurrentMessageIndex,
+    startEditingMessage,
+    saveEditedMessage,
+    cancelEditingMessage
+  } = useAIChat();
 
   // Get canvas state for AI context
   const { canvas } = useCanvas();
@@ -59,10 +66,44 @@ export function AIChatInterface({
     // Find the original prompt and resubmit it
   };
 
+  const [editingContent, setEditingContent] = useState<{ [key: string]: string }>({});
+
+  const handleEdit = (messageId: string) => {
+    const message = messages.find(msg => msg.id === messageId);
+    if (message) {
+      setEditingContent(prev => ({
+        ...prev,
+        [messageId]: message.content
+      }));
+      startEditingMessage(messageId);
+    }
+  };
+
+  const handleSaveEdit = (messageId: string) => {
+    const newContent = editingContent[messageId];
+    if (newContent && newContent.trim()) {
+      saveEditedMessage(messageId, newContent.trim());
+      setEditingContent(prev => {
+        const updated = { ...prev };
+        delete updated[messageId];
+        return updated;
+      });
+    }
+  };
+
+  const handleCancelEdit = (messageId: string) => {
+    cancelEditingMessage(messageId);
+    setEditingContent(prev => {
+      const updated = { ...prev };
+      delete updated[messageId];
+      return updated;
+    });
+  };
+
   const handleCopy = async (content: string) => {
     try {
       await navigator.clipboard.writeText(content);
-      console.log("Response copied to clipboard");
+      console.log("Content copied to clipboard");
       // TODO: Show toast notification
     } catch (error) {
       console.error("Failed to copy to clipboard:", error);
@@ -117,13 +158,118 @@ export function AIChatInterface({
                 {message.type === "user" ? (
                   /* User Message - Bubble Style */
                   <div className="flex justify-end">
-                    <div
-                      className="max-w-[80%] rounded-2xl rounded-br-md px-4 py-2 text-white"
-                      style={{ backgroundColor: BRAND_COLORS.primary }}
-                    >
-                      <div className="text-sm leading-relaxed">
-                        {message.content}
-                      </div>
+                    <div className="max-w-[80%]">
+                      {message.isEditing ? (
+                        /* Editing Mode */
+                        <div className="mb-1">
+                          <textarea
+                            value={editingContent[message.id] || message.content}
+                            onChange={(e) => setEditingContent(prev => ({
+                              ...prev,
+                              [message.id]: e.target.value
+                            }))}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handleSaveEdit(message.id);
+                              } else if (e.key === 'Escape') {
+                                e.preventDefault();
+                                handleCancelEdit(message.id);
+                              }
+                            }}
+                            className="w-full rounded-2xl rounded-br-md px-4 py-2 text-sm border-2 border-blue-300 focus:border-blue-500 focus:outline-none resize-none"
+                            rows={Math.min(5, (editingContent[message.id] || message.content).split('\n').length)}
+                            style={{ backgroundColor: BRAND_COLORS.primary, color: 'white' }}
+                            autoFocus
+                            placeholder="Edit your message..."
+                          />
+                          <div className="flex justify-end gap-1 mt-1">
+                            <span className="text-xs text-gray-400 mr-2 self-center">
+                              Enter to save, Esc to cancel
+                            </span>
+                            <button
+                              onClick={() => handleCancelEdit(message.id)}
+                              className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                              title="Cancel edit"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => handleSaveEdit(message.id)}
+                              className="px-2 py-1 text-xs text-white rounded transition-colors"
+                              style={{ backgroundColor: BRAND_COLORS.primary }}
+                              title="Save edit"
+                            >
+                              Save
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        /* Normal Display Mode */
+                        <div
+                          className="rounded-2xl rounded-br-md px-4 py-2 text-white mb-1"
+                          style={{ backgroundColor: BRAND_COLORS.primary }}
+                        >
+                          <div className="text-sm leading-relaxed">
+                            {message.content}
+                          </div>
+                        </div>
+                      )}
+                      {/* User Message Action Buttons - Only show when not editing */}
+                      {!message.isEditing && (
+                        <div className="flex justify-end gap-1">
+                          <button
+                            onClick={() => handleEdit(message.id)}
+                            className="p-1 text-gray-500 hover:bg-gray-100 rounded transition-colors"
+                            onMouseEnter={(e) =>
+                              (e.currentTarget.style.color = BRAND_COLORS.primary)
+                            }
+                            onMouseLeave={(e) =>
+                              (e.currentTarget.style.color = "#6B7280")
+                            }
+                            title="Edit message"
+                          >
+                            <svg
+                              className="w-3 h-3"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                              />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => handleCopy(message.content)}
+                            className="p-1 text-gray-500 hover:bg-gray-100 rounded transition-colors"
+                            onMouseEnter={(e) =>
+                              (e.currentTarget.style.color = BRAND_COLORS.primary)
+                            }
+                            onMouseLeave={(e) =>
+                              (e.currentTarget.style.color = "#6B7280")
+                            }
+                            title="Copy message"
+                          >
+                            <svg
+                              className="w-3 h-3"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                              />
+                            </svg>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ) : (

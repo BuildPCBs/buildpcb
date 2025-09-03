@@ -61,11 +61,16 @@ export const createSimpleComponent = (
     name: string;
     x?: number;
     y?: number;
+    id?: string; // Add optional id parameter
   }
 ) => {
-  if (!fabricCanvas) return;
+  console.log(`🏭 ENHANCED: Creating ${componentInfo.name} on canvas:`, !!fabricCanvas);
+  console.log(`🏭 Canvas type:`, fabricCanvas?.constructor?.name);
 
-  console.log(`🏭 ENHANCED: Creating ${componentInfo.name}`);
+  if (!fabricCanvas) {
+    console.error("❌ No fabric canvas provided to createSimpleComponent");
+    return;
+  }
 
   // Get component-specific styling
   const style =
@@ -109,6 +114,8 @@ export const createSimpleComponent = (
   });
 
   // Create FUNCTIONAL connection pins with metadata
+  const componentId = componentInfo.id || `component_${Date.now()}`;
+
   const pin1 = new fabric.Circle({
     radius: 4,
     fill: "#10B981", // Green pins
@@ -118,16 +125,15 @@ export const createSimpleComponent = (
     originY: "center",
     left: -style.pinDistance,
     top: 0,
-  });
-
-  // Add pin metadata that the wiring tool expects
-  pin1.set("pin", true); // This is what the wiring tool looks for!
-  pin1.set("data", {
-    type: "pin",
-    componentId: `component_${Date.now()}`,
-    pinId: "pin1",
-    pinNumber: 1,
-    isConnectable: true,
+    // Add pin metadata that the wiring tool expects
+    pin: true, // This is what the wiring tool looks for!
+    data: {
+      type: "pin",
+      componentId: componentId,
+      pinId: "pin1",
+      pinNumber: 1,
+      isConnectable: true,
+    },
   });
   console.log("🔌 Pin1 created with pin=true and metadata");
 
@@ -140,16 +146,15 @@ export const createSimpleComponent = (
     originY: "center",
     left: style.pinDistance,
     top: 0,
-  });
-
-  // Add pin metadata that the wiring tool expects
-  pin2.set("pin", true); // This is what the wiring tool looks for!
-  pin2.set("data", {
-    type: "pin",
-    componentId: `component_${Date.now()}`,
-    pinId: "pin2",
-    pinNumber: 2,
-    isConnectable: true,
+    // Add pin metadata that the wiring tool expects
+    pin: true, // This is what the wiring tool looks for!
+    data: {
+      type: "pin",
+      componentId: componentId,
+      pinId: "pin2",
+      pinNumber: 2,
+      isConnectable: true,
+    },
   });
   console.log("🔌 Pin2 created with pin=true and metadata");
 
@@ -161,6 +166,7 @@ export const createSimpleComponent = (
 
   // Add component metadata that the wiring tool expects
   component.set("componentType", componentInfo.type); // This is what the wiring tool looks for!
+  component.set("id", componentInfo.id || `component_${Date.now()}`); // Set the component ID for wire connections
   component.set("data", {
     type: "component",
     componentType: componentInfo.type,
@@ -179,7 +185,14 @@ export const createSimpleComponent = (
   });
 
   // Add to canvas
+  console.log(`🎨 Adding component to canvas at position:`, component.left, component.top);
+  console.log(`🎨 Canvas objects before add:`, fabricCanvas.getObjects().length);
+
   fabricCanvas.add(component);
+
+  console.log(`🎨 Canvas objects after add:`, fabricCanvas.getObjects().length);
+  console.log(`🎨 Component added successfully:`, componentInfo.name);
+
   fabricCanvas.renderAll();
 
   console.log(`✅ ENHANCED: Added ${componentInfo.name} with functional pins!`);

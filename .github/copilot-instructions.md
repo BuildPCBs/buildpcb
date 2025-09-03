@@ -10,7 +10,7 @@ This is an AI-powered PCB design IDE built with:
 - **Icons**: Lucide React for consistent iconography
 - **Architecture**: Modern component-based with hooks and context patterns
 
-**Key Focus**: Creating an intuitive, browser-based PCB design tool - "The Figma for Electronics Design"
+**Key Focus**: Creating a professional-grade, browser-based PCB design tool that rivals enterprise CAD software, targeting engineers at major companies
 
 ## Development Environment
 

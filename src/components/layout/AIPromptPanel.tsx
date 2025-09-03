@@ -32,15 +32,18 @@ export function AIPromptPanel({
   const currentIsThinking = contextIsThinking || isThinking || localIsThinking;
 
   const handlePromptSubmit = async (prompt: string) => {
-    console.log("AI Prompt submitted:", prompt);
-    console.log("Canvas state for AI:", canvasState);
+    console.log("🚀 AI Prompt submitted:", prompt);
+    console.log("🎨 Canvas available:", !!canvas);
+    console.log("📊 Canvas state:", canvasState);
+    console.log("🔧 Canvas type:", canvas?.constructor?.name);
 
     if (onPromptSubmit) {
       // Use external handler if provided
       await onPromptSubmit(prompt);
     } else {
-      // Use context handler with canvas state
-      await contextHandlePromptSubmit(prompt, canvasState);
+      // Use context handler with canvas state and canvas
+      console.log("📤 Calling context handlePromptSubmit with canvas:", !!canvas);
+      await contextHandlePromptSubmit(prompt, canvasState, canvas);
     }
   };
 
