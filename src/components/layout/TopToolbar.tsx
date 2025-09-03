@@ -23,8 +23,8 @@ export function TopToolbar({ className = "" }: TopToolbarProps) {
   }, []);
 
   const handleExport = () => {
-    console.log("Export clicked - showing analytics panel");
-    setShowAnalyticsPanel(true);
+    console.log("Export clicked - handling export functionality");
+    // Add actual export functionality here
   };
 
   const handleUserClick = () => {
@@ -33,8 +33,8 @@ export function TopToolbar({ className = "" }: TopToolbarProps) {
   };
 
   const handleChartClick = () => {
-    console.log("Chart icon clicked");
-    // Add chart functionality here
+    console.log("Chart icon clicked - showing analytics panel");
+    setShowAnalyticsPanel(true);
   };
 
   return (
@@ -144,7 +144,7 @@ export function TopToolbar({ className = "" }: TopToolbarProps) {
         </span>
       </div>
 
-      {/* Analytics Panel Overlay - Triggered by Export Button Click */}
+      {/* Analytics Panel Overlay - Triggered by Chart Icon Click */}
       {showAnalyticsPanel && (
         <>
           {/* Blur Backdrop */}
@@ -156,18 +156,18 @@ export function TopToolbar({ className = "" }: TopToolbarProps) {
 
           {/* Analytics Panel Container */}
           <div
-            className="fixed z-50 bg-white"
+            className="fixed z-50"
             style={{
               ...r({
                 width: 522,
                 height: 331,
                 top: 92,
                 left: 614,
+                borderRadius: 20,
               }),
               opacity: 1,
               transform: "rotate(0deg)",
-              boxShadow:
-                "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+              overflow: "hidden", // Ensure content doesn't bleed outside rounded corners
             }}
           >
             {/* Analytics Panel Content */}
