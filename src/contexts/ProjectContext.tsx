@@ -13,7 +13,6 @@ import { Circuit } from "@/lib/schemas/circuit";
 import { ProjectService, ProjectLoadResult } from "@/lib/project-service";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
-import { useProjectStore } from "@/store/projectStore";
 
 interface ProjectContextType {
   // Current project state
@@ -44,7 +43,6 @@ interface ProjectProviderProps {
 
 export function ProjectProvider({ children }: ProjectProviderProps) {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const router = useRouter();
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [currentCircuit, setCurrentCircuit] = useState<Circuit | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -52,23 +50,11 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
   const [isNewProject, setIsNewProject] = useState(false);
   const [isFirstTimeUser, setIsFirstTimeUser] = useState(false);
 
-  // Get Zustand store actions
-  const { setProject, setCircuit, clearProject } = useProjectStore();
-
-  // Only auto-load project when user becomes authenticated AND we're not on a specific project page
+  // Load project when user becomes authenticated
   useEffect(() => {
     if (isAuthenticated && !authLoading) {
-      // Check if we're on a specific project page (has project ID in URL)
-      const isOnSpecificProject =
-        window.location.pathname.includes("/project/");
-
-      if (!isOnSpecificProject) {
-        console.log("🔄 User authenticated, loading default project...");
-        loadProject();
-      } else {
-        console.log("🎯 On specific project page, skipping auto-load");
-        setIsLoading(false); // Don't block the specific project loading
-      }
+      console.log("🔄 User authenticated, loading project...");
+      loadProject();
     } else if (!isAuthenticated) {
       // Clear project state when not authenticated
       console.log("🚪 User not authenticated, clearing project state");
@@ -76,9 +62,6 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
       setCurrentCircuit(null);
       setIsLoading(false);
       setError(null);
-
-      // CLEAR ZUSTAND STORE TOO
-      clearProject();
     } else if (authLoading) {
       console.log("⏳ Still loading auth state...");
     }
@@ -108,13 +91,6 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
         setIsNewProject(false);
         setIsFirstTimeUser(false);
 
-        // SYNC TO ZUSTAND STORE - This is what the canvas needs!
-        setProject(project.id, project.id, project.name);
-        console.log("🎯 STORE SYNC: Set project in Zustand store:", {
-          projectId: project.id,
-          projectName: project.name,
-        });
-
         // Load the circuit data for this project
         const circuitData = await ProjectService.loadProjectCircuit(project.id);
 
@@ -127,12 +103,6 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
         };
 
         setCurrentCircuit(circuit);
-
-        // SYNC TO ZUSTAND STORE - Canvas only needs basic project info
-        console.log("🔄 Syncing project to store for canvas:", {
-          projectId: project.id,
-          projectName: project.name,
-        });
 
         // Update last opened timestamp
         await DatabaseService.updateLastOpened(project.id);
@@ -178,9 +148,6 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
       setCurrentProject(result.project);
       setIsNewProject(result.isNewProject);
       setIsFirstTimeUser(result.isFirstTimeUser);
-
-      // SYNC TO ZUSTAND STORE for default project too
-      setProject(result.project.id, result.project.id, result.project.name);
 
       // Load the circuit data for this project
       const circuitData = await ProjectService.loadProjectCircuit(

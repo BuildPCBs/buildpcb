@@ -29,38 +29,24 @@ export function serializeCanvasToCircuit(
   const components: CanvasComponent[] = objects
     .filter((obj) => obj.type !== "line" && obj.type !== "path") // Exclude wires
     .map((obj, index) => {
-      // Try to get complete component metadata from fabric object
-      const componentData = (obj as any).componentData;
+      // Get component metadata from fabric object
+      const componentData = (obj as any).componentData || {};
 
-      if (componentData) {
-        // Use complete metadata if available
-        return {
-          ...componentData,
-          position: {
-            x: obj.left || 0,
-            y: obj.top || 0,
-          },
-          rotation: obj.angle || 0,
-        };
-      } else {
-        // Fallback to legacy incomplete metadata (for backward compatibility)
-        const legacyData = (obj as any).data || {};
-        return {
-          id: legacyData.id || `comp_${index}`,
-          name: legacyData.componentName || `Component ${index + 1}`,
-          type: legacyData.componentType || "unknown",
-          category: "general",
-          specifications: {},
-          availability: "in-stock" as const,
-          position: {
-            x: obj.left || 0,
-            y: obj.top || 0,
-          },
-          rotation: obj.angle || 0,
-          properties: {},
-          pins: legacyData.pins || [],
-        };
-      }
+      return {
+        id: componentData.id || `comp_${index}`,
+        name: componentData.name || `Component ${index + 1}`,
+        type: componentData.type || "unknown",
+        category: componentData.category || "general",
+        specifications: componentData.specifications || {},
+        availability: componentData.availability || ("in-stock" as const),
+        position: {
+          x: obj.left || 0,
+          y: obj.top || 0,
+        },
+        rotation: obj.angle || 0,
+        properties: componentData.properties || {},
+        pins: componentData.pins || [],
+      };
     });
 
   // Extract connections from canvas objects (wires)

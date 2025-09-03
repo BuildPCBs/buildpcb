@@ -41,35 +41,10 @@ export function useCanvasAutoSave({
   const getCurrentCanvasData = useCallback(() => {
     if (!canvas) return { circuit: null, canvasData: {} };
 
-    try {
-      const circuit = serializeCanvasToCircuit(canvas);
-      const canvasData = serializeCanvasData(canvas);
+    const circuit = serializeCanvasToCircuit(canvas);
+    const canvasData = serializeCanvasData(canvas);
 
-      // Validate that we have meaningful data before saving
-      if (!circuit || !circuit.components || circuit.components.length === 0) {
-        console.log("🔄 Auto-save: No components to save yet, skipping");
-        return { circuit: null, canvasData: {} };
-      }
-
-      // Check if all components have required metadata
-      const incompleteComponents = circuit.components.filter(
-        (comp) =>
-          !comp.id || !comp.type || !comp.category || !comp.specifications
-      );
-
-      if (incompleteComponents.length > 0) {
-        console.log(
-          "🔄 Auto-save: Some components missing metadata, skipping save"
-        );
-        console.log("Incomplete components:", incompleteComponents);
-        return { circuit: null, canvasData: {} };
-      }
-
-      return { circuit, canvasData };
-    } catch (error) {
-      console.error("❌ Auto-save: Failed to serialize canvas data:", error);
-      return { circuit: null, canvasData: {} };
-    }
+    return { circuit, canvasData };
   }, [canvas]);
 
   // Use the database auto-save hook

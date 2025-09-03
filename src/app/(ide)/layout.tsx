@@ -22,5 +22,9 @@ export const metadata: Metadata = generatePageMetadata({
 });
 
 export default function IDELayout({ children }: { children: React.ReactNode }) {
-  return <RouteGuard requireAuth={true}>{children}</RouteGuard>;
+  return (
+    <RouteGuard requireAuth={true}>
+      <ProjectProvider>{children}</ProjectProvider>
+    </RouteGuard>
+  );
 }

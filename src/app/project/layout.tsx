@@ -16,5 +16,9 @@ export default function ProjectLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <ProjectProvider>{children}</ProjectProvider>;
+  return (
+    <RouteGuard requireAuth={true}>
+      <ProjectProvider>{children}</ProjectProvider>
+    </RouteGuard>
+  );
 }
