@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { UserIcon, ChartIcon, CloudIcon } from "@/components/icons";
+import {
+  UserIcon,
+  ChartIcon,
+  CloudIcon,
+  WindowIcon,
+  ExportIcon,
+} from "@/components/icons";
 import { ActivityAnalyticsPanel } from "./ActivityAnalyticsPanel";
 import { r, responsive, responsiveSquare } from "@/lib/responsive";
 import { useProject } from "@/contexts/ProjectContext";
@@ -16,6 +22,8 @@ export function TopToolbar({ className = "" }: TopToolbarProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [showAnalyticsPanel, setShowAnalyticsPanel] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [isFullyExpanded, setIsFullyExpanded] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
   // Get project and canvas contexts
   const { currentProject, currentCircuit, saveProject } = useProject();
@@ -97,84 +105,144 @@ export function TopToolbar({ className = "" }: TopToolbarProps) {
     setShowAnalyticsPanel(true);
   };
 
+  const toggleFullExpand = () => {
+    if (isFullyExpanded) {
+      setIsFullyExpanded(false);
+      setIsHovered(false);
+    } else {
+      setIsFullyExpanded(true);
+    }
+  };
+
+  // Determine toolbar state and styles
+  const getToolbarStyles = () => {
+    if (isFullyExpanded) {
+      return {
+        width: responsive(338),
+        height: responsive(45),
+        borderRadius: responsive(16),
+      };
+    } else if (isHovered) {
+      return {
+        width: responsive(200),
+        height: responsive(45),
+        borderRadius: responsive(16),
+      };
+    } else {
+      return {
+        width: responsive(45),
+        height: responsive(45),
+        borderRadius: responsive(22.5),
+      };
+    }
+  };
+
   return (
     <div className="relative">
       {/* Main Toolbar Box */}
       <div
-        className={`fixed bg-white border border-gray-300 flex items-center justify-between ${className}`}
+        className={`fixed bg-white border border-gray-300 flex items-center justify-between transition-all duration-300 ease-in-out overflow-hidden cursor-pointer ${className}`}
         style={{
-          ...r({
-            width: 338,
-            height: 45,
-            borderRadius: 16,
-            top: 45,
-          }),
-          right: responsive(32), // Add some margin from right edge
+          ...getToolbarStyles(),
+          top: responsive(45),
+          right: responsive(32), // Position from right edge
           borderWidth: responsive(1),
           zIndex: 10,
         }}
-      >
-        {/* Left Side Icons */}
-        <div className="flex items-center" style={{ gap: responsive(25) }}>
-          {/* User Icon */}
-          <button
-            onClick={handleUserClick}
-            className="flex items-center justify-center border border-gray-300 hover:border-[#0038DF] hover:bg-[#0038DF]/10 transition-colors"
-            style={{
-              ...responsiveSquare(24),
-              borderRadius: responsive(99),
-              borderWidth: responsive(0.5),
-              marginLeft: responsive(11),
-            }}
-          >
-            <UserIcon size={16} className="text-gray-600" />
-          </button>
-
-          {/* Chart Icon */}
-          <button
-            onClick={handleChartClick}
-            className="flex items-center justify-center border border-gray-400 hover:border-[#0038DF] hover:bg-[#0038DF]/10 transition-colors"
-            style={{
-              ...r({
-                width: 24,
-                height: 24,
-              }),
-              borderWidth: responsive(1.2),
-              borderRadius: responsive(4),
-            }}
-          >
-            <ChartIcon size={16} className="text-gray-700" />
-          </button>
-        </div>
-
-        {/* Right Side Export Button */}
-        <button
-          onClick={handleExport}
-          disabled={isSaving || !currentProject}
-          title={
-            navigator.platform.includes("Mac")
-              ? "Export (⌘S)"
-              : "Export (Ctrl+S)"
+        onMouseEnter={() => !isFullyExpanded && setIsHovered(true)}
+        onMouseLeave={() => !isFullyExpanded && setIsHovered(false)}
+        onClick={(e) => {
+          if (!isFullyExpanded) {
+            e.stopPropagation();
+            toggleFullExpand();
           }
-          className={`flex items-center justify-center text-white transition-colors ${
-            isSaving || !currentProject
-              ? "bg-gray-400 cursor-not-allowed"
-              : "bg-[#0038DF] hover:bg-[#0032c6]"
-          }`}
-          style={{
-            ...r({
-              width: 83,
-              height: 30,
-              borderRadius: 8,
-              padding: 10,
-            }),
-            marginRight: responsive(8),
-          }}
-        >
-          <span className="font-medium" style={{ fontSize: responsive(10) }}>
-            {isSaving ? "Saving..." : "Export"}
-          </span>
-        </button>
+        }}
+      >
+        {/* Collapsed state - just show WindowIcon */}
+        {!isHovered && !isFullyExpanded && (
+          <div className="flex items-center justify-center w-full h-full">
+            <ExportIcon size={20} className="text-[#0038DF]" />
+          </div>
+        )}
+
+        {/* Hover state OR Fully expanded - show full toolbar */}
+        {(isHovered || isFullyExpanded) && (
+          <>
+            {/* Left Side Icons */}
+            <div className="flex items-center" style={{ gap: responsive(25) }}>
+              {/* User Icon */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleUserClick();
+                }}
+                className="flex items-center justify-center border border-gray-300 hover:border-[#0038DF] hover:bg-[#0038DF]/10 transition-colors"
+                style={{
+                  ...responsiveSquare(24),
+                  borderRadius: responsive(99),
+                  borderWidth: responsive(0.5),
+                  marginLeft: responsive(11),
+                }}
+              >
+                <UserIcon size={16} className="text-gray-600" />
+              </button>
+
+              {/* Chart Icon */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleChartClick();
+                }}
+                className="flex items-center justify-center border border-gray-400 hover:border-[#0038DF] hover:bg-[#0038DF]/10 transition-colors"
+                style={{
+                  ...r({
+                    width: 24,
+                    height: 24,
+                  }),
+                  borderWidth: responsive(1.2),
+                  borderRadius: responsive(4),
+                }}
+              >
+                <ChartIcon size={16} className="text-gray-700" />
+              </button>
+            </div>
+
+            {/* Right Side Export Button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleExport();
+              }}
+              disabled={isSaving || !currentProject}
+              title={
+                navigator.platform.includes("Mac")
+                  ? "Export (⌘S)"
+                  : "Export (Ctrl+S)"
+              }
+              className={`flex items-center justify-center text-white transition-colors ${
+                isSaving || !currentProject
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-[#0038DF] hover:bg-[#0032c6]"
+              }`}
+              style={{
+                ...r({
+                  width: 83,
+                  height: 30,
+                  borderRadius: 8,
+                  padding: 10,
+                }),
+                marginRight: responsive(8),
+              }}
+            >
+              <span
+                className="font-medium"
+                style={{ fontSize: responsive(10) }}
+              >
+                {isSaving ? "Saving..." : "Export"}
+              </span>
+            </button>
+          </>
+        )}
       </div>
 
       {/* Autosave Indicator - Outside the box */}
@@ -184,7 +252,9 @@ export function TopToolbar({ className = "" }: TopToolbarProps) {
           ...r({
             top: 61,
           }),
-          right: responsive(32 + 338 + 16), // Right margin + box width + spacing
+          right: responsive(
+            32 + (isFullyExpanded ? 338 : isHovered ? 200 : 45) + 16
+          ), // Dynamic right margin based on toolbar width
           gap: responsive(6),
           zIndex: 9,
         }}
@@ -237,8 +307,8 @@ export function TopToolbar({ className = "" }: TopToolbarProps) {
           style={{
             ...r({
               top: 95,
-              right: 32,
             }),
+            right: responsive(32), // Position from right edge
             maxWidth: "300px",
             zIndex: 10,
           }}
