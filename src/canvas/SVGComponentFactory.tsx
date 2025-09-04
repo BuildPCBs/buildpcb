@@ -495,10 +495,11 @@ export const recreateComponentPins = (
 
   // CRITICAL FIX: Preserve original component ID for pin consistency
   // This ensures electrical connections are maintained during copy/paste
-  const originalComponentId = (component as any).id || componentData.componentId;
-  const newComponentId = originalComponentId || `component_${Date.now()}_${Math.random()
-    .toString(36)
-    .substr(2, 9)}`;
+  const originalComponentId =
+    (component as any).id || componentData.componentId;
+  const newComponentId =
+    originalComponentId ||
+    `component_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
   // Get existing objects from the component (excluding old pins)
   const existingObjects = component.getObjects().filter((obj: any) => {

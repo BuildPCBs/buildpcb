@@ -125,7 +125,10 @@ export function serializeCanvasData(
       const fabricObj = obj as any;
 
       // Check if this is a wire with electrical properties
-      if (fabricObj.wireType === "connection" || fabricObj.wireType === "junction") {
+      if (
+        fabricObj.wireType === "connection" ||
+        fabricObj.wireType === "junction"
+      ) {
         electricalMetadata[`wire_${index}`] = {
           // Core wire identification
           wireType: fabricObj.wireType,
@@ -169,7 +172,7 @@ export function serializeCanvasData(
         });
       }
 
-      // Also preserve component metadata
+      // Also preserve component metadata and pin information
       if (fabricObj.componentType) {
         electricalMetadata[`component_${index}`] = {
           componentType: fabricObj.componentType,
@@ -177,6 +180,42 @@ export function serializeCanvasData(
           data: fabricObj.data,
           objectIndex: index,
         };
+
+        // If this is a group component, preserve pin information
+        if (fabricObj.type === "group") {
+          const groupObjects = (fabricObj as fabric.Group).getObjects();
+          const pinInfo: any[] = [];
+
+          groupObjects.forEach((groupObj: any, groupIndex: number) => {
+            if (
+              groupObj.pin ||
+              (groupObj.data && groupObj.data.type === "pin")
+            ) {
+              pinInfo.push({
+                pinId: groupObj.data?.pinId || `pin_${groupIndex}`,
+                pin: groupObj.pin,
+                data: groupObj.data,
+                type: groupObj.type,
+                radius: groupObj.radius,
+                fill: groupObj.fill,
+                stroke: groupObj.stroke,
+                strokeWidth: groupObj.strokeWidth,
+                left: groupObj.left,
+                top: groupObj.top,
+                originX: groupObj.originX,
+                originY: groupObj.originY,
+              });
+            }
+          });
+
+          if (pinInfo.length > 0) {
+            electricalMetadata[`component_${index}`].pins = pinInfo;
+            console.log(
+              `🔌 Preserving ${pinInfo.length} pins for component ${fabricObj.componentType}:`,
+              pinInfo.map((p) => p.pinId)
+            );
+          }
+        }
       }
     });
 
@@ -202,7 +241,7 @@ export function loadCanvasFromData(
   canvas: fabric.Canvas,
   canvasData: Record<string, any>
 ): Promise<void> {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     try {
       console.log("🔄 Loading canvas from data:", {
         objectCount: canvasData.objects?.length || 0,
@@ -211,7 +250,7 @@ export function loadCanvasFromData(
         hasElectricalMetadata: !!canvasData.electricalMetadata,
       });
 
-      canvas.loadFromJSON(canvasData, () => {
+      canvas.loadFromJSON(canvasData, async () => {
         console.log(
           "📊 Canvas loaded, objects on canvas:",
           canvas.getObjects().length
@@ -221,13 +260,20 @@ export function loadCanvasFromData(
         if (canvasData.electricalMetadata) {
           const objects = canvas.getObjects();
 
-          Object.entries(canvasData.electricalMetadata).forEach(([key, metadata]: [string, any]) => {
-            if (metadata.objectIndex !== undefined && objects[metadata.objectIndex]) {
+          for (const [key, metadata] of Object.entries(
+            canvasData.electricalMetadata
+          ) as [string, any][]) {
+            if (
+              metadata.objectIndex !== undefined &&
+              objects[metadata.objectIndex]
+            ) {
               const obj = objects[metadata.objectIndex] as any;
 
               // Restore wire electrical properties
-              if (key.startsWith('wire_')) {
-                console.log(`🔌 Restoring electrical metadata for wire at index ${metadata.objectIndex}`);
+              if (key.startsWith("wire_")) {
+                console.log(
+                  `🔌 Restoring electrical metadata for wire at index ${metadata.objectIndex}`
+                );
 
                 // Core wire identification
                 obj.wireType = metadata.wireType;
@@ -279,7 +325,7 @@ export function loadCanvasFromData(
               }
 
               // Restore component metadata
-              if (key.startsWith('component_')) {
+              if (key.startsWith("component_")) {
                 obj.componentType = metadata.componentType;
                 obj.id = metadata.id;
                 obj.data = metadata.data;
@@ -291,14 +337,99 @@ export function loadCanvasFromData(
                 obj.hasControls = true;
                 obj.hasBorders = true;
                 obj.centeredRotation = true;
+
+                // Restore pin properties if they were preserved
+                if (metadata.pins && obj.type === "group") {
+                  const groupObjects = (obj as fabric.Group).getObjects();
+
+                  metadata.pins.forEach((pinData: any) => {
+                    // Find the pin by pinId instead of index
+                    const pinObj = groupObjects.find(
+                      (groupObj: any) =>
+                        groupObj.data && groupObj.data.pinId === pinData.pinId
+                    ) as any;
+
+                    if (pinObj) {
+                      pinObj.pin = pinData.pin;
+                      pinObj.data = pinData.data;
+                      console.log(
+                        `✅ Restored pin properties for pin ${pinData.pinId}`
+                      );
+                    } else {
+                      console.warn(
+                        `⚠️ Could not find pin with ID ${pinData.pinId} in component ${obj.componentType}`
+                      );
+                    }
+                  });
+
+                  console.log(
+                    `✅ Restored ${metadata.pins.length} pins for component ${obj.componentType}`
+                  );
+                }
+
+                // Check if this component needs pin recreation (fallback)
+                if (obj.type === "group" && obj.componentType) {
+                  console.log(
+                    `🔌 Checking pins for component ${obj.componentType} at index ${metadata.objectIndex}`
+                  );
+
+                  // Check if the component has pins
+                  const groupObjects = (obj as fabric.Group).getObjects();
+                  const hasPins = groupObjects.some(
+                    (groupObj: any) =>
+                      groupObj.pin ||
+                      (groupObj.data && groupObj.data.type === "pin")
+                  );
+
+                  if (!hasPins) {
+                    console.log(
+                      `⚠️ Component ${obj.componentType} missing pins, attempting recreation`
+                    );
+
+                    // Try to recreate pins for this component
+                    try {
+                      // Import the SVG component factory dynamically
+                      const { recreateComponentPins } = await import(
+                        "../SVGComponentFactory"
+                      );
+                      const recreatedComponent = recreateComponentPins(
+                        obj as fabric.Group,
+                        canvas
+                      );
+
+                      if (recreatedComponent && recreatedComponent !== obj) {
+                        // Replace the old component with the recreated one
+                        const index = canvas.getObjects().indexOf(obj);
+                        if (index !== -1) {
+                          canvas.remove(obj);
+                          canvas.add(recreatedComponent);
+                          console.log(
+                            `✅ Successfully recreated pins for component ${obj.componentType}`
+                          );
+                        }
+                      }
+                    } catch (error) {
+                      console.error(
+                        `❌ Failed to recreate pins for component ${obj.componentType}:`,
+                        error
+                      );
+                    }
+                  } else {
+                    console.log(
+                      `✅ Component ${obj.componentType} already has pins`
+                    );
+                  }
+                }
               }
             }
-          });
+          }
 
-          console.log(`🔌 Electrical metadata restoration completed for ${Object.keys(canvasData.electricalMetadata).length} objects`);
-        }
-
-        // Preserve the grid background if it was set
+          console.log(
+            `🔌 Electrical metadata restoration completed for ${
+              Object.keys(canvasData.electricalMetadata).length
+            } objects`
+          );
+        } // Preserve the grid background if it was set
         const currentBg = canvas.backgroundColor;
         if (!currentBg || typeof currentBg === "string") {
           // Create and apply grid pattern if background is not already a pattern
@@ -341,6 +472,65 @@ export function loadCanvasFromData(
 
         canvas.renderAll();
         console.log("✅ Canvas restoration completed with electrical metadata");
+
+        // Trigger pin visibility update after restoration
+        // This ensures pins are properly shown/hidden based on current wiring tool state
+        setTimeout(() => {
+          const objects = canvas.getObjects();
+          let pinCount = 0;
+
+          objects.forEach((obj) => {
+            // Handle new Component Sandwich architecture
+            if (
+              (obj as any).data?.isComponentSandwich &&
+              obj.type === "group"
+            ) {
+              const componentSandwich = obj as fabric.Group;
+              const sandwichLayers = componentSandwich.getObjects();
+
+              sandwichLayers.forEach((layer) => {
+                if ((layer as any).pin && layer.type === "circle") {
+                  pinCount++;
+                  // Set default pin visibility (will be overridden by wiring tool if active)
+                  layer.set({
+                    opacity: 0.8, // Default visible state
+                    strokeWidth: 1,
+                    fill: "#10B981", // Default green
+                    stroke: "#059669",
+                    visible: true,
+                  });
+                }
+              });
+            }
+
+            // Legacy support for old component structure
+            else if ((obj as any).componentType && obj.type === "group") {
+              const group = obj as fabric.Group;
+              const groupObjects = group.getObjects();
+
+              groupObjects.forEach((groupObj) => {
+                if ((groupObj as any).pin) {
+                  pinCount++;
+                  groupObj.set({
+                    opacity: 0.8,
+                    strokeWidth: 1,
+                    fill: "#10B981",
+                    stroke: "#059669",
+                    visible: true,
+                  });
+                }
+              });
+            }
+          });
+
+          if (pinCount > 0) {
+            canvas.renderAll();
+            console.log(
+              `✅ PIN RESTORATION: Made ${pinCount} pins visible after canvas load`
+            );
+          }
+        }, 100); // Small delay to ensure everything is settled
+
         resolve();
       });
     } catch (error) {

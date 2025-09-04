@@ -358,17 +358,26 @@ export function useWiringTool({
 
   // RULE #3: Prevent wire self-overlapping and crossing
   const validateWirePath = useCallback(
-    (newPoints: fabric.Point[], existingWires: fabric.Polyline[] = []): boolean => {
+    (
+      newPoints: fabric.Point[],
+      existingWires: fabric.Polyline[] = []
+    ): boolean => {
       if (newPoints.length < 2) return true;
 
       // Rule 3A: Prevent self-intersection within the new wire path
       for (let i = 0; i < newPoints.length - 2; i++) {
         for (let j = i + 2; j < newPoints.length - 1; j++) {
-          if (linesIntersect(
-            newPoints[i], newPoints[i + 1],
-            newPoints[j], newPoints[j + 1]
-          )) {
-            console.log("🚫 RULE #3A: Wire self-intersection detected - path invalid");
+          if (
+            linesIntersect(
+              newPoints[i],
+              newPoints[i + 1],
+              newPoints[j],
+              newPoints[j + 1]
+            )
+          ) {
+            console.log(
+              "🚫 RULE #3A: Wire self-intersection detected - path invalid"
+            );
             return false;
           }
         }
@@ -382,19 +391,31 @@ export function useWiringTool({
         for (let i = 0; i < newPoints.length - 1; i++) {
           for (let j = 0; j < existingPoints.length - 1; j++) {
             // Convert XY points to fabric.Point for distance calculation
-            const existingPointJ = new fabric.Point(existingPoints[j].x, existingPoints[j].y);
-            const existingPointJ1 = new fabric.Point(existingPoints[j + 1].x, existingPoints[j + 1].y);
+            const existingPointJ = new fabric.Point(
+              existingPoints[j].x,
+              existingPoints[j].y
+            );
+            const existingPointJ1 = new fabric.Point(
+              existingPoints[j + 1].x,
+              existingPoints[j + 1].y
+            );
 
             // Skip if this is a legitimate junction (very close endpoints)
-            const isNearStart = distanceBetweenPoints(newPoints[i], existingPointJ) < 5;
-            const isNearEnd = distanceBetweenPoints(newPoints[i + 1], existingPointJ1) < 5;
+            const isNearStart =
+              distanceBetweenPoints(newPoints[i], existingPointJ) < 5;
+            const isNearEnd =
+              distanceBetweenPoints(newPoints[i + 1], existingPointJ1) < 5;
 
             if (isNearStart || isNearEnd) continue;
 
-            if (linesIntersect(
-              newPoints[i], newPoints[i + 1],
-              existingPointJ, existingPointJ1
-            )) {
+            if (
+              linesIntersect(
+                newPoints[i],
+                newPoints[i + 1],
+                existingPointJ,
+                existingPointJ1
+              )
+            ) {
               console.log("🚫 RULE #3B: Wire crossing detected - path invalid");
               return false;
             }
@@ -409,12 +430,21 @@ export function useWiringTool({
 
   // Helper function: Check if two line segments intersect
   const linesIntersect = useCallback(
-    (p1: fabric.Point, p2: fabric.Point, p3: fabric.Point, p4: fabric.Point): boolean => {
-      const denom = (p1.x - p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x - p4.x);
+    (
+      p1: fabric.Point,
+      p2: fabric.Point,
+      p3: fabric.Point,
+      p4: fabric.Point
+    ): boolean => {
+      const denom =
+        (p1.x - p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x - p4.x);
       if (Math.abs(denom) < 1e-10) return false; // Lines are parallel
 
-      const t = ((p1.x - p3.x) * (p3.y - p4.y) - (p1.y - p3.y) * (p3.x - p4.x)) / denom;
-      const u = -((p1.x - p2.x) * (p1.y - p3.y) - (p1.y - p2.y) * (p1.x - p3.x)) / denom;
+      const t =
+        ((p1.x - p3.x) * (p3.y - p4.y) - (p1.y - p3.y) * (p3.x - p4.x)) / denom;
+      const u =
+        -((p1.x - p2.x) * (p1.y - p3.y) - (p1.y - p2.y) * (p1.x - p3.x)) /
+        denom;
 
       return t >= 0 && t <= 1 && u >= 0 && u <= 1;
     },
@@ -437,10 +467,17 @@ export function useWiringTool({
       existingWires: fabric.Polyline[] = []
     ): fabric.Point => {
       // Get all existing wires from canvas if not provided
-      const wiresToCheck = existingWires.length > 0 ? existingWires :
-        canvas ? canvas.getObjects().filter((obj: any) =>
-          obj.wireType === "connection" && obj.type === "polyline"
-        ) as fabric.Polyline[] : [];
+      const wiresToCheck =
+        existingWires.length > 0
+          ? existingWires
+          : canvas
+          ? (canvas
+              .getObjects()
+              .filter(
+                (obj: any) =>
+                  obj.wireType === "connection" && obj.type === "polyline"
+              ) as fabric.Polyline[])
+          : [];
 
       const deltaX = Math.abs(currentPoint.x - lastPoint.x);
       const deltaY = Math.abs(currentPoint.y - lastPoint.y);
@@ -461,7 +498,9 @@ export function useWiringTool({
       }
 
       // If preferred direction causes lapping, try the alternative
-      console.log("⚠️ RULE #3: Preferred orthogonal path causes lapping, trying alternative");
+      console.log(
+        "⚠️ RULE #3: Preferred orthogonal path causes lapping, trying alternative"
+      );
       if (deltaX > deltaY) {
         candidatePoint = new fabric.Point(lastPoint.x, currentPoint.y);
       } else {
@@ -475,7 +514,9 @@ export function useWiringTool({
       }
 
       // If both directions cause lapping, use direct line (last resort)
-      console.log("⚠️ RULE #3: Both orthogonal paths cause lapping, using direct line");
+      console.log(
+        "⚠️ RULE #3: Both orthogonal paths cause lapping, using direct line"
+      );
       return currentPoint;
     },
     [validateWirePath, canvas]
@@ -855,7 +896,10 @@ export function useWiringTool({
       console.log("🟡 TRAFFIC LIGHT: YELLOW (Drawing - Wire in progress)");
 
       const pinCoords = getPinWorldCoordinates(pin);
-      const orthogonalPoint = calculateOrthogonalPointWithValidation(pinCoords, clickPoint);
+      const orthogonalPoint = calculateOrthogonalPointWithValidation(
+        pinCoords,
+        clickPoint
+      );
 
       // Create visible POLYLINE immediately with pin coordinates as start
       const initialPoints = [pinCoords, orthogonalPoint];
@@ -1603,11 +1647,15 @@ export function useWiringTool({
       const currentPoint = new fabric.Point(pointer.x, pointer.y);
       const pin = findPinAtPoint(currentPoint);
 
-      // Handle pin highlighting
+      // Handle pin highlighting and cursor changes
       if (pin && pin !== wiringState.startPin) {
         highlightPin(pin);
+        // Change cursor to "+" when hovering over a valid pin
+        canvas.defaultCursor = "copy"; // "+" cursor
       } else {
         clearPinHighlight();
+        // Reset to crosshair when not over a pin
+        canvas.defaultCursor = "crosshair";
       }
 
       // PART 1 FIX: Update live wire preview
