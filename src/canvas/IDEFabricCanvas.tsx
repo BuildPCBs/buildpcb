@@ -1430,7 +1430,9 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
 
         // Prevent duplicate processing
         if (isProcessingComponent) {
-          console.log(`⚠️ Component creation already in progress, skipping ${componentInfo.name}`);
+          console.log(
+            `⚠️ Component creation already in progress, skipping ${componentInfo.name}`
+          );
           return;
         }
 

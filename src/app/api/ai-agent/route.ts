@@ -32,6 +32,136 @@ interface CircuitResponse {
   };
 }
 
+// Generate detailed markdown explanation for AI responses
+function generateDetailedExplanation(response: CircuitResponse): string {
+  if (response.mode === "text-only") {
+    return `## 🤖 AI Assistant Response
+
+**Response Type:** Text-only explanation
+**Content:** ${response.textResponse?.substring(0, 100)}${
+      response.textResponse && response.textResponse.length > 100 ? "..." : ""
+    }
+
+### 📝 What I Provided
+- Educational explanation or guidance
+- No circuit modifications made
+- Pure informational response
+
+### 💡 Usage Notes
+- This response contains explanatory content only
+- No components were added to the canvas
+- Use this information to inform your circuit design decisions`;
+  }
+
+  if (response.mode === "full" && response.circuit) {
+    const circuit = response.circuit;
+    const componentCount = circuit.components?.length || 0;
+    const connectionCount = circuit.connections?.length || 0;
+
+    let explanation = `## 🚀 Circuit Design Created
+
+**Circuit Name:** ${circuit.name || "Unnamed Circuit"}
+**Design Overview:** ${circuit.description || "Custom circuit design"}
+
+### 📊 Circuit Statistics
+- **Components:** ${componentCount} total
+- **Connections:** ${connectionCount} wires
+- **Complexity:** ${
+      componentCount > 5
+        ? "Advanced"
+        : componentCount > 2
+        ? "Intermediate"
+        : "Basic"
+    }
+
+### 🔧 Components Added`;
+
+    if (circuit.components && circuit.components.length > 0) {
+      circuit.components.forEach((comp: any, index: number) => {
+        explanation += `\n${index + 1}. **${
+          comp.type?.toUpperCase() || "COMPONENT"
+        }**`;
+        if (comp.value) explanation += ` - ${comp.value}`;
+        if (comp.position) {
+          explanation += `\n   - Position: (${comp.position.x || 0}, ${
+            comp.position.y || 0
+          })`;
+        }
+        if (comp.explanation) {
+          explanation += `\n   - Purpose: ${comp.explanation}`;
+        }
+      });
+    }
+
+    if (circuit.connections && circuit.connections.length > 0) {
+      explanation += `\n\n### 🔗 Electrical Connections`;
+      circuit.connections.forEach((conn: any, index: number) => {
+        const fromComp = circuit.components?.find(
+          (c: any) => c.id === conn.from?.componentId
+        );
+        const toComp = circuit.components?.find(
+          (c: any) => c.id === conn.to?.componentId
+        );
+        explanation += `\n${index + 1}. ${fromComp?.type || "Component"} → ${
+          toComp?.type || "Component"
+        }`;
+      });
+    }
+
+    explanation += `\n\n### 🎯 Design Intent
+This circuit was designed to fulfill your specific requirements. All components are positioned for optimal layout and electrical performance.
+
+### ⚡ Next Steps
+- Review component placements
+- Verify electrical connections
+- Test circuit functionality
+- Make adjustments as needed`;
+
+    return explanation;
+  }
+
+  if (response.mode === "edit" && response.edit) {
+    return `## ✏️ Circuit Modification Applied
+
+**Modification Type:** Circuit edit operation
+**Changes Made:** ${
+      response.edit.description || "Circuit modifications applied"
+    }
+
+### 🔄 What Was Changed
+- Existing circuit components were modified
+- Connection topology may have been updated
+- Component properties adjusted for better performance
+
+### 📋 Modification Details
+${response.edit.details || "Specific edit details not available"}
+
+### ✅ Verification Steps
+- Check that all connections remain intact
+- Verify component values are correct
+- Ensure circuit functionality is preserved`;
+  }
+
+  // Fallback for unknown response types
+  return `## 🤖 AI Response Generated
+
+**Response Mode:** ${response.mode || "Unknown"}
+**Timestamp:** ${new Date().toISOString()}
+
+### 📝 Response Summary
+An AI-generated response was created based on your input. The response type and content have been processed according to your request.
+
+### 🔍 Technical Details
+- Response format: ${response.mode || "Unspecified"}
+- Processing completed successfully
+- Ready for implementation or review
+
+### 💡 Recommendations
+- Review the response content carefully
+- Verify all specifications match your requirements
+- Test any generated circuits thoroughly`;
+}
+
 export const POST = withAuth(
   async (request: NextRequest, user: AuthenticatedUser) => {
     try {
@@ -234,26 +364,17 @@ IMPORTANT: Your response must be PURE JSON with no additional text, markdown, or
         parsedResponse.metadata = {
           timestamp: new Date().toISOString(),
           version: "1.0",
-          explanation:
-            parsedResponse.textResponse ||
-            (parsedResponse.circuit
-              ? `Created circuit with ${
-                  parsedResponse.circuit.components?.length || 0
-                } components`
-              : "AI circuit response"),
+          explanation: generateDetailedExplanation(parsedResponse),
         };
       } else if (
         !parsedResponse.metadata.explanation ||
-        parsedResponse.metadata.explanation === "AI circuit response"
+        parsedResponse.metadata.explanation === "AI circuit response" ||
+        parsedResponse.metadata.explanation ===
+          "Brief explanation of what was done"
       ) {
         // Fix the generic fallback explanation
         parsedResponse.metadata.explanation =
-          parsedResponse.textResponse ||
-          (parsedResponse.circuit
-            ? `Created circuit with ${
-                parsedResponse.circuit.components?.length || 0
-              } components`
-            : "Circuit design assistance");
+          generateDetailedExplanation(parsedResponse);
       }
 
       console.log("📤 Final response:", {

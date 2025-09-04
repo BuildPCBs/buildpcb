@@ -354,23 +354,134 @@ export function useWiringTool({
     }
   }, [highlightedPin, canvas]);
 
-  // Calculate orthogonal point for 90-degree routing
-  const calculateOrthogonalPoint = useCallback(
-    (lastPoint: fabric.Point, currentPoint: fabric.Point): fabric.Point => {
-      const deltaX = Math.abs(currentPoint.x - lastPoint.x);
-      const deltaY = Math.abs(currentPoint.y - lastPoint.y);
+  // ===== PROFESSIONAL WIRE LAPPING RULES =====
 
-      // Decide direction based on which delta is larger
-      if (deltaX > deltaY) {
-        // Horizontal line - fix Y coordinate
-        return new fabric.Point(currentPoint.x, lastPoint.y);
-      } else {
-        // Vertical line - fix X coordinate
-        return new fabric.Point(lastPoint.x, currentPoint.y);
+  // RULE #3: Prevent wire self-overlapping and crossing
+  const validateWirePath = useCallback(
+    (newPoints: fabric.Point[], existingWires: fabric.Polyline[] = []): boolean => {
+      if (newPoints.length < 2) return true;
+
+      // Rule 3A: Prevent self-intersection within the new wire path
+      for (let i = 0; i < newPoints.length - 2; i++) {
+        for (let j = i + 2; j < newPoints.length - 1; j++) {
+          if (linesIntersect(
+            newPoints[i], newPoints[i + 1],
+            newPoints[j], newPoints[j + 1]
+          )) {
+            console.log("🚫 RULE #3A: Wire self-intersection detected - path invalid");
+            return false;
+          }
+        }
       }
+
+      // Rule 3B: Prevent overlapping with existing wires (except at junctions)
+      for (const existingWire of existingWires) {
+        if (!existingWire.points) continue;
+
+        const existingPoints = existingWire.points;
+        for (let i = 0; i < newPoints.length - 1; i++) {
+          for (let j = 0; j < existingPoints.length - 1; j++) {
+            // Convert XY points to fabric.Point for distance calculation
+            const existingPointJ = new fabric.Point(existingPoints[j].x, existingPoints[j].y);
+            const existingPointJ1 = new fabric.Point(existingPoints[j + 1].x, existingPoints[j + 1].y);
+
+            // Skip if this is a legitimate junction (very close endpoints)
+            const isNearStart = distanceBetweenPoints(newPoints[i], existingPointJ) < 5;
+            const isNearEnd = distanceBetweenPoints(newPoints[i + 1], existingPointJ1) < 5;
+
+            if (isNearStart || isNearEnd) continue;
+
+            if (linesIntersect(
+              newPoints[i], newPoints[i + 1],
+              existingPointJ, existingPointJ1
+            )) {
+              console.log("🚫 RULE #3B: Wire crossing detected - path invalid");
+              return false;
+            }
+          }
+        }
+      }
+
+      return true;
     },
     []
   );
+
+  // Helper function: Check if two line segments intersect
+  const linesIntersect = useCallback(
+    (p1: fabric.Point, p2: fabric.Point, p3: fabric.Point, p4: fabric.Point): boolean => {
+      const denom = (p1.x - p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x - p4.x);
+      if (Math.abs(denom) < 1e-10) return false; // Lines are parallel
+
+      const t = ((p1.x - p3.x) * (p3.y - p4.y) - (p1.y - p3.y) * (p3.x - p4.x)) / denom;
+      const u = -((p1.x - p2.x) * (p1.y - p3.y) - (p1.y - p2.y) * (p1.x - p3.x)) / denom;
+
+      return t >= 0 && t <= 1 && u >= 0 && u <= 1;
+    },
+    []
+  );
+
+  // Helper function: Calculate distance between two points
+  const distanceBetweenPoints = useCallback(
+    (p1: fabric.Point, p2: fabric.Point): number => {
+      return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+    },
+    []
+  );
+
+  // RULE #3: Enhanced calculateOrthogonalPoint with lapping prevention
+  const calculateOrthogonalPointWithValidation = useCallback(
+    (
+      lastPoint: fabric.Point,
+      currentPoint: fabric.Point,
+      existingWires: fabric.Polyline[] = []
+    ): fabric.Point => {
+      // Get all existing wires from canvas if not provided
+      const wiresToCheck = existingWires.length > 0 ? existingWires :
+        canvas ? canvas.getObjects().filter((obj: any) =>
+          obj.wireType === "connection" && obj.type === "polyline"
+        ) as fabric.Polyline[] : [];
+
+      const deltaX = Math.abs(currentPoint.x - lastPoint.x);
+      const deltaY = Math.abs(currentPoint.y - lastPoint.y);
+
+      let candidatePoint: fabric.Point;
+
+      // Try the preferred orthogonal direction first
+      if (deltaX > deltaY) {
+        candidatePoint = new fabric.Point(currentPoint.x, lastPoint.y);
+      } else {
+        candidatePoint = new fabric.Point(lastPoint.x, currentPoint.y);
+      }
+
+      // Test if this path would cause lapping
+      const testPoints = [lastPoint, candidatePoint];
+      if (validateWirePath(testPoints, wiresToCheck)) {
+        return candidatePoint;
+      }
+
+      // If preferred direction causes lapping, try the alternative
+      console.log("⚠️ RULE #3: Preferred orthogonal path causes lapping, trying alternative");
+      if (deltaX > deltaY) {
+        candidatePoint = new fabric.Point(lastPoint.x, currentPoint.y);
+      } else {
+        candidatePoint = new fabric.Point(currentPoint.x, lastPoint.y);
+      }
+
+      // Test the alternative path
+      const altTestPoints = [lastPoint, candidatePoint];
+      if (validateWirePath(altTestPoints, wiresToCheck)) {
+        return candidatePoint;
+      }
+
+      // If both directions cause lapping, use direct line (last resort)
+      console.log("⚠️ RULE #3: Both orthogonal paths cause lapping, using direct line");
+      return currentPoint;
+    },
+    [validateWirePath, canvas]
+  );
+
+  // ===== END PROFESSIONAL WIRE LAPPING RULES =====
 
   // ===== AUTOMATIC NET COLORING SYSTEM =====
 
@@ -744,7 +855,7 @@ export function useWiringTool({
       console.log("🟡 TRAFFIC LIGHT: YELLOW (Drawing - Wire in progress)");
 
       const pinCoords = getPinWorldCoordinates(pin);
-      const orthogonalPoint = calculateOrthogonalPoint(pinCoords, clickPoint);
+      const orthogonalPoint = calculateOrthogonalPointWithValidation(pinCoords, clickPoint);
 
       // Create visible POLYLINE immediately with pin coordinates as start
       const initialPoints = [pinCoords, orthogonalPoint];
@@ -776,7 +887,7 @@ export function useWiringTool({
     [
       canvas,
       getPinWorldCoordinates,
-      calculateOrthogonalPoint,
+      calculateOrthogonalPointWithValidation,
       trafficLightState,
     ]
   );
@@ -796,7 +907,7 @@ export function useWiringTool({
         wiringState.wirePoints[wiringState.wirePoints.length - 1];
 
       // Calculate orthogonal point from last waypoint to current mouse position
-      const orthogonalPoint = calculateOrthogonalPoint(
+      const orthogonalPoint = calculateOrthogonalPointWithValidation(
         lastWaypoint,
         mousePoint
       );
@@ -814,7 +925,7 @@ export function useWiringTool({
       wiringState.currentLine,
       wiringState.wirePoints,
       canvas,
-      calculateOrthogonalPoint,
+      calculateOrthogonalPointWithValidation,
     ]
   );
 
@@ -835,7 +946,7 @@ export function useWiringTool({
         wiringState.wirePoints[wiringState.wirePoints.length - 1];
 
       // Calculate orthogonal point from last waypoint to click location
-      const orthogonalPoint = calculateOrthogonalPoint(
+      const orthogonalPoint = calculateOrthogonalPointWithValidation(
         lastWaypoint,
         clickPoint
       );
@@ -857,7 +968,7 @@ export function useWiringTool({
       wiringState.currentLine,
       wiringState.wirePoints,
       canvas,
-      calculateOrthogonalPoint,
+      calculateOrthogonalPointWithValidation,
     ]
   );
 
@@ -877,7 +988,7 @@ export function useWiringTool({
       // Get the last waypoint for orthogonal calculation
       const lastWaypoint =
         wiringState.wirePoints[wiringState.wirePoints.length - 1];
-      const orthogonalJunctionPoint = calculateOrthogonalPoint(
+      const orthogonalJunctionPoint = calculateOrthogonalPointWithValidation(
         lastWaypoint,
         intersectionPoint
       );
@@ -915,6 +1026,7 @@ export function useWiringTool({
         hasControls: false, // No scaling/rotation controls
         hasBorders: true, // Show selection border for editing
         wireType: "connection",
+        id: `wire_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // Unique wire ID
         startPin: wiringState.startPin,
         startComponentId: startComponentId,
         startPinIndex: startPinIndex,
@@ -1032,7 +1144,7 @@ export function useWiringTool({
       wiringState.startPin,
       wiringState.wirePoints,
       canvas,
-      calculateOrthogonalPoint,
+      calculateOrthogonalPointWithValidation,
       createJunctionDot,
       clearPinHighlight,
       findPinNet,
@@ -1056,7 +1168,7 @@ export function useWiringTool({
       // Get the last waypoint for orthogonal calculation
       const lastWaypoint =
         wiringState.wirePoints[wiringState.wirePoints.length - 1];
-      const orthogonalEndPoint = calculateOrthogonalPoint(
+      const orthogonalEndPoint = calculateOrthogonalPointWithValidation(
         lastWaypoint,
         endPinCoords
       );
@@ -1100,6 +1212,7 @@ export function useWiringTool({
         hasControls: false, // No scaling/rotation controls
         hasBorders: true, // Show selection border for editing
         wireType: "connection",
+        id: `wire_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // Unique wire ID
         startPin: wiringState.startPin,
         endPin: endPin,
         // PART 1: Wire Memory - Store connection information
@@ -1173,7 +1286,7 @@ export function useWiringTool({
       wiringState.wirePoints,
       canvas,
       getPinWorldCoordinates,
-      calculateOrthogonalPoint,
+      calculateOrthogonalPointWithValidation,
       clearPinHighlight,
       handleNetColoring,
     ]

@@ -107,7 +107,7 @@ export function serializeCanvasToCircuit(
 }
 
 /**
- * Serialize Fabric.js canvas to raw canvas data format
+ * Serialize Fabric.js canvas to raw canvas data format with electrical metadata preservation
  */
 export function serializeCanvasData(
   canvas: fabric.Canvas | null
@@ -115,8 +115,70 @@ export function serializeCanvasData(
   if (!canvas) return {};
 
   try {
-    // Use the correct toJSON method without parameters for Fabric.js 6+
+    // Get the base canvas data
     const canvasData = canvas.toJSON();
+
+    // Extract and preserve electrical metadata for wires
+    const electricalMetadata: Record<string, any> = {};
+
+    canvas.getObjects().forEach((obj, index) => {
+      const fabricObj = obj as any;
+
+      // Check if this is a wire with electrical properties
+      if (fabricObj.wireType === "connection" || fabricObj.wireType === "junction") {
+        electricalMetadata[`wire_${index}`] = {
+          // Core wire identification
+          wireType: fabricObj.wireType,
+          id: fabricObj.id,
+
+          // Pin connections
+          startPin: fabricObj.startPin,
+          endPin: fabricObj.endPin,
+          startComponentId: fabricObj.startComponentId,
+          endComponentId: fabricObj.endComponentId,
+          startPinIndex: fabricObj.startPinIndex,
+          endPinIndex: fabricObj.endPinIndex,
+          startComponent: fabricObj.startComponent,
+          endComponent: fabricObj.endComponent,
+
+          // Electrical net information
+          netId: fabricObj.netId,
+
+          // Junction information
+          endsAtJunction: fabricObj.endsAtJunction,
+          junctionWire: fabricObj.junctionWire,
+          junctionPoint: fabricObj.junctionPoint,
+          junctionDot: fabricObj.junctionDot,
+          connectedWires: fabricObj.connectedWires,
+          junctionDots: fabricObj.junctionDots,
+
+          // Wire editing properties
+          isWireEndpoint: fabricObj.isWireEndpoint,
+          isWireVertex: fabricObj.isWireVertex,
+          vertexIndex: fabricObj.vertexIndex,
+
+          // Original object index for restoration
+          objectIndex: index,
+        };
+
+        console.log(`🔌 Preserving electrical metadata for wire ${index}:`, {
+          wireType: fabricObj.wireType,
+          netId: fabricObj.netId,
+          startComponentId: fabricObj.startComponentId,
+          endComponentId: fabricObj.endComponentId,
+        });
+      }
+
+      // Also preserve component metadata
+      if (fabricObj.componentType) {
+        electricalMetadata[`component_${index}`] = {
+          componentType: fabricObj.componentType,
+          id: fabricObj.id,
+          data: fabricObj.data,
+          objectIndex: index,
+        };
+      }
+    });
 
     return {
       ...canvasData,
@@ -124,6 +186,7 @@ export function serializeCanvasData(
         zoom: canvas.getZoom(),
         transform: canvas.viewportTransform,
       },
+      electricalMetadata,
       timestamp: new Date().toISOString(),
     };
   } catch (error) {
@@ -133,7 +196,7 @@ export function serializeCanvasData(
 }
 
 /**
- * Restore Fabric.js canvas from raw canvas data
+ * Restore Fabric.js canvas from raw canvas data with electrical metadata restoration
  */
 export function loadCanvasFromData(
   canvas: fabric.Canvas,
@@ -145,6 +208,7 @@ export function loadCanvasFromData(
         objectCount: canvasData.objects?.length || 0,
         hasViewport: !!canvasData.viewportTransform,
         zoom: canvasData.zoom,
+        hasElectricalMetadata: !!canvasData.electricalMetadata,
       });
 
       canvas.loadFromJSON(canvasData, () => {
@@ -152,6 +216,87 @@ export function loadCanvasFromData(
           "📊 Canvas loaded, objects on canvas:",
           canvas.getObjects().length
         );
+
+        // Restore electrical metadata for wires and components
+        if (canvasData.electricalMetadata) {
+          const objects = canvas.getObjects();
+
+          Object.entries(canvasData.electricalMetadata).forEach(([key, metadata]: [string, any]) => {
+            if (metadata.objectIndex !== undefined && objects[metadata.objectIndex]) {
+              const obj = objects[metadata.objectIndex] as any;
+
+              // Restore wire electrical properties
+              if (key.startsWith('wire_')) {
+                console.log(`🔌 Restoring electrical metadata for wire at index ${metadata.objectIndex}`);
+
+                // Core wire identification
+                obj.wireType = metadata.wireType;
+                obj.id = metadata.id;
+
+                // Pin connections
+                obj.startPin = metadata.startPin;
+                obj.endPin = metadata.endPin;
+                obj.startComponentId = metadata.startComponentId;
+                obj.endComponentId = metadata.endComponentId;
+                obj.startPinIndex = metadata.startPinIndex;
+                obj.endPinIndex = metadata.endPinIndex;
+                obj.startComponent = metadata.startComponent;
+                obj.endComponent = metadata.endComponent;
+
+                // Electrical net information
+                obj.netId = metadata.netId;
+
+                // Junction information
+                obj.endsAtJunction = metadata.endsAtJunction;
+                obj.junctionWire = metadata.junctionWire;
+                obj.junctionPoint = metadata.junctionPoint;
+                obj.junctionDot = metadata.junctionDot;
+                obj.connectedWires = metadata.connectedWires;
+                obj.junctionDots = metadata.junctionDots;
+
+                // Wire editing properties
+                obj.isWireEndpoint = metadata.isWireEndpoint;
+                obj.isWireVertex = metadata.isWireVertex;
+                obj.vertexIndex = metadata.vertexIndex;
+
+                // Ensure wire is selectable and interactive
+                obj.selectable = true;
+                obj.evented = true;
+                obj.lockMovementX = true;
+                obj.lockMovementY = true;
+                obj.lockRotation = true;
+                obj.lockScalingX = true;
+                obj.lockScalingY = true;
+                obj.hasControls = false;
+                obj.hasBorders = true;
+
+                console.log(`✅ Wire electrical properties restored:`, {
+                  wireType: obj.wireType,
+                  netId: obj.netId,
+                  startComponentId: obj.startComponentId,
+                  endComponentId: obj.endComponentId,
+                });
+              }
+
+              // Restore component metadata
+              if (key.startsWith('component_')) {
+                obj.componentType = metadata.componentType;
+                obj.id = metadata.id;
+                obj.data = metadata.data;
+
+                // Ensure component is selectable and interactive
+                obj.selectable = true;
+                obj.evented = true;
+                obj.lockUniScaling = true;
+                obj.hasControls = true;
+                obj.hasBorders = true;
+                obj.centeredRotation = true;
+              }
+            }
+          });
+
+          console.log(`🔌 Electrical metadata restoration completed for ${Object.keys(canvasData.electricalMetadata).length} objects`);
+        }
 
         // Preserve the grid background if it was set
         const currentBg = canvas.backgroundColor;
@@ -195,7 +340,7 @@ export function loadCanvasFromData(
         }
 
         canvas.renderAll();
-        console.log("✅ Canvas restoration completed");
+        console.log("✅ Canvas restoration completed with electrical metadata");
         resolve();
       });
     } catch (error) {

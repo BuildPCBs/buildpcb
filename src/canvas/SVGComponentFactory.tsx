@@ -492,7 +492,11 @@ export const recreateComponentPins = (
   const config =
     componentConfig[componentType as keyof typeof componentConfig] ||
     componentConfig.resistor;
-  const newComponentId = `component_${Date.now()}_${Math.random()
+
+  // CRITICAL FIX: Preserve original component ID for pin consistency
+  // This ensures electrical connections are maintained during copy/paste
+  const originalComponentId = (component as any).id || componentData.componentId;
+  const newComponentId = originalComponentId || `component_${Date.now()}_${Math.random()
     .toString(36)
     .substr(2, 9)}`;
 
@@ -502,7 +506,7 @@ export const recreateComponentPins = (
     return !obj.pin && !(obj.data && obj.data.type === "pin");
   });
 
-  // Create new functional pins
+  // Create new functional pins with preserved metadata
   const newPins = createComponentPins(config, newComponentId);
 
   // Create new component group with existing objects + new pins
@@ -514,12 +518,14 @@ export const recreateComponentPins = (
     scaleY: component.scaleY,
   });
 
-  // Restore component metadata with new ID
+  // Restore component metadata with preserved ID
   newComponent.set("componentType", componentType);
+  newComponent.set("id", newComponentId); // Preserve original ID
   newComponent.set("data", {
     type: "component",
     componentType: componentType,
     componentName: componentData.componentName,
+    componentId: newComponentId, // Preserve original ID
     pins: newPins.map((_, index) => `pin${index + 1}`),
   });
 
@@ -534,7 +540,7 @@ export const recreateComponentPins = (
   });
 
   console.log(
-    `✅ Pin recreation: Added ${newPins.length} functional pins to pasted component`
+    `✅ Pin recreation: Added ${newPins.length} functional pins to pasted component (ID preserved: ${newComponentId})`
   );
   return newComponent;
 }; // Fallback to simple component if SVG loading fails

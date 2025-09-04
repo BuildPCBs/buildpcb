@@ -58,7 +58,7 @@ export function IDECanvas() {
             <div
               className="absolute z-20"
               style={{
-                bottom: responsive(180), // 32 (prompt bottom) + 97 (prompt height) + 25 (thinking height) + 15 (spacing: 10 + 5)
+                bottom: responsive(150), // 32 (prompt bottom) + 97 (prompt height) + 25 (thinking height) + 15 (spacing: 10 + 5)
                 right: responsive(32), // Match PromptEntry's responsive(32)
                 width: responsive(338), // Match PromptEntry's exact width
               }}
