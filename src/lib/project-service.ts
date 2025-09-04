@@ -127,25 +127,32 @@ export class ProjectService {
   }
 
   /**
-   * Save project data (circuit + canvas state)
+   * Save project data (circuit + canvas state + chat data)
    */
   static async saveProject(
     projectId: string,
     circuitData: Circuit,
-    canvasData: Record<string, any>
+    canvasData: Record<string, any>,
+    chatData?: Record<string, any>
   ): Promise<void> {
     try {
+      // Merge chat data into canvas data for storage
+      const extendedCanvasData = {
+        ...canvasData,
+        chatData: chatData || null,
+      };
+
       // Update the project's last modified time
       await DatabaseService.updateProject(projectId, {
         updated_at: new Date().toISOString(),
-        canvas_settings: canvasData,
+        canvas_settings: extendedCanvasData,
       });
 
       // Create a new version with the circuit data
       await DatabaseService.createVersion(
         projectId,
         circuitData,
-        canvasData,
+        extendedCanvasData,
         "Auto-save"
       );
 

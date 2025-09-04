@@ -26,7 +26,8 @@ interface ProjectContextType {
   loadSpecificProject: (projectId: string) => Promise<void>;
   saveProject: (
     circuitData: Circuit,
-    canvasData: Record<string, any>
+    canvasData: Record<string, any>,
+    chatData?: Record<string, any>
   ) => Promise<void>;
   renameProject: (newName: string) => Promise<void>;
   restoreCanvasData: (canvas: any) => Promise<void>;
@@ -200,7 +201,7 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
   }, [isAuthenticated]);
 
   const saveProject = useCallback(
-    async (circuitData: Circuit, canvasData: Record<string, any>) => {
+    async (circuitData: Circuit, canvasData: Record<string, any>, chatData?: Record<string, any>) => {
       if (!currentProject) {
         throw new Error("No project loaded");
       }
@@ -209,7 +210,8 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
         await ProjectService.saveProject(
           currentProject.id,
           circuitData,
-          canvasData
+          canvasData,
+          chatData
         );
         setCurrentCircuit(circuitData);
 
@@ -263,16 +265,34 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
           hasObjects: currentProject.canvas_settings.objects?.length || 0,
           hasViewport: !!currentProject.canvas_settings.viewportTransform,
           zoom: currentProject.canvas_settings.zoom,
+          hasChatData: !!currentProject.canvas_settings.chatData,
         });
+
+        // Extract chat data before loading canvas
+        const chatData = currentProject.canvas_settings.chatData;
+        const canvasDataWithoutChat = { ...currentProject.canvas_settings };
+        delete canvasDataWithoutChat.chatData;
 
         // Import the canvas restoration function
         const { loadCanvasFromData } = await import(
           "@/canvas/utils/canvasSerializer"
         );
 
-        await loadCanvasFromData(canvas, currentProject.canvas_settings);
+        await loadCanvasFromData(canvas, canvasDataWithoutChat);
 
-        console.log("✅ Canvas data restored successfully");
+        // Restore chat data if available
+        if (chatData) {
+          console.log("💬 Restoring chat data:", {
+            messageCount: chatData.messages?.length || 0,
+          });
+
+          // Dispatch custom event to notify AIChatContext of restored data
+          window.dispatchEvent(new CustomEvent('chatDataRestored', {
+            detail: { chatData }
+          }));
+        }
+
+        console.log("✅ Canvas and chat data restored successfully");
       } catch (error) {
         console.error("❌ Failed to restore canvas data:", error);
       }

@@ -62,6 +62,32 @@ export function AIChatProvider({
 
   // Get auth token for API calls
   const { getToken, isAuthenticated } = useAuth();
+
+  // Listen for chat data restoration events
+  useEffect(() => {
+    const handleChatDataRestored = (event: CustomEvent) => {
+      const { chatData } = event.detail;
+      if (chatData && chatData.messages) {
+        console.log("💬 Loading saved chat messages:", chatData.messages.length);
+
+        // Convert timestamp strings back to Date objects
+        const restoredMessages = chatData.messages.map((msg: any) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp),
+        }));
+
+        setMessages(restoredMessages);
+        console.log("✅ Chat messages restored successfully");
+      }
+    };
+
+    window.addEventListener('chatDataRestored', handleChatDataRestored as EventListener);
+
+    return () => {
+      window.removeEventListener('chatDataRestored', handleChatDataRestored as EventListener);
+    };
+  }, []);
+
   const addMessage = (message: ChatMessage) => {
     setMessages((prev) => [...prev, message]);
   };

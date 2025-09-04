@@ -7,6 +7,7 @@ import { useCanvasStateSnapshot } from "../../hooks/useCanvasState";
 import type { ChatMessage } from "../../contexts/AIChatContext";
 import { BRAND_COLORS } from "@/lib/constants";
 import { responsive } from "@/lib/responsive";
+import { MarkdownMessage } from "./MarkdownMessage";
 
 interface AIChatInterfaceProps {
   className?: string;
@@ -220,14 +221,11 @@ export function AIChatInterface({
                         </div>
                       ) : (
                         /* Normal Display Mode */
-                        <div
-                          className="rounded-2xl rounded-br-md px-4 py-2 text-white mb-1"
-                          style={{ backgroundColor: BRAND_COLORS.primary }}
-                        >
-                          <div className="text-sm leading-relaxed">
-                            {message.content}
-                          </div>
-                        </div>
+                        <MarkdownMessage
+                          content={message.content}
+                          isUser={true}
+                          className="mb-1"
+                        />
                       )}
                       {/* User Message Action Buttons - Only show when not editing */}
                       {!message.isEditing && (
@@ -292,10 +290,12 @@ export function AIChatInterface({
                   /* AI Response - Full Width Text Block */
                   <div className="w-full">
                     <div className="w-full p-2.5 bg-gray-50 rounded-lg border border-gray-100">
-                      {/* Response Content */}
-                      <div className="text-xs leading-relaxed text-gray-800 mb-2">
-                        {message.content}
-                      </div>
+                      {/* Response Content with Markdown Support */}
+                      <MarkdownMessage
+                        content={message.content}
+                        isUser={false}
+                        className="mb-2"
+                      />
 
                       {/* Status Indicator for Processing States */}
                       {message.status && message.status !== "complete" && (

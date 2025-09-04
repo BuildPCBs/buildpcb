@@ -13,6 +13,7 @@ import { r, responsive, responsiveSquare } from "@/lib/responsive";
 import { useProject } from "@/contexts/ProjectContext";
 import { Circuit } from "@/lib/schemas/circuit";
 import { canvasCommandManager } from "@/canvas/canvas-command-manager";
+import { useAIChat } from "@/contexts/AIChatContext";
 
 interface TopToolbarProps {
   className?: string;
@@ -27,6 +28,7 @@ export function TopToolbar({ className = "" }: TopToolbarProps) {
 
   // Get project and canvas contexts
   const { currentProject, currentCircuit, saveProject } = useProject();
+  const { messages } = useAIChat();
 
   // Track last save time for better status display
   const [lastSaveTime, setLastSaveTime] = useState<Date | null>(null);
@@ -78,8 +80,11 @@ export function TopToolbar({ className = "" }: TopToolbarProps) {
         connections: [],
       };
 
-      // Save the project
-      await saveProject(circuitData, canvasData);
+      // Prepare chat data for saving
+      const chatData = messages.length > 0 ? { messages } : undefined;
+
+      // Save the project with chat data
+      await saveProject(circuitData, canvasData, chatData);
 
       // Update last save time
       setLastSaveTime(new Date());
