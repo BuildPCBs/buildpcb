@@ -83,6 +83,13 @@ export function TopToolbar({ className = "" }: TopToolbarProps) {
       // Prepare chat data for saving
       const chatData = messages.length > 0 ? { messages } : undefined;
 
+      if (chatData) {
+        console.log("💬 Saving chat data:", {
+          messageCount: messages.length,
+          totalCharacters: messages.reduce((sum, msg) => sum + msg.content.length, 0),
+        });
+      }
+
       // Save the project with chat data
       await saveProject(circuitData, canvasData, chatData);
 

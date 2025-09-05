@@ -7,7 +7,10 @@ import { useCanvasStateSnapshot } from "../../hooks/useCanvasState";
 import type { ChatMessage } from "../../contexts/AIChatContext";
 import { BRAND_COLORS } from "@/lib/constants";
 import { responsive } from "@/lib/responsive";
-import { MarkdownMessage } from "./MarkdownMessage";
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 
 interface AIChatInterfaceProps {
   className?: string;
@@ -221,11 +224,46 @@ export function AIChatInterface({
                         </div>
                       ) : (
                         /* Normal Display Mode */
-                        <MarkdownMessage
-                          content={message.content}
-                          isUser={true}
-                          className="mb-1"
-                        />
+                        <div
+                          className="rounded-2xl rounded-br-md px-4 py-2 text-white mb-1"
+                          style={{ backgroundColor: BRAND_COLORS.primary }}
+                        >
+                          <div className="text-sm leading-relaxed prose prose-xs prose-invert max-w-none">
+                            <ReactMarkdown
+                              remarkPlugins={[remarkMath]}
+                              rehypePlugins={[rehypeKatex]}
+                              components={{
+                                // Custom styling for user messages (light theme)
+                                p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                                strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                                em: ({ children }) => <em className="opacity-90">{children}</em>,
+                                code: ({ children }) => (
+                                  <code className="bg-white bg-opacity-20 px-1 py-0.5 rounded text-xs font-mono">
+                                    {children}
+                                  </code>
+                                ),
+                                pre: ({ children }) => (
+                                  <pre className="bg-white bg-opacity-20 p-2 rounded text-xs font-mono overflow-x-auto">
+                                    {children}
+                                  </pre>
+                                ),
+                                ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
+                                ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
+                                li: ({ children }) => <li>{children}</li>,
+                                h1: ({ children }) => <h1 className="text-sm font-bold mb-2">{children}</h1>,
+                                h2: ({ children }) => <h2 className="text-sm font-bold mb-2">{children}</h2>,
+                                h3: ({ children }) => <h3 className="text-sm font-bold mb-2">{children}</h3>,
+                                blockquote: ({ children }) => (
+                                  <blockquote className="border-l-4 border-white border-opacity-30 pl-4 italic mb-2">
+                                    {children}
+                                  </blockquote>
+                                ),
+                              }}
+                            >
+                              {message.content}
+                            </ReactMarkdown>
+                          </div>
+                        </div>
                       )}
                       {/* User Message Action Buttons - Only show when not editing */}
                       {!message.isEditing && (
@@ -290,12 +328,42 @@ export function AIChatInterface({
                   /* AI Response - Full Width Text Block */
                   <div className="w-full">
                     <div className="w-full p-2.5 bg-gray-50 rounded-lg border border-gray-100">
-                      {/* Response Content with Markdown Support */}
-                      <MarkdownMessage
-                        content={message.content}
-                        isUser={false}
-                        className="mb-2"
-                      />
+                      {/* Response Content */}
+                      <div className="text-xs leading-relaxed text-gray-800 mb-2 prose prose-xs max-w-none">
+                        <ReactMarkdown
+                          remarkPlugins={[remarkMath]}
+                          rehypePlugins={[rehypeKatex]}
+                          components={{
+                            // Custom styling for markdown elements
+                            p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                            strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
+                            em: ({ children }) => <em className="italic text-gray-700">{children}</em>,
+                            code: ({ children }) => (
+                              <code className="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono text-gray-800">
+                                {children}
+                              </code>
+                            ),
+                            pre: ({ children }) => (
+                              <pre className="bg-gray-100 p-2 rounded text-xs font-mono text-gray-800 overflow-x-auto">
+                                {children}
+                              </pre>
+                            ),
+                            ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
+                            ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
+                            li: ({ children }) => <li className="text-gray-700">{children}</li>,
+                            h1: ({ children }) => <h1 className="text-sm font-bold text-gray-900 mb-2">{children}</h1>,
+                            h2: ({ children }) => <h2 className="text-sm font-bold text-gray-900 mb-2">{children}</h2>,
+                            h3: ({ children }) => <h3 className="text-sm font-bold text-gray-900 mb-2">{children}</h3>,
+                            blockquote: ({ children }) => (
+                              <blockquote className="border-l-4 border-gray-300 pl-4 italic text-gray-600 mb-2">
+                                {children}
+                              </blockquote>
+                            ),
+                          }}
+                        >
+                          {message.content}
+                        </ReactMarkdown>
+                      </div>
 
                       {/* Status Indicator for Processing States */}
                       {message.status && message.status !== "complete" && (

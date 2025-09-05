@@ -284,6 +284,7 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
         if (chatData) {
           console.log("💬 Restoring chat data:", {
             messageCount: chatData.messages?.length || 0,
+            totalCharacters: chatData.messages?.reduce((sum: number, msg: any) => sum + msg.content.length, 0) || 0,
           });
 
           // Dispatch custom event to notify AIChatContext of restored data
