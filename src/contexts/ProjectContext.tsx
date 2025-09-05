@@ -201,7 +201,11 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
   }, [isAuthenticated]);
 
   const saveProject = useCallback(
-    async (circuitData: Circuit, canvasData: Record<string, any>, chatData?: Record<string, any>) => {
+    async (
+      circuitData: Circuit,
+      canvasData: Record<string, any>,
+      chatData?: Record<string, any>
+    ) => {
       if (!currentProject) {
         throw new Error("No project loaded");
       }
@@ -284,13 +288,19 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
         if (chatData) {
           console.log("💬 Restoring chat data:", {
             messageCount: chatData.messages?.length || 0,
-            totalCharacters: chatData.messages?.reduce((sum: number, msg: any) => sum + msg.content.length, 0) || 0,
+            totalCharacters:
+              chatData.messages?.reduce(
+                (sum: number, msg: any) => sum + msg.content.length,
+                0
+              ) || 0,
           });
 
           // Dispatch custom event to notify AIChatContext of restored data
-          window.dispatchEvent(new CustomEvent('chatDataRestored', {
-            detail: { chatData }
-          }));
+          window.dispatchEvent(
+            new CustomEvent("chatDataRestored", {
+              detail: { chatData },
+            })
+          );
         }
 
         console.log("✅ Canvas and chat data restored successfully");

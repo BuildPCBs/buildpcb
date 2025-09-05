@@ -86,7 +86,10 @@ export function TopToolbar({ className = "" }: TopToolbarProps) {
       if (chatData) {
         console.log("💬 Saving chat data:", {
           messageCount: messages.length,
-          totalCharacters: messages.reduce((sum, msg) => sum + msg.content.length, 0),
+          totalCharacters: messages.reduce(
+            (sum, msg) => sum + msg.content.length,
+            0
+          ),
         });
       }
 

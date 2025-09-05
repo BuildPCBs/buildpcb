@@ -68,7 +68,10 @@ export function AIChatProvider({
     const handleChatDataRestored = (event: CustomEvent) => {
       const { chatData } = event.detail;
       if (chatData && chatData.messages) {
-        console.log("💬 Loading saved chat messages:", chatData.messages.length);
+        console.log(
+          "💬 Loading saved chat messages:",
+          chatData.messages.length
+        );
 
         // Convert timestamp strings back to Date objects
         const restoredMessages = chatData.messages.map((msg: any) => ({
@@ -81,10 +84,16 @@ export function AIChatProvider({
       }
     };
 
-    window.addEventListener('chatDataRestored', handleChatDataRestored as EventListener);
+    window.addEventListener(
+      "chatDataRestored",
+      handleChatDataRestored as EventListener
+    );
 
     return () => {
-      window.removeEventListener('chatDataRestored', handleChatDataRestored as EventListener);
+      window.removeEventListener(
+        "chatDataRestored",
+        handleChatDataRestored as EventListener
+      );
     };
   }, []);
 
