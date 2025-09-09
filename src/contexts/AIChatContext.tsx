@@ -125,7 +125,7 @@ export function AIChatProvider({
     const receivingMessage: ChatMessage = {
       id: aiMessageId,
       type: "assistant",
-      content: "Thinking...",
+      content: "",
       timestamp: new Date(),
       status: "receiving",
     };
@@ -144,7 +144,7 @@ export function AIChatProvider({
         throw new Error("Failed to get authentication token");
       }
 
-      // Call our AI Agent API with authentication
+      // Call our AI Agent API with streaming
       const response = await fetch("/api/ai-agent", {
         method: "POST",
         headers: {
@@ -153,7 +153,7 @@ export function AIChatProvider({
         },
         body: JSON.stringify({
           message: prompt,
-          canvasState: canvasState || null, // Use passed canvas state or null
+          canvasState: canvasState || null,
           conversationHistory: messages,
           sessionId: "main-session",
         }),
@@ -163,166 +163,144 @@ export function AIChatProvider({
         throw new Error(`API error: ${response.status}`);
       }
 
-      // Update to parsing state
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === aiMessageId
-            ? {
-                ...msg,
-                content: "Processing your request...",
-                status: "parsing" as const,
-              }
-            : msg
-        )
-      );
+      // Handle streaming response
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedContent = '';
+      let buffer = '';
 
-      const aiResponseData = await response.json();
+      if (!reader) {
+        throw new Error("No response body reader available");
+      }
 
-      // Debug logging
-      console.log("🤖 Raw AI API response:", aiResponseData);
-      console.log("📊 Response mode:", aiResponseData.mode);
-      console.log("📦 Has circuit:", !!aiResponseData.circuit);
-      console.log("📝 Has text response:", !!aiResponseData.textResponse);
-      console.log("📋 Metadata:", aiResponseData.metadata);
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
 
-      // Simulate parsing delay for better UX
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      // Import circuit response parser
-      const { parseCircuitResponse, applyCircuitToCanvas } = await import(
-        "../lib/circuitResponseParser"
-      );
-
-      // Parse the circuit response
-      const parsedResponse = parseCircuitResponse(aiResponseData);
-
-      console.log("🔧 Parsed response result:", parsedResponse);
-      console.log("✅ Is valid:", parsedResponse.isValid);
-      console.log("📋 Operations to apply:", parsedResponse.operations.length);
-      console.log("❌ Errors:", parsedResponse.errors);
-
-      // Apply circuit changes to canvas if we have a canvas
-      let circuitApplicationResult = null;
-      console.log("🔍 Starting canvas application check...");
-      console.log(
-        "📊 Parsed response operations:",
-        parsedResponse.operations.length
-      );
-      console.log("✅ Response valid:", parsedResponse.isValid);
-      console.log("🎨 Canvas object exists:", !!canvas);
-
-      if (
-        parsedResponse.isValid &&
-        parsedResponse.operations.length > 0 &&
-        canvas
-      ) {
-        console.log("🎨 Canvas object received:", !!canvas);
-        console.log("🎨 Canvas type:", canvas?.constructor?.name);
-        console.log("🎨 Canvas ready state:", canvas ? "Ready" : "Not ready");
-        console.log("📋 Operations to apply:", parsedResponse.operations);
-
-        // Check if canvas is actually ready to use
-        if (
-          canvas &&
-          typeof canvas.add === "function" &&
-          typeof canvas.renderAll === "function"
-        ) {
-          console.log("✅ Canvas is fully initialized and ready to use");
-
-          // Add a small delay to ensure canvas is fully ready
-          await new Promise((resolve) => setTimeout(resolve, 100));
-
-          try {
-            console.log("🚀 Calling applyCircuitToCanvas...");
-            circuitApplicationResult = await applyCircuitToCanvas(
-              parsedResponse,
-              canvas
-            );
-            console.log(
-              "✅ Circuit changes applied to canvas:",
-              circuitApplicationResult
-            );
-          } catch (applyError) {
-            console.error("❌ Failed to apply circuit changes:", applyError);
-            console.error("❌ Error details:", {
-              message:
-                applyError instanceof Error
-                  ? applyError.message
-                  : "Unknown error",
-              stack:
-                applyError instanceof Error
-                  ? applyError.stack
-                  : "No stack trace",
-              canvas: !!canvas,
-              operations: parsedResponse.operations.length,
-            });
+          if (done) {
+            console.log("✅ Streaming complete");
+            break;
           }
-        } else {
-          console.log(
-            "⚠️ Canvas is not fully initialized yet, skipping application"
-          );
-          console.log("Canvas methods check:", {
-            hasAdd: typeof canvas?.add === "function",
-            hasRenderAll: typeof canvas?.renderAll === "function",
-          });
-        }
-      } else {
-        console.log("⚠️ Skipping canvas application:");
-        console.log("  - Response valid:", parsedResponse.isValid);
-        console.log("  - Operations count:", parsedResponse.operations.length);
-        console.log("  - Canvas available:", !!canvas);
-        if (!parsedResponse.isValid) {
-          console.log("  - Validation errors:", parsedResponse.errors);
-        }
-      }
 
-      // Update with final response
-      const finalContent =
-        aiResponseData.textResponse ||
-        aiResponseData.metadata?.explanation ||
-        parsedResponse.explanation ||
-        "I've processed your request.";
+          // Decode the chunk
+          const chunk = decoder.decode(value, { stream: true });
+          buffer += chunk;
 
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === aiMessageId
-            ? {
-                ...msg,
-                content: finalContent,
-                status: "complete" as const,
-                circuitChanges: aiResponseData.circuit
-                  ? [aiResponseData.circuit]
-                  : [],
-                circuitApplication: circuitApplicationResult,
+          // Process complete SSE messages
+          const lines = buffer.split('\n\n');
+          buffer = lines.pop() || ''; // Keep incomplete message in buffer
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6); // Remove 'data: ' prefix
+
+              if (data === '[DONE]') {
+                console.log("🎯 Streaming finished with [DONE]");
+                break;
               }
-            : msg
-        )
-      );
 
-      // If there are circuit changes, notify parent component
-      if (aiResponseData.circuit && onCircuitUpdate) {
-        onCircuitUpdate(aiResponseData.circuit);
+              try {
+                const chunkData = JSON.parse(data);
+                console.log("� Received chunk:", chunkData);
+
+                // Accumulate content
+                if (chunkData.content) {
+                  accumulatedContent += chunkData.content;
+                }
+
+                // Update the message content in real-time
+                setMessages((prev) =>
+                  prev.map((msg) =>
+                    msg.id === aiMessageId
+                      ? {
+                          ...msg,
+                          content: accumulatedContent,
+                          status: chunkData.isComplete ? "complete" : "receiving",
+                        }
+                      : msg
+                  )
+                );
+
+                // If we have a complete response, process it
+                if (chunkData.isComplete && chunkData.accumulatedContent) {
+                  console.log("🎯 Complete response received, processing...");
+
+                  try {
+                    const finalResponse = JSON.parse(chunkData.accumulatedContent);
+
+                    // Import circuit response parser
+                    const { parseCircuitResponse, applyCircuitToCanvas } = await import(
+                      "../lib/circuitResponseParser"
+                    );
+
+                    // Parse the circuit response
+                    const parsedResponse = parseCircuitResponse(finalResponse);
+
+                    console.log("🔧 Parsed streaming response result:", parsedResponse);
+
+                    // Apply circuit changes if any
+                    if (parsedResponse.isValid && parsedResponse.operations.length > 0 && canvas) {
+                      console.log("🔧 Applying circuit changes to canvas...");
+                      await applyCircuitToCanvas(parsedResponse, canvas);
+                    }
+
+                    // Update message with final content and status
+                    setMessages((prev) =>
+                      prev.map((msg) =>
+                        msg.id === aiMessageId
+                          ? {
+                              ...msg,
+                              content: finalResponse.metadata?.explanation || accumulatedContent,
+                              status: "complete",
+                              circuitChanges: parsedResponse.operations.length > 0 ? [parsedResponse] : undefined,
+                            }
+                          : msg
+                      )
+                    );
+
+                  } catch (parseError) {
+                    console.error("❌ Error processing final response:", parseError);
+                    // Update message with accumulated content as fallback
+                    setMessages((prev) =>
+                      prev.map((msg) =>
+                        msg.id === aiMessageId
+                          ? {
+                              ...msg,
+                              content: accumulatedContent,
+                              status: "complete",
+                            }
+                          : msg
+                      )
+                    );
+                  }
+                }
+
+              } catch (parseError) {
+                console.error("❌ Error parsing chunk data:", parseError, "Raw data:", data);
+              }
+            }
+          }
+        }
+      } finally {
+        reader.releaseLock();
       }
 
-      setIsThinking(false);
     } catch (error) {
-      console.error("AI request failed:", error);
+      console.error("❌ Error in streaming:", error);
 
-      // Update with error message
+      // Update message with error status
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === aiMessageId
             ? {
                 ...msg,
-                content: `Sorry, I encountered an error: ${
-                  error instanceof Error ? error.message : "Unknown error"
-                }. Please try again.`,
-                status: "error" as const,
+                content: "Sorry, I encountered an error while processing your request.",
+                status: "error",
               }
             : msg
         )
       );
-
+    } finally {
       setIsThinking(false);
     }
   };

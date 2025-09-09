@@ -275,8 +275,7 @@ IMPORTANT: Your response must be PURE JSON with no additional text, markdown, or
           {
             model: "o3", //
             messages,
-            // temperature: 0.7,
-            // max_tokens: 2000,
+            stream: true, // Enable streaming
             response_format: { type: "json_object" },
           },
           {
@@ -290,8 +289,7 @@ IMPORTANT: Your response must be PURE JSON with no additional text, markdown, or
           {
             model: "o3",
             messages,
-            // temperature: 0.7,
-            // max_tokens: 2000,
+            stream: true, // Enable streaming for fallback too
             response_format: { type: "json_object" },
           },
           {
@@ -300,91 +298,70 @@ IMPORTANT: Your response must be PURE JSON with no additional text, markdown, or
         );
       }
 
-      console.log("✅ OpenAI response received");
+      console.log("✅ OpenAI streaming response initiated");
 
-      const aiResponse = completion.choices[0]?.message?.content;
-
-      if (!aiResponse) {
-        throw new Error("No response from OpenAI");
-      }
-
-      // Parse the AI response
-      let parsedResponse: CircuitResponse;
-      try {
-        parsedResponse = JSON.parse(aiResponse);
-        console.log("✅ AI response parsed successfully");
-        console.log("📊 Response mode:", parsedResponse.mode);
-        console.log("📦 Has circuit:", !!parsedResponse.circuit);
-        console.log("📝 Has text response:", !!parsedResponse.textResponse);
-      } catch (parseError) {
-        console.error("❌ JSON parsing failed!");
-        console.error("🔍 Raw AI response:", aiResponse);
-        console.error("🔍 Parse error:", parseError);
-
-        // Try to extract JSON from markdown code blocks
-        const jsonMatch = aiResponse.match(
-          /```(?:json)?\s*(\{[\s\S]*?\})\s*```/
-        );
-        if (jsonMatch) {
-          console.log("🔧 Found JSON in markdown, attempting extraction...");
+      // Handle streaming response
+      const stream = new ReadableStream({
+        async start(controller) {
           try {
-            parsedResponse = JSON.parse(jsonMatch[1]);
-            console.log("✅ Successfully extracted JSON from markdown");
-          } catch (extractError) {
-            console.error(
-              "❌ Failed to extract JSON from markdown:",
-              extractError
-            );
-            parsedResponse = {
-              mode: "text-only",
-              textResponse: aiResponse,
-              metadata: {
-                timestamp: new Date().toISOString(),
-                version: "1.0",
-                explanation: "AI response (JSON parsing failed)",
-              },
-            };
+            let accumulatedContent = '';
+            const isFirstChunk = true;
+
+            for await (const chunk of completion) {
+              const content = chunk.choices[0]?.delta?.content || '';
+
+              if (content) {
+                accumulatedContent += content;
+
+                // Try to parse accumulated content as JSON
+                let parsedResponse: CircuitResponse | null = null;
+                try {
+                  // Check if we have a complete JSON object
+                  if (accumulatedContent.trim().startsWith('{') &&
+                      accumulatedContent.trim().endsWith('}') &&
+                      accumulatedContent.includes('"mode"')) {
+                    parsedResponse = JSON.parse(accumulatedContent);
+                  }
+                } catch (parseError) {
+                  // JSON not complete yet, continue accumulating
+                }
+
+                // Send chunk to client
+                const chunkData = {
+                  content: content,
+                  accumulatedContent: accumulatedContent,
+                  isComplete: !!parsedResponse,
+                  timestamp: new Date().toISOString(),
+                };
+
+                controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(chunkData)}\n\n`));
+
+                // If we have a complete response, we can stop here
+                if (parsedResponse) {
+                  console.log("✅ Complete JSON response received via streaming");
+                  break;
+                }
+              }
+            }
+
+            // Send final completion signal
+            controller.enqueue(new TextEncoder().encode(`data: [DONE]\n\n`));
+            controller.close();
+
+          } catch (streamError) {
+            console.error("❌ Streaming error:", streamError);
+            controller.error(streamError);
           }
-        } else {
-          console.log("🔧 Using fallback text-only response");
-          parsedResponse = {
-            mode: "text-only",
-            textResponse: aiResponse,
-            metadata: {
-              timestamp: new Date().toISOString(),
-              version: "1.0",
-              explanation: "AI response (fallback format)",
-            },
-          };
-        }
-      }
-
-      // Ensure metadata is present and has proper explanation
-      if (!parsedResponse.metadata) {
-        parsedResponse.metadata = {
-          timestamp: new Date().toISOString(),
-          version: "1.0",
-          explanation: generateDetailedExplanation(parsedResponse),
-        };
-      } else if (
-        !parsedResponse.metadata.explanation ||
-        parsedResponse.metadata.explanation === "AI circuit response" ||
-        parsedResponse.metadata.explanation ===
-          "Brief explanation of what was done"
-      ) {
-        // Fix the generic fallback explanation
-        parsedResponse.metadata.explanation =
-          generateDetailedExplanation(parsedResponse);
-      }
-
-      console.log("📤 Final response:", {
-        mode: parsedResponse.mode,
-        hasCircuit: !!parsedResponse.circuit,
-        hasText: !!parsedResponse.textResponse,
-        explanation: parsedResponse.metadata.explanation,
+        },
       });
 
-      return NextResponse.json(parsedResponse);
+      return new Response(stream, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+        },
+      });
     } catch (error) {
       console.error("❌ AI Agent API error:", error);
 

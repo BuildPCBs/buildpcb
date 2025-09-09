@@ -431,17 +431,19 @@ export function AIChatInterface({
                           {message.status === "receiving" && (
                             <>
                               <div className="flex gap-1">
-                                <div className="w-1 h-1 bg-gray-400 rounded-full animate-pulse"></div>
+                                <div className="w-1 h-1 bg-blue-400 rounded-full animate-pulse"></div>
                                 <div
-                                  className="w-1 h-1 bg-gray-400 rounded-full animate-pulse"
+                                  className="w-1 h-1 bg-blue-400 rounded-full animate-pulse"
                                   style={{ animationDelay: "0.2s" }}
                                 ></div>
                                 <div
-                                  className="w-1 h-1 bg-gray-400 rounded-full animate-pulse"
+                                  className="w-1 h-1 bg-blue-400 rounded-full animate-pulse"
                                   style={{ animationDelay: "0.4s" }}
                                 ></div>
                               </div>
-                              <span>Thinking...</span>
+                              <span className="text-blue-600 font-medium">
+                                {message.content ? "Streaming response..." : "Thinking..."}
+                              </span>
                             </>
                           )}
                           {message.status === "parsing" && (
