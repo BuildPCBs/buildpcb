@@ -63,7 +63,7 @@ function EmailEntryForm({ onSuccess }: Pick<AuthFormProps, "onSuccess">) {
             color: "#555555",
           }}
         >
-          Welcome to BuildPCB
+          Welcome to BuildPCBs
         </h2>
 
         {/* Subtitle */}
