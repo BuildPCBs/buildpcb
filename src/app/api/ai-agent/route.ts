@@ -304,11 +304,11 @@ IMPORTANT: Your response must be PURE JSON with no additional text, markdown, or
       const stream = new ReadableStream({
         async start(controller) {
           try {
-            let accumulatedContent = '';
+            let accumulatedContent = "";
             const isFirstChunk = true;
 
             for await (const chunk of completion) {
-              const content = chunk.choices[0]?.delta?.content || '';
+              const content = chunk.choices[0]?.delta?.content || "";
 
               if (content) {
                 accumulatedContent += content;
@@ -317,9 +317,11 @@ IMPORTANT: Your response must be PURE JSON with no additional text, markdown, or
                 let parsedResponse: CircuitResponse | null = null;
                 try {
                   // Check if we have a complete JSON object
-                  if (accumulatedContent.trim().startsWith('{') &&
-                      accumulatedContent.trim().endsWith('}') &&
-                      accumulatedContent.includes('"mode"')) {
+                  if (
+                    accumulatedContent.trim().startsWith("{") &&
+                    accumulatedContent.trim().endsWith("}") &&
+                    accumulatedContent.includes('"mode"')
+                  ) {
                     parsedResponse = JSON.parse(accumulatedContent);
                   }
                 } catch (parseError) {
@@ -334,11 +336,17 @@ IMPORTANT: Your response must be PURE JSON with no additional text, markdown, or
                   timestamp: new Date().toISOString(),
                 };
 
-                controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(chunkData)}\n\n`));
+                controller.enqueue(
+                  new TextEncoder().encode(
+                    `data: ${JSON.stringify(chunkData)}\n\n`
+                  )
+                );
 
                 // If we have a complete response, we can stop here
                 if (parsedResponse) {
-                  console.log("✅ Complete JSON response received via streaming");
+                  console.log(
+                    "✅ Complete JSON response received via streaming"
+                  );
                   break;
                 }
               }
@@ -347,7 +355,6 @@ IMPORTANT: Your response must be PURE JSON with no additional text, markdown, or
             // Send final completion signal
             controller.enqueue(new TextEncoder().encode(`data: [DONE]\n\n`));
             controller.close();
-
           } catch (streamError) {
             console.error("❌ Streaming error:", streamError);
             controller.error(streamError);
@@ -357,9 +364,9 @@ IMPORTANT: Your response must be PURE JSON with no additional text, markdown, or
 
       return new Response(stream, {
         headers: {
-          'Content-Type': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          'Connection': 'keep-alive',
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
         },
       });
     } catch (error) {

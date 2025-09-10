@@ -166,8 +166,8 @@ export function AIChatProvider({
       // Handle streaming response
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
-      let accumulatedContent = '';
-      let buffer = '';
+      let accumulatedContent = "";
+      let buffer = "";
 
       if (!reader) {
         throw new Error("No response body reader available");
@@ -187,14 +187,14 @@ export function AIChatProvider({
           buffer += chunk;
 
           // Process complete SSE messages
-          const lines = buffer.split('\n\n');
-          buffer = lines.pop() || ''; // Keep incomplete message in buffer
+          const lines = buffer.split("\n\n");
+          buffer = lines.pop() || ""; // Keep incomplete message in buffer
 
           for (const line of lines) {
-            if (line.startsWith('data: ')) {
+            if (line.startsWith("data: ")) {
               const data = line.slice(6); // Remove 'data: ' prefix
 
-              if (data === '[DONE]') {
+              if (data === "[DONE]") {
                 console.log("🎯 Streaming finished with [DONE]");
                 break;
               }
@@ -215,7 +215,9 @@ export function AIChatProvider({
                       ? {
                           ...msg,
                           content: accumulatedContent,
-                          status: chunkData.isComplete ? "complete" : "receiving",
+                          status: chunkData.isComplete
+                            ? "complete"
+                            : "receiving",
                         }
                       : msg
                   )
@@ -226,20 +228,28 @@ export function AIChatProvider({
                   console.log("🎯 Complete response received, processing...");
 
                   try {
-                    const finalResponse = JSON.parse(chunkData.accumulatedContent);
+                    const finalResponse = JSON.parse(
+                      chunkData.accumulatedContent
+                    );
 
                     // Import circuit response parser
-                    const { parseCircuitResponse, applyCircuitToCanvas } = await import(
-                      "../lib/circuitResponseParser"
-                    );
+                    const { parseCircuitResponse, applyCircuitToCanvas } =
+                      await import("../lib/circuitResponseParser");
 
                     // Parse the circuit response
                     const parsedResponse = parseCircuitResponse(finalResponse);
 
-                    console.log("🔧 Parsed streaming response result:", parsedResponse);
+                    console.log(
+                      "🔧 Parsed streaming response result:",
+                      parsedResponse
+                    );
 
                     // Apply circuit changes if any
-                    if (parsedResponse.isValid && parsedResponse.operations.length > 0 && canvas) {
+                    if (
+                      parsedResponse.isValid &&
+                      parsedResponse.operations.length > 0 &&
+                      canvas
+                    ) {
                       console.log("🔧 Applying circuit changes to canvas...");
                       await applyCircuitToCanvas(parsedResponse, canvas);
                     }
@@ -250,16 +260,23 @@ export function AIChatProvider({
                         msg.id === aiMessageId
                           ? {
                               ...msg,
-                              content: finalResponse.metadata?.explanation || accumulatedContent,
+                              content:
+                                finalResponse.metadata?.explanation ||
+                                accumulatedContent,
                               status: "complete",
-                              circuitChanges: parsedResponse.operations.length > 0 ? [parsedResponse] : undefined,
+                              circuitChanges:
+                                parsedResponse.operations.length > 0
+                                  ? [parsedResponse]
+                                  : undefined,
                             }
                           : msg
                       )
                     );
-
                   } catch (parseError) {
-                    console.error("❌ Error processing final response:", parseError);
+                    console.error(
+                      "❌ Error processing final response:",
+                      parseError
+                    );
                     // Update message with accumulated content as fallback
                     setMessages((prev) =>
                       prev.map((msg) =>
@@ -274,9 +291,13 @@ export function AIChatProvider({
                     );
                   }
                 }
-
               } catch (parseError) {
-                console.error("❌ Error parsing chunk data:", parseError, "Raw data:", data);
+                console.error(
+                  "❌ Error parsing chunk data:",
+                  parseError,
+                  "Raw data:",
+                  data
+                );
               }
             }
           }
@@ -284,7 +305,6 @@ export function AIChatProvider({
       } finally {
         reader.releaseLock();
       }
-
     } catch (error) {
       console.error("❌ Error in streaming:", error);
 
@@ -294,7 +314,8 @@ export function AIChatProvider({
           msg.id === aiMessageId
             ? {
                 ...msg,
-                content: "Sorry, I encountered an error while processing your request.",
+                content:
+                  "Sorry, I encountered an error while processing your request.",
                 status: "error",
               }
             : msg

@@ -17,6 +17,9 @@ importers:
       fabric:
         specifier: ^6.7.1
         version: 6.7.1
+      katex:
+        specifier: ^0.16.22
+        version: 0.16.22
       lucide-react:
         specifier: ^0.528.0
         version: 0.528.0(react@19.1.0)

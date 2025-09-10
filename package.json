@@ -12,6 +12,7 @@
     "@supabase/supabase-js": "^2.57.0",
     "clsx": "^2.1.1",
     "fabric": "^6.7.1",
+    "katex": "^0.16.22",
     "lucide-react": "^0.528.0",
     "next": "15.4.4",
     "openai": "^5.18.1",

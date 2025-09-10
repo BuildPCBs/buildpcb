@@ -10,7 +10,7 @@ import { responsive } from "@/lib/responsive";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-import "katex/dist/katex.min.css";
+import "katex/dist/katex.css";
 
 interface AIChatInterfaceProps {
   className?: string;
@@ -442,7 +442,9 @@ export function AIChatInterface({
                                 ></div>
                               </div>
                               <span className="text-blue-600 font-medium">
-                                {message.content ? "Streaming response..." : "Thinking..."}
+                                {message.content
+                                  ? "Streaming response..."
+                                  : "Thinking..."}
                               </span>
                             </>
                           )}
