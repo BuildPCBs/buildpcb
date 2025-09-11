@@ -70,10 +70,12 @@ export function AIChatProvider({
         hasEvent: !!event,
         hasDetail: !!event.detail,
         hasChatData: !!event.detail?.chatData,
-        chatDataKeys: event.detail?.chatData ? Object.keys(event.detail.chatData) : [],
+        chatDataKeys: event.detail?.chatData
+          ? Object.keys(event.detail.chatData)
+          : [],
         messageCount: event.detail?.chatData?.messages?.length || 0,
       });
-      
+
       const { chatData } = event.detail;
       if (chatData && chatData.messages && chatData.messages.length > 0) {
         console.log(
@@ -86,7 +88,10 @@ export function AIChatProvider({
           id: msg.id || `restored-${Date.now()}-${Math.random()}`,
           type: msg.type || "assistant",
           content: msg.content || "",
-          timestamp: msg.timestamp instanceof Date ? msg.timestamp : new Date(msg.timestamp),
+          timestamp:
+            msg.timestamp instanceof Date
+              ? msg.timestamp
+              : new Date(msg.timestamp),
           circuitChanges: msg.circuitChanges || undefined,
           status: msg.status || "complete",
           isEditing: false, // Never restore in editing state
@@ -95,7 +100,11 @@ export function AIChatProvider({
         console.log("✅ Restoring chat messages:", {
           restoredCount: restoredMessages.length,
           firstMessage: restoredMessages[0]?.content?.substring(0, 50) + "...",
-          lastMessage: restoredMessages[restoredMessages.length - 1]?.content?.substring(0, 50) + "...",
+          lastMessage:
+            restoredMessages[restoredMessages.length - 1]?.content?.substring(
+              0,
+              50
+            ) + "...",
         });
 
         setMessages(restoredMessages);
@@ -109,25 +118,69 @@ export function AIChatProvider({
     const handleManualRestore = () => {
       console.log("🔧 Manual chat restore triggered");
       // This can be called from browser console for testing
-      window.dispatchEvent(new CustomEvent("chatDataRestored", {
-        detail: { 
-          chatData: { 
-            messages: [
-              {
-                id: "test-1",
-                type: "user",
-                content: "Test message",
-                timestamp: new Date().toISOString(),
-                status: "complete"
-              }
-            ]
-          }
-        }
-      }));
+      window.dispatchEvent(
+        new CustomEvent("chatDataRestored", {
+          detail: {
+            chatData: {
+              messages: [
+                {
+                  id: "test-1",
+                  type: "user",
+                  content: "Test message",
+                  timestamp: new Date().toISOString(),
+                  status: "complete",
+                },
+              ],
+            },
+          },
+        })
+      );
     };
-    
+
     // Expose for testing
     (window as any).manualChatRestore = handleManualRestore;
+
+    // Add debugging function to check current messages
+    (window as any).checkChatMessages = () => {
+      console.log("📝 Current chat messages:", {
+        messageCount: messages.length,
+        messages: messages.map((msg, index) => ({
+          index,
+          id: msg.id,
+          type: msg.type,
+          content: msg.content.substring(0, 50) + "...",
+          timestamp: msg.timestamp,
+          status: msg.status,
+        })),
+      });
+      return messages;
+    };
+
+    // Add function to test restoration status
+    (window as any).testChatRestorationStatus = () => {
+      console.log("🧪 Chat restoration status:", {
+        messageCount: messages.length,
+        isThinking,
+        currentMessageIndex,
+        hasMessages: messages.length > 0,
+        lastMessage:
+          messages.length > 0
+            ? {
+                type: messages[messages.length - 1].type,
+                content:
+                  messages[messages.length - 1].content.substring(0, 50) +
+                  "...",
+                timestamp: messages[messages.length - 1].timestamp,
+              }
+            : null,
+      });
+      return {
+        messageCount: messages.length,
+        isThinking,
+        currentMessageIndex,
+        hasMessages: messages.length > 0,
+      };
+    };
 
     window.addEventListener(
       "chatDataRestored",
@@ -140,8 +193,7 @@ export function AIChatProvider({
         handleChatDataRestored as EventListener
       );
     };
-  }, []);
-
+  }, [messages, isThinking, currentMessageIndex]);
   const addMessage = (message: ChatMessage) => {
     setMessages((prev) => {
       const newMessages = [...prev, message];
@@ -262,12 +314,29 @@ export function AIChatProvider({
                 }
 
                 // Update the message content in real-time
+                // For text-only responses, show the accumulated text content
+                // For circuit responses, show the raw JSON until parsing is complete
+                let displayContent = accumulatedContent;
+                if (chunkData.accumulatedContent && 
+                    chunkData.accumulatedContent.includes('"mode":"text-only"') && 
+                    !chunkData.isComplete) {
+                  // During streaming of text-only, try to extract just the textResponse
+                  try {
+                    const tempResponse = JSON.parse(chunkData.accumulatedContent);
+                    if (tempResponse.textResponse) {
+                      displayContent = tempResponse.textResponse;
+                    }
+                  } catch (e) {
+                    // JSON not complete yet, use accumulated content
+                  }
+                }
+
                 setMessages((prev) =>
                   prev.map((msg) =>
                     msg.id === aiMessageId
                       ? {
                           ...msg,
-                          content: accumulatedContent,
+                          content: displayContent,
                           status: chunkData.isComplete
                             ? "complete"
                             : "receiving",
@@ -314,8 +383,9 @@ export function AIChatProvider({
                           ? {
                               ...msg,
                               content:
-                                finalResponse.metadata?.explanation ||
-                                accumulatedContent,
+                                finalResponse.mode === "text-only"
+                                  ? finalResponse.textResponse || accumulatedContent
+                                  : finalResponse.metadata?.explanation || accumulatedContent,
                               status: "complete" as const,
                               circuitChanges:
                                 parsedResponse.operations.length > 0
@@ -324,19 +394,27 @@ export function AIChatProvider({
                             }
                           : msg
                       );
-                      
+
                       // Trigger a save after chat completion
-                      console.log("💬 Chat message completed, triggering save in 3 seconds");
+                      console.log(
+                        "💬 Chat message completed, triggering save in 3 seconds"
+                      );
                       setTimeout(() => {
-                        console.log("🚀 Dispatching chat save event with", updatedMessages.length, "messages");
-                        window.dispatchEvent(new CustomEvent("triggerChatSave", {
-                          detail: { 
-                            messages: updatedMessages,
-                            messageCount: updatedMessages.length 
-                          }
-                        }));
+                        console.log(
+                          "🚀 Dispatching chat save event with",
+                          updatedMessages.length,
+                          "messages"
+                        );
+                        window.dispatchEvent(
+                          new CustomEvent("triggerChatSave", {
+                            detail: {
+                              messages: updatedMessages,
+                              messageCount: updatedMessages.length,
+                            },
+                          })
+                        );
                       }, 3000);
-                      
+
                       return updatedMessages;
                     });
                   } catch (parseError) {
@@ -435,15 +513,13 @@ export function AIChatProvider({
           type: msg.type,
           content: msg.content.substring(0, 50) + "...",
           timestamp: msg.timestamp,
-          status: msg.status
+          status: msg.status,
         });
       });
     };
   }, [messages]);
 
   return (
-    <AIChatContext.Provider value={value}>
-      {children}
-    </AIChatContext.Provider>
+    <AIChatContext.Provider value={value}>{children}</AIChatContext.Provider>
   );
 }

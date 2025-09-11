@@ -35,6 +35,7 @@ export function IDEFabricCanvas({
   });
   const [areRulersVisible, setAreRulersVisible] = useState(false);
   const [restorationInProgress, setRestorationInProgress] = useState(false);
+  const [chatRestored, setChatRestored] = useState(false);
   const [currentZoom, setCurrentZoom] = useState(1); // Track current zoom level
   const lastZoomRef = useRef(1); // Use ref to avoid stale closure issues
   const [gridVisible, setGridVisible] = useState(false); // Manual grid toggle
@@ -100,13 +101,6 @@ export function IDEFabricCanvas({
       currentProject?.canvas_settings &&
       !restorationInProgress
     ) {
-      // Check if canvas already has objects (might have been restored already)
-      const existingObjects = fabricCanvas.getObjects();
-      if (existingObjects.length > 0) {
-        console.log("ℹ️ Canvas already has objects, skipping canvas restoration but chat was restored");
-        return;
-      }
-
       console.log("🔄 Canvas ready, attempting to restore canvas data...");
       console.log("📊 Canvas data to restore:", {
         timestamp: new Date().toISOString(),
@@ -119,19 +113,24 @@ export function IDEFabricCanvas({
       });
 
       // Always try to restore chat data first, regardless of canvas objects
-      if (currentProject.canvas_settings.chatData) {
+      if (currentProject.canvas_settings.chatData && !chatRestored) {
         console.log("💬 Chat data found, dispatching restoration event");
         setTimeout(() => {
-          window.dispatchEvent(new CustomEvent("chatDataRestored", {
-            detail: { chatData: currentProject.canvas_settings.chatData }
-          }));
+          window.dispatchEvent(
+            new CustomEvent("chatDataRestored", {
+              detail: { chatData: currentProject.canvas_settings.chatData },
+            })
+          );
+          setChatRestored(true);
         }, 100);
       }
 
       // Check if canvas already has objects (might have been restored already)
       const existingObjects = fabricCanvas.getObjects();
       if (existingObjects.length > 0) {
-        console.log("ℹ️ Canvas already has objects, skipping canvas restoration but chat was restored");
+        console.log(
+          "ℹ️ Canvas already has objects, skipping canvas restoration but chat was restored"
+        );
         return;
       }
 
@@ -176,7 +175,55 @@ export function IDEFabricCanvas({
           setRestorationInProgress(false);
         });
     }
-  }, [fabricCanvas, currentProject?.canvas_settings, restoreCanvasData]);
+  }, [
+    fabricCanvas,
+    currentProject?.canvas_settings,
+    restoreCanvasData,
+    chatRestored,
+  ]);
+
+  // Global debugging functions for chat restoration testing
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      (window as any).testChatRestoration = () => {
+        console.log("🧪 Testing chat restoration...");
+        console.log(
+          "Current project chat data:",
+          currentProject?.canvas_settings?.chatData
+        );
+        console.log("Chat restored state:", chatRestored);
+        console.log("Restoration in progress:", restorationInProgress);
+        return {
+          hasChatData: !!currentProject?.canvas_settings?.chatData,
+          chatRestored,
+          restorationInProgress,
+          messageCount:
+            currentProject?.canvas_settings?.chatData?.messages?.length || 0,
+        };
+      };
+
+      (window as any).manualChatRestore = () => {
+        console.log("🔧 Manual chat restoration triggered");
+        if (currentProject?.canvas_settings?.chatData) {
+          window.dispatchEvent(
+            new CustomEvent("chatDataRestored", {
+              detail: { chatData: currentProject.canvas_settings.chatData },
+            })
+          );
+          setChatRestored(true);
+          console.log("✅ Manual chat restoration event dispatched");
+        } else {
+          console.log("❌ No chat data available for manual restoration");
+        }
+      };
+
+      (window as any).checkChatMessages = () => {
+        console.log("📝 Checking current chat messages...");
+        // This will be handled by the AIChatContext
+        window.dispatchEvent(new CustomEvent("checkChatMessages"));
+      };
+    }
+  }, [currentProject, chatRestored, restorationInProgress]);
 
   // Ruler dimensions and grid settings
   const rulerSize = 30;
