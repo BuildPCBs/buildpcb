@@ -273,7 +273,7 @@ IMPORTANT: Your response must be PURE JSON with no additional text, markdown, or
       try {
         completion = await openai.chat.completions.create(
           {
-            model: "o3", //
+            model: "gpt-4o",
             messages,
             stream: true, // Enable streaming
             response_format: { type: "json_object" },
@@ -283,11 +283,11 @@ IMPORTANT: Your response must be PURE JSON with no additional text, markdown, or
           }
         );
       } catch (modelError) {
-        console.warn("⚠️ gpt-4o-mini failed, trying gpt-3.5-turbo...");
-        // Fallback to gpt-3.5-turbo if gpt-4o-mini fails
+        console.warn("⚠️ gpt-4o failed, trying gpt-3.5-turbo...");
+        // Fallback to gpt-3.5-turbo if gpt-4o fails
         completion = await openai.chat.completions.create(
           {
-            model: "o3",
+            model: "gpt-3.5-turbo",
             messages,
             stream: true, // Enable streaming for fallback too
             response_format: { type: "json_object" },

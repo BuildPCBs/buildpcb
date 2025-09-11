@@ -132,7 +132,14 @@ export class DatabaseService {
       throw new Error(`Database error: ${error.message}`);
     }
 
-    console.log("✅ Project retrieved:", data.name);
+    console.log("✅ Project retrieved:", {
+      name: data.name,
+      hasCanvasSettings: !!data.canvas_settings,
+      canvasSettingsKeys: data.canvas_settings ? Object.keys(data.canvas_settings) : [],
+      hasChatDataInSettings: !!data.canvas_settings?.chatData,
+      chatMessageCountInSettings: data.canvas_settings?.chatData?.messages?.length || 0,
+      canvasSettingsSize: data.canvas_settings ? JSON.stringify(data.canvas_settings).length : 0,
+    });
     return data;
   }
 
@@ -278,6 +285,8 @@ export class DatabaseService {
   static async getLatestVersion(
     projectId: string
   ): Promise<ProjectVersion | null> {
+    console.log("🔍 Getting latest version for project:", projectId);
+    
     const { data, error } = await supabase
       .from("project_versions")
       .select("*")
@@ -287,6 +296,17 @@ export class DatabaseService {
       .single();
 
     if (error && error.code !== "PGRST116") throw error; // PGRST116 = no rows
+    
+    console.log("📊 Latest version data:", {
+      hasData: !!data,
+      versionNumber: data?.version_number,
+      hasCanvasData: !!data?.canvas_data,
+      canvasDataKeys: data?.canvas_data ? Object.keys(data.canvas_data) : [],
+      hasChatDataInCanvas: !!data?.canvas_data?.chatData,
+      chatMessageCount: data?.canvas_data?.chatData?.messages?.length || 0,
+      canvasDataSize: data?.canvas_data ? JSON.stringify(data.canvas_data).length : 0,
+    });
+    
     return data;
   }
 
@@ -305,54 +325,80 @@ export class DatabaseService {
     } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
-    // Get the next version number
-    const { data: latestVersion } = await supabase
-      .from("project_versions")
-      .select("version_number")
-      .eq("project_id", projectId)
-      .order("version_number", { ascending: false })
-      .limit(1)
-      .single();
+    // Use a retry mechanism to handle concurrent version creation
+    let retries = 3;
+    while (retries > 0) {
+      try {
+        // Get the next version number
+        const { data: latestVersion } = await supabase
+          .from("project_versions")
+          .select("version_number")
+          .eq("project_id", projectId)
+          .order("version_number", { ascending: false })
+          .limit(1)
+          .single();
 
-    const nextVersionNumber = (latestVersion?.version_number || 0) + 1;
+        const nextVersionNumber = (latestVersion?.version_number || 0) + 1;
+        
+        console.log("💾 Creating version", nextVersionNumber, "for project", projectId);
 
-    const { data, error } = await supabase
-      .from("project_versions")
-      .insert([
-        {
-          project_id: projectId,
-          version_number: nextVersionNumber,
-          version_name: versionName,
-          circuit_data: circuitData,
-          canvas_data: canvasData,
-          changelog,
-          created_by: user.id,
-        },
-      ])
-      .select()
-      .single();
+        const { data, error } = await supabase
+          .from("project_versions")
+          .insert([
+            {
+              project_id: projectId,
+              version_number: nextVersionNumber,
+              version_name: versionName,
+              circuit_data: circuitData,
+              canvas_data: canvasData,
+              changelog,
+              created_by: user.id,
+            },
+          ])
+          .select()
+          .single();
 
-    if (error) throw error;
+        if (error) {
+          if (error.code === '23505' && retries > 1) {
+            // Duplicate key violation, retry with delay
+            console.warn("⚠️ Version number collision, retrying...", retries - 1, "attempts left");
+            retries--;
+            await new Promise(resolve => setTimeout(resolve, Math.random() * 1000)); // Random delay
+            continue;
+          }
+          throw error;
+        }
 
-    // Update project's updated_at timestamp
-    await this.updateProject(projectId, {});
+        // Update project's updated_at timestamp
+        await this.updateProject(projectId, {});
 
-    // Log activity (don't fail the version creation if activity logging fails)
-    try {
-      await this.logActivity(
-        projectId,
-        "version_created",
-        `Version ${nextVersionNumber} created`
-      );
-    } catch (activityError) {
-      console.warn(
-        "⚠️ Could not log version creation activity:",
-        activityError
-      );
-      // Don't fail the version creation if activity logging fails
+        // Log activity (don't fail the version creation if activity logging fails)
+        try {
+          await this.logActivity(
+            projectId,
+            "version_created",
+            `Version ${nextVersionNumber} created`
+          );
+        } catch (activityError) {
+          console.warn(
+            "⚠️ Could not log version creation activity:",
+            activityError
+          );
+        }
+
+        return data;
+      } catch (error) {
+        if (retries === 1) {
+          // Last attempt failed
+          throw error;
+        }
+        retries--;
+        console.warn("⚠️ Version creation failed, retrying...", error);
+        await new Promise(resolve => setTimeout(resolve, Math.random() * 1000));
+      }
     }
-
-    return data;
+    
+    throw new Error("Failed to create version after multiple attempts");
   }
 
   /**

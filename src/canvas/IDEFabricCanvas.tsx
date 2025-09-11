@@ -103,16 +103,37 @@ export function IDEFabricCanvas({
       // Check if canvas already has objects (might have been restored already)
       const existingObjects = fabricCanvas.getObjects();
       if (existingObjects.length > 0) {
-        console.log("ℹ️ Canvas already has objects, skipping restoration");
+        console.log("ℹ️ Canvas already has objects, skipping canvas restoration but chat was restored");
         return;
       }
 
       console.log("🔄 Canvas ready, attempting to restore canvas data...");
       console.log("📊 Canvas data to restore:", {
+        timestamp: new Date().toISOString(),
         hasObjects: currentProject.canvas_settings.objects?.length || 0,
         hasViewport: !!currentProject.canvas_settings.viewportTransform,
         zoom: currentProject.canvas_settings.zoom,
+        hasChatData: !!currentProject.canvas_settings.chatData,
+        chatMessageCount:
+          currentProject.canvas_settings.chatData?.messages?.length || 0,
       });
+
+      // Always try to restore chat data first, regardless of canvas objects
+      if (currentProject.canvas_settings.chatData) {
+        console.log("💬 Chat data found, dispatching restoration event");
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent("chatDataRestored", {
+            detail: { chatData: currentProject.canvas_settings.chatData }
+          }));
+        }, 100);
+      }
+
+      // Check if canvas already has objects (might have been restored already)
+      const existingObjects = fabricCanvas.getObjects();
+      if (existingObjects.length > 0) {
+        console.log("ℹ️ Canvas already has objects, skipping canvas restoration but chat was restored");
+        return;
+      }
 
       // Prevent multiple restorations
       setRestorationInProgress(true);

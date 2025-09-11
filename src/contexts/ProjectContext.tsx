@@ -98,6 +98,17 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
           project.id
         );
 
+        console.log("🔄 Specific project loading details:", {
+          projectId: project.id,
+          projectName: project.name,
+          hasLatestVersion: !!latestVersion,
+          latestVersionNumber: latestVersion?.version_number,
+          hasVersionCanvasData: !!latestVersion?.canvas_data,
+          hasProjectCanvasSettings: !!project.canvas_settings,
+          versionCanvasDataKeys: latestVersion?.canvas_data ? Object.keys(latestVersion.canvas_data) : [],
+          projectCanvasSettingsKeys: project.canvas_settings ? Object.keys(project.canvas_settings) : [],
+        });
+
         // If no version data exists, create an empty circuit
         const circuit: Circuit = latestVersion?.circuit_data || {
           mode: "full",
@@ -109,9 +120,18 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
         setCurrentCircuit(circuit);
 
         // Store canvas data for later restoration (when canvas is ready)
-        // Prioritize project-level canvas_settings if available, otherwise use version data
+        // Prioritize latest version data (which has the most recent chat data)
         const canvasData =
-          project.canvas_settings || latestVersion?.canvas_data;
+          latestVersion?.canvas_data || project.canvas_settings;
+        
+        console.log("🔄 Canvas data selection:", {
+          usingLatestVersion: !!latestVersion?.canvas_data,
+          usingProjectSettings: !latestVersion?.canvas_data && !!project.canvas_settings,
+          finalCanvasDataKeys: canvasData ? Object.keys(canvasData) : [],
+          hasChatData: !!canvasData?.chatData,
+          chatMessageCount: canvasData?.chatData?.messages?.length || 0,
+        });
+        
         if (canvasData) {
           setCurrentProject((prev) =>
             prev
@@ -168,13 +188,24 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
       setIsNewProject(result.isNewProject);
       setIsFirstTimeUser(result.isFirstTimeUser);
 
-      // Load the circuit data for this project
-      const circuitData = await ProjectService.loadProjectCircuit(
+      // Load the latest version to get both circuit and canvas data
+      const latestVersion = await DatabaseService.getLatestVersion(
         result.project.id
       );
 
-      // If no circuit data exists, create an empty one
-      const circuit: Circuit = circuitData || {
+      console.log("🔄 Project loading details:", {
+        projectId: result.project.id,
+        projectName: result.project.name,
+        hasLatestVersion: !!latestVersion,
+        latestVersionNumber: latestVersion?.version_number,
+        hasVersionCanvasData: !!latestVersion?.canvas_data,
+        hasProjectCanvasSettings: !!result.project.canvas_settings,
+        versionCanvasDataKeys: latestVersion?.canvas_data ? Object.keys(latestVersion.canvas_data) : [],
+        projectCanvasSettingsKeys: result.project.canvas_settings ? Object.keys(result.project.canvas_settings) : [],
+      });
+
+      // Load the circuit data for this project
+      const circuit: Circuit = latestVersion?.circuit_data || {
         mode: "full",
         components: [],
         connections: [],
@@ -182,6 +213,34 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
       };
 
       setCurrentCircuit(circuit);
+
+      // Load canvas data with chat data - prioritize latest version
+      const canvasData =
+        latestVersion?.canvas_data || result.project.canvas_settings;
+      
+      console.log("🔄 Loading canvas data for project:", {
+        projectName: result.project.name,
+        hasLatestVersion: !!latestVersion,
+        hasVersionCanvasData: !!latestVersion?.canvas_data,
+        hasProjectCanvasSettings: !!result.project.canvas_settings,
+        versionCanvasDataKeys: latestVersion?.canvas_data ? Object.keys(latestVersion.canvas_data) : [],
+        projectCanvasSettingsKeys: result.project.canvas_settings ? Object.keys(result.project.canvas_settings) : [],
+        finalCanvasDataKeys: canvasData ? Object.keys(canvasData) : [],
+        hasChatDataInVersion: !!latestVersion?.canvas_data?.chatData,
+        hasChatDataInProject: !!result.project.canvas_settings?.chatData,
+        finalHasChatData: !!canvasData?.chatData,
+      });
+      
+      if (canvasData) {
+        setCurrentProject((prev) =>
+          prev
+            ? {
+                ...prev,
+                canvas_settings: canvasData,
+              }
+            : null
+        );
+      }
 
       console.log("✅ Project loaded successfully:", {
         projectName: result.project.name,
@@ -219,12 +278,19 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
         );
         setCurrentCircuit(circuitData);
 
-        // Update the project's updated_at time in our local state
+        // Update the project's updated_at time and canvas_settings in our local state
+        // Include chat data in the canvas_settings for proper local state sync
+        const extendedCanvasData = {
+          ...canvasData,
+          chatData: chatData || null,
+        };
+
         setCurrentProject((prev) =>
           prev
             ? {
                 ...prev,
                 updated_at: new Date().toISOString(),
+                canvas_settings: extendedCanvasData,
               }
             : null
         );
@@ -259,6 +325,15 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
 
   const restoreCanvasData = useCallback(
     async (canvas: any) => {
+      console.log("🔄 restoreCanvasData called:", {
+        timestamp: new Date().toISOString(),
+        hasCurrentProject: !!currentProject,
+        hasCanvasSettings: !!currentProject?.canvas_settings,
+        canvasSettingsKeys: currentProject?.canvas_settings ? Object.keys(currentProject.canvas_settings) : [],
+        hasChatDataInSettings: !!currentProject?.canvas_settings?.chatData,
+        chatMessageCountInSettings: currentProject?.canvas_settings?.chatData?.messages?.length || 0,
+      });
+      
       if (!currentProject?.canvas_settings) {
         console.log("ℹ️ No canvas data to restore");
         return;
@@ -270,6 +345,8 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
           hasViewport: !!currentProject.canvas_settings.viewportTransform,
           zoom: currentProject.canvas_settings.zoom,
           hasChatData: !!currentProject.canvas_settings.chatData,
+          chatDataType: typeof currentProject.canvas_settings.chatData,
+          chatDataKeys: currentProject.canvas_settings.chatData ? Object.keys(currentProject.canvas_settings.chatData) : [],
         });
 
         // Extract chat data before loading canvas
@@ -296,11 +373,15 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
           });
 
           // Dispatch custom event to notify AIChatContext of restored data
-          window.dispatchEvent(
-            new CustomEvent("chatDataRestored", {
-              detail: { chatData },
-            })
-          );
+          // Add a small delay to ensure AIChatContext is ready
+          setTimeout(() => {
+            console.log("🚀 Dispatching chatDataRestored event with", chatData.messages?.length || 0, "messages");
+            window.dispatchEvent(
+              new CustomEvent("chatDataRestored", {
+                detail: { chatData },
+              })
+            );
+          }, 100);
         }
 
         console.log("✅ Canvas and chat data restored successfully");
@@ -310,6 +391,26 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
     },
     [currentProject]
   );
+
+  // Add global test function for debugging
+  useEffect(() => {
+    (window as any).testChatRestoration = () => {
+      console.log("🧪 Testing chat restoration...");
+      console.log("Current project:", currentProject?.name);
+      console.log("Canvas settings:", currentProject?.canvas_settings);
+      console.log("Has chat data:", !!currentProject?.canvas_settings?.chatData);
+      console.log("Chat messages:", currentProject?.canvas_settings?.chatData?.messages);
+      
+      if (currentProject?.canvas_settings?.chatData) {
+        console.log("🚀 Dispatching test chat restoration event");
+        window.dispatchEvent(new CustomEvent("chatDataRestored", {
+          detail: { chatData: currentProject.canvas_settings.chatData }
+        }));
+      } else {
+        console.log("❌ No chat data found in current project");
+      }
+    };
+  }, [currentProject]);
 
   const value: ProjectContextType = {
     currentProject,

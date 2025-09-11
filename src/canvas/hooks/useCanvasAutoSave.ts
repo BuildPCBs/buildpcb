@@ -8,6 +8,7 @@ import {
   serializeCanvasToCircuit,
   serializeCanvasData,
 } from "@/canvas/utils/canvasSerializer";
+import { useAIChat } from "@/contexts/AIChatContext";
 
 interface UseCanvasAutoSaveOptions {
   canvas: fabric.Canvas | null;
@@ -34,6 +35,9 @@ export function useCanvasAutoSave({
     markClean,
   } = useProjectStore();
 
+  // Get chat messages for auto-save
+  const { messages } = useAIChat();
+
   const lastCanvasState = useRef<string>("");
   const changeTimeout = useRef<NodeJS.Timeout | null>(null);
 
@@ -55,17 +59,37 @@ export function useCanvasAutoSave({
   const [currentData, setCurrentData] = useState<{
     circuit: any;
     canvasData: any;
+    chatData: any;
   }>({
     circuit: null,
     canvasData: {},
+    chatData: null,
   });
 
-  // Update current data when canvas changes
+  // Update current data when canvas or chat changes
   useEffect(() => {
     if (canvas) {
-      getCurrentCanvasData().then(setCurrentData);
+      getCurrentCanvasData().then((data) => {
+        // Include chat data in the canvas data for auto-save
+        const chatData = messages.length > 0 ? {
+          messages: messages.map(msg => ({
+            ...msg,
+            timestamp: msg.timestamp instanceof Date ? msg.timestamp.toISOString() : msg.timestamp,
+          }))
+        } : null;
+        const extendedCanvasData = {
+          ...data.canvasData,
+          chatData: chatData,
+        };
+
+        setCurrentData({
+          circuit: data.circuit,
+          canvasData: extendedCanvasData,
+          chatData: chatData,
+        });
+      });
     }
-  }, [canvas, getCurrentCanvasData]);
+  }, [canvas, getCurrentCanvasData, messages]);
 
   const autoSave = useAutoSave(
     projectId,
@@ -100,6 +124,18 @@ export function useCanvasAutoSave({
       }
     }, 500); // 500ms debounce
   }, [canvas, projectId, markDirty]);
+
+  // Track chat message changes and mark project as dirty
+  useEffect(() => {
+    if (messages.length > 0 && projectId) {
+      console.log("💬 Chat messages changed, marking project as dirty", {
+        messageCount: messages.length,
+        projectId,
+        lastMessageContent: messages[messages.length - 1]?.content?.substring(0, 50) + "...",
+      });
+      markDirty();
+    }
+  }, [messages.length, projectId, markDirty]);
 
   // Set up canvas event listeners for change detection
   useEffect(() => {
@@ -147,13 +183,33 @@ export function useCanvasAutoSave({
 
     try {
       console.log("💾 Manual save triggered");
+      // Get fresh canvas data with current chat data
+      const data = await getCurrentCanvasData();
+      const chatData = messages.length > 0 ? {
+        messages: messages.map(msg => ({
+          ...msg,
+          timestamp: msg.timestamp instanceof Date ? msg.timestamp.toISOString() : msg.timestamp,
+        }))
+      } : null;
+      const extendedCanvasData = {
+        ...data.canvasData,
+        chatData: chatData,
+      };
+
+      // Update the current data state for auto-save consistency
+      setCurrentData({
+        circuit: data.circuit,
+        canvasData: extendedCanvasData,
+        chatData: chatData,
+      });
+
       await autoSave.saveNow();
       markClean();
       console.log("✅ Manual save completed");
     } catch (error) {
       console.error("❌ Manual save failed:", error);
     }
-  }, [projectId, canvas, autoSave, markClean]);
+  }, [projectId, canvas, autoSave, markClean, getCurrentCanvasData, messages]);
 
   // Listen for auto-save completion to mark clean
   useEffect(() => {

@@ -44,11 +44,29 @@ export function TopToolbar({ className = "" }: TopToolbarProps) {
       }
     };
 
+    const handleChatSave = (event: CustomEvent) => {
+      console.log("🔥 Chat save event received, triggering manual save", {
+        hasEventDetail: !!event.detail,
+        eventMessages: event.detail?.messages?.length || 0,
+        currentMessages: messages.length,
+      });
+      if (currentProject && !isSaving) {
+        // Use the messages from the event if available, otherwise fall back to current messages
+        const messagesToSave = event.detail?.messages || messages;
+        handleExport(messagesToSave);
+      }
+    };
+
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("triggerChatSave", handleChatSave as EventListener);
+    
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("triggerChatSave", handleChatSave as EventListener);
+    };
   }, [currentProject, isSaving]);
 
-  const handleExport = async () => {
+  const handleExport = async (overrideMessages?: any[]) => {
     if (!currentProject) {
       setSaveError("No project loaded");
       return;
@@ -80,17 +98,37 @@ export function TopToolbar({ className = "" }: TopToolbarProps) {
         connections: [],
       };
 
+      // Use override messages if provided, otherwise use current messages
+      const messagesToSave = overrideMessages || messages;
+      
       // Prepare chat data for saving
-      const chatData = messages.length > 0 ? { messages } : undefined;
+      console.log("🔍 Checking messages for save:", {
+        hasOverride: !!overrideMessages,
+        overrideLength: overrideMessages?.length || 0,
+        messagesLength: messages.length,
+        finalMessagesLength: messagesToSave.length,
+        hasMessages: messagesToSave && messagesToSave.length > 0,
+      });
+
+      const chatData = messagesToSave.length > 0 ? {
+        messages: messagesToSave.map(msg => ({
+          ...msg,
+          timestamp: msg.timestamp instanceof Date ? msg.timestamp.toISOString() : msg.timestamp,
+        }))
+      } : undefined;
 
       if (chatData) {
         console.log("💬 Saving chat data:", {
-          messageCount: messages.length,
-          totalCharacters: messages.reduce(
-            (sum, msg) => sum + msg.content.length,
+          messageCount: messagesToSave.length,
+          totalCharacters: messagesToSave.reduce(
+            (sum: number, msg: any) => sum + msg.content.length,
             0
           ),
+          firstMessage: messagesToSave[0]?.content?.substring(0, 50) + "...",
+          lastMessage: messagesToSave[messagesToSave.length - 1]?.content?.substring(0, 50) + "...",
         });
+      } else {
+        console.log("⚠️ No chat data to save - messages array is empty or undefined");
       }
 
       // Save the project with chat data

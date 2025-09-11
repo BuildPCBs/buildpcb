@@ -142,13 +142,24 @@ export class ProjectService {
         chatData: chatData || null,
       };
 
-      // Update the project's last modified time
+      console.log("💾 Saving project with data:", {
+        projectId,
+        hasCircuitData: !!circuitData,
+        hasCanvasData: !!canvasData,
+        hasChatData: !!chatData,
+        chatMessageCount: chatData?.messages?.length || 0,
+        extendedCanvasDataKeys: Object.keys(extendedCanvasData),
+        extendedCanvasDataSize: JSON.stringify(extendedCanvasData).length,
+        chatDataPreview: chatData ? JSON.stringify(chatData).substring(0, 200) + "..." : "No chat data",
+      });
+
+      // Update the project's last modified time and canvas settings
       await DatabaseService.updateProject(projectId, {
         updated_at: new Date().toISOString(),
         canvas_settings: extendedCanvasData,
       });
 
-      // Create a new version with the circuit data
+      // Create a new version with the circuit data and extended canvas data
       await DatabaseService.createVersion(
         projectId,
         circuitData,

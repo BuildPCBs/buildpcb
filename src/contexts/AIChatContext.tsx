@@ -3,9 +3,9 @@
 import React, {
   createContext,
   useContext,
+  useEffect,
   useState,
   ReactNode,
-  useEffect,
 } from "react";
 import { useAuth } from "../hooks/useAuth";
 
@@ -66,23 +66,68 @@ export function AIChatProvider({
   // Listen for chat data restoration events
   useEffect(() => {
     const handleChatDataRestored = (event: CustomEvent) => {
+      console.log("🎯 AIChatContext received chatDataRestored event:", {
+        hasEvent: !!event,
+        hasDetail: !!event.detail,
+        hasChatData: !!event.detail?.chatData,
+        chatDataKeys: event.detail?.chatData ? Object.keys(event.detail.chatData) : [],
+        messageCount: event.detail?.chatData?.messages?.length || 0,
+      });
+      
       const { chatData } = event.detail;
-      if (chatData && chatData.messages) {
+      if (chatData && chatData.messages && chatData.messages.length > 0) {
         console.log(
           "💬 Loading saved chat messages:",
           chatData.messages.length
         );
 
-        // Convert timestamp strings back to Date objects
+        // Convert timestamp strings back to Date objects and ensure proper message structure
         const restoredMessages = chatData.messages.map((msg: any) => ({
-          ...msg,
-          timestamp: new Date(msg.timestamp),
+          id: msg.id || `restored-${Date.now()}-${Math.random()}`,
+          type: msg.type || "assistant",
+          content: msg.content || "",
+          timestamp: msg.timestamp instanceof Date ? msg.timestamp : new Date(msg.timestamp),
+          circuitChanges: msg.circuitChanges || undefined,
+          status: msg.status || "complete",
+          isEditing: false, // Never restore in editing state
         }));
+
+        console.log("✅ Restoring chat messages:", {
+          restoredCount: restoredMessages.length,
+          firstMessage: restoredMessages[0]?.content?.substring(0, 50) + "...",
+          lastMessage: restoredMessages[restoredMessages.length - 1]?.content?.substring(0, 50) + "...",
+        });
 
         setMessages(restoredMessages);
         console.log("✅ Chat messages restored successfully");
+      } else {
+        console.log("⚠️ No valid chat data in restoration event");
       }
     };
+
+    // Add a manual trigger for testing (can be removed later)
+    const handleManualRestore = () => {
+      console.log("🔧 Manual chat restore triggered");
+      // This can be called from browser console for testing
+      window.dispatchEvent(new CustomEvent("chatDataRestored", {
+        detail: { 
+          chatData: { 
+            messages: [
+              {
+                id: "test-1",
+                type: "user",
+                content: "Test message",
+                timestamp: new Date().toISOString(),
+                status: "complete"
+              }
+            ]
+          }
+        }
+      }));
+    };
+    
+    // Expose for testing
+    (window as any).manualChatRestore = handleManualRestore;
 
     window.addEventListener(
       "chatDataRestored",
@@ -98,7 +143,15 @@ export function AIChatProvider({
   }, []);
 
   const addMessage = (message: ChatMessage) => {
-    setMessages((prev) => [...prev, message]);
+    setMessages((prev) => {
+      const newMessages = [...prev, message];
+      console.log("➕ Message added to chat:", {
+        messageType: message.type,
+        messageContent: message.content.substring(0, 50) + "...",
+        totalMessages: newMessages.length,
+      });
+      return newMessages;
+    });
   };
 
   const handlePromptSubmit = async (
@@ -201,7 +254,7 @@ export function AIChatProvider({
 
               try {
                 const chunkData = JSON.parse(data);
-                console.log("� Received chunk:", chunkData);
+                console.log("📦 Received chunk:", chunkData);
 
                 // Accumulate content
                 if (chunkData.content) {
@@ -255,23 +308,37 @@ export function AIChatProvider({
                     }
 
                     // Update message with final content and status
-                    setMessages((prev) =>
-                      prev.map((msg) =>
+                    setMessages((prev) => {
+                      const updatedMessages = prev.map((msg) =>
                         msg.id === aiMessageId
                           ? {
                               ...msg,
                               content:
                                 finalResponse.metadata?.explanation ||
                                 accumulatedContent,
-                              status: "complete",
+                              status: "complete" as const,
                               circuitChanges:
                                 parsedResponse.operations.length > 0
                                   ? [parsedResponse]
                                   : undefined,
                             }
                           : msg
-                      )
-                    );
+                      );
+                      
+                      // Trigger a save after chat completion
+                      console.log("💬 Chat message completed, triggering save in 3 seconds");
+                      setTimeout(() => {
+                        console.log("🚀 Dispatching chat save event with", updatedMessages.length, "messages");
+                        window.dispatchEvent(new CustomEvent("triggerChatSave", {
+                          detail: { 
+                            messages: updatedMessages,
+                            messageCount: updatedMessages.length 
+                          }
+                        }));
+                      }, 3000);
+                      
+                      return updatedMessages;
+                    });
                   } catch (parseError) {
                     console.error(
                       "❌ Error processing final response:",
@@ -291,13 +358,8 @@ export function AIChatProvider({
                     );
                   }
                 }
-              } catch (parseError) {
-                console.error(
-                  "❌ Error parsing chunk data:",
-                  parseError,
-                  "Raw data:",
-                  data
-                );
+              } catch (chunkError) {
+                console.error("❌ Error parsing chunk:", chunkError);
               }
             }
           }
@@ -306,16 +368,14 @@ export function AIChatProvider({
         reader.releaseLock();
       }
     } catch (error) {
-      console.error("❌ Error in streaming:", error);
-
-      // Update message with error status
+      console.error("❌ Error in handlePromptSubmit:", error);
+      // Update the AI message with error status
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === aiMessageId
             ? {
                 ...msg,
-                content:
-                  "Sorry, I encountered an error while processing your request.",
+                content: "Sorry, I encountered an error. Please try again.",
                 status: "error",
               }
             : msg
@@ -366,7 +426,24 @@ export function AIChatProvider({
     cancelEditingMessage,
   };
 
+  // Add global test function for debugging
+  useEffect(() => {
+    (window as any).checkChatMessages = () => {
+      console.log("💬 Current chat messages:", messages.length);
+      messages.forEach((msg, index) => {
+        console.log(`Message ${index + 1}:`, {
+          type: msg.type,
+          content: msg.content.substring(0, 50) + "...",
+          timestamp: msg.timestamp,
+          status: msg.status
+        });
+      });
+    };
+  }, [messages]);
+
   return (
-    <AIChatContext.Provider value={value}>{children}</AIChatContext.Provider>
+    <AIChatContext.Provider value={value}>
+      {children}
+    </AIChatContext.Provider>
   );
 }
