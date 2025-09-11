@@ -81,6 +81,10 @@ CREATE TABLE components (
 
   -- Documentation
   datasheet_url TEXT,
+  keywords TEXT[] DEFAULT '{}',              -- KiCad search keywords
+  footprint_filters TEXT[] DEFAULT '{}',     -- KiCad footprint compatibility filters
+  default_footprint TEXT,                    -- Default footprint suggestion
+  reference_designator TEXT,                 -- Standard reference designator
   manufacturer VARCHAR(255),
   part_number VARCHAR(255),
 
