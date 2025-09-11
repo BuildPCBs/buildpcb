@@ -75,6 +75,10 @@ CREATE TABLE components (
   symbol_svg TEXT,
   footprint_data JSONB DEFAULT '{}',
 
+  -- KiCad integration
+  kicad_sym_raw JSONB DEFAULT '{}',         -- raw .kicad_sym definition
+  kicad_library_source TEXT,                -- attribution/source info
+
   -- Documentation
   datasheet_url TEXT,
   manufacturer VARCHAR(255),

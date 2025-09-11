@@ -25,6 +25,12 @@ export function useHistoryStack({
   const saveState = useCallback(() => {
     if (!canvas || isUndoRedoInProgress.current) return;
 
+    // Don't save if history is not initialized
+    if (historyIndex < 0) {
+      console.log("⚠️ Cannot save state: History not initialized");
+      return;
+    }
+
     console.log("💾 Saving canvas state to history");
 
     try {
@@ -68,7 +74,10 @@ export function useHistoryStack({
 
   // Initialize history with empty canvas state
   const initializeHistory = useCallback(() => {
-    if (!canvas) return;
+    if (!canvas) {
+      console.log("⚠️ Cannot initialize history: Canvas not available");
+      return;
+    }
 
     console.log("🎬 Initializing history stack");
     const initialState: HistoryState = {

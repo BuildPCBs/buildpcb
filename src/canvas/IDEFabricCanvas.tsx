@@ -8,6 +8,7 @@ import { useCanvasHotkeys } from "./hooks/useCanvasHotkeys";
 import { useWiringTool } from "./hooks/useWiringTool";
 import { useCanvasViewport } from "./hooks/useCanvasViewport";
 import { useCanvasAutoSave } from "./hooks/useCanvasAutoSave";
+import { useHistoryStack } from "./hooks/useHistoryStack";
 import { canvasCommandManager } from "./canvas-command-manager";
 import { createSimpleComponent } from "./SimpleComponentFactory";
 import { createSVGComponent } from "./SVGComponentFactory";
@@ -93,6 +94,23 @@ export function IDEFabricCanvas({
     canvas: fabricCanvas,
     enabled: !!currentProject, // Only enable when we have a project
   });
+
+  // History stack for undo/redo
+  const {
+    saveState,
+    initializeHistory,
+    handleUndo: historyUndo,
+    handleRedo: historyRedo,
+    canUndo,
+    canRedo,
+  } = useHistoryStack({ canvas: fabricCanvas });
+
+  // Initialize history when canvas becomes available
+  useEffect(() => {
+    if (fabricCanvas && initializeHistory) {
+      initializeHistory();
+    }
+  }, [fabricCanvas, initializeHistory]);
 
   // Canvas restoration effect - only run once when both canvas and data are ready
   useEffect(() => {
@@ -713,6 +731,9 @@ export function IDEFabricCanvas({
         console.log("🎯 Component movement completed - final wire update");
         wiringTool.updateConnectedWires(movedObject);
       }
+
+      // Save state for undo/redo
+      saveState();
     };
 
     // New ruler visibility handlers per design requirements
@@ -736,6 +757,14 @@ export function IDEFabricCanvas({
     // Attach all listeners
     fabricCanvas.on("object:moving", handleObjectMoving);
     fabricCanvas.on("object:modified", handleObjectMoved);
+    fabricCanvas.on("object:added", () => {
+      // Debounce saveState to prevent multiple rapid calls
+      setTimeout(() => saveState(), 0);
+    });
+    fabricCanvas.on("object:removed", () => {
+      // Debounce saveState to prevent multiple rapid calls
+      setTimeout(() => saveState(), 0);
+    });
     fabricCanvas.on("selection:created", handleSelectionCreated);
     fabricCanvas.on("selection:updated", handleSelectionUpdated);
     fabricCanvas.on("selection:cleared", handleSelectionCleared);
@@ -743,11 +772,17 @@ export function IDEFabricCanvas({
     return () => {
       fabricCanvas.off("object:moving", handleObjectMoving);
       fabricCanvas.off("object:modified", handleObjectMoved);
+      fabricCanvas.off("object:added", () => {
+        setTimeout(() => saveState(), 0);
+      });
+      fabricCanvas.off("object:removed", () => {
+        setTimeout(() => saveState(), 0);
+      });
       fabricCanvas.off("selection:created", handleSelectionCreated);
       fabricCanvas.off("selection:updated", handleSelectionUpdated);
       fabricCanvas.off("selection:cleared", handleSelectionCleared);
     };
-  }, [fabricCanvas, wiringTool]);
+  }, [fabricCanvas, wiringTool, saveState]);
 
   // PART 1: Master Action Functions with "LOUD" Logging - The Single Source of Truth
   const handleGroup = () => {
@@ -944,6 +979,7 @@ export function IDEFabricCanvas({
       objects.forEach((obj: fabric.Object) => fabricCanvas.remove(obj));
       fabricCanvas.discardActiveObject();
       fabricCanvas.renderAll();
+      saveState();
       console.log(
         `--- ACTION SUCCESS: handleDelete (deleted ${objects.length} objects) ---`
       );
@@ -953,8 +989,8 @@ export function IDEFabricCanvas({
     // Handle single object
     fabricCanvas.remove(activeObject);
     fabricCanvas.renderAll();
+    saveState();
     console.log("--- ACTION SUCCESS: handleDelete (deleted 1 object) ---");
-    // saveState(); // We can add this back later
   };
 
   const handleCopy = () => {
@@ -1047,6 +1083,7 @@ export function IDEFabricCanvas({
             fabricCanvas.add(recreatedComponent);
             fabricCanvas.setActiveObject(recreatedComponent);
             fabricCanvas.renderAll();
+            saveState();
 
             console.log(
               `--- ACTION SUCCESS: handlePaste with pin recreation at position (${pastePos.x}, ${pastePos.y}) ---`
@@ -1057,6 +1094,7 @@ export function IDEFabricCanvas({
             fabricCanvas.add(cloned);
             fabricCanvas.setActiveObject(cloned);
             fabricCanvas.renderAll();
+            saveState();
 
             console.log(
               `--- ACTION SUCCESS: handlePaste (fallback) at position (${pastePos.x}, ${pastePos.y}) ---`
@@ -1070,6 +1108,7 @@ export function IDEFabricCanvas({
         fabricCanvas.add(cloned);
         fabricCanvas.setActiveObject(cloned);
         fabricCanvas.renderAll();
+        saveState();
         console.log(
           `--- ACTION SUCCESS: handlePaste at position (${pastePos.x}, ${pastePos.y}) ---`
         );
@@ -1103,26 +1142,22 @@ export function IDEFabricCanvas({
 
     activeObject.set("angle", newAngle);
     fabricCanvas.renderAll();
+    saveState();
 
     console.log(
       `--- ACTION SUCCESS: handleRotate (${currentAngle}° → ${newAngle}°) ---`
     );
-    // saveState(); // We can add this back later
   };
 
   const handleUndo = () => {
     console.log("--- ACTION START: handleUndo ---");
-    console.log(
-      "--- ACTION PLACEHOLDER: Undo functionality to be implemented ---"
-    );
+    historyUndo();
     console.log("--- ACTION END: handleUndo ---");
   };
 
   const handleRedo = () => {
     console.log("--- ACTION START: handleRedo ---");
-    console.log(
-      "--- ACTION PLACEHOLDER: Redo functionality to be implemented ---"
-    );
+    historyRedo();
     console.log("--- ACTION END: handleRedo ---");
   };
 

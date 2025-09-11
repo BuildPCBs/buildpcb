@@ -1,6 +1,6 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 schema.txt
-
+blueprint.md
 # dependencies
 /node_modules
 /.pnp
@@ -10,7 +10,8 @@ schema.txt
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
-
+starter_symbols
+symbols/
 # testing
 /coverage
 test-results/
