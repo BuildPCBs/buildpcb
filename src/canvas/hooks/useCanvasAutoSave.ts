@@ -71,12 +71,18 @@ export function useCanvasAutoSave({
     if (canvas) {
       getCurrentCanvasData().then((data) => {
         // Include chat data in the canvas data for auto-save
-        const chatData = messages.length > 0 ? {
-          messages: messages.map(msg => ({
-            ...msg,
-            timestamp: msg.timestamp instanceof Date ? msg.timestamp.toISOString() : msg.timestamp,
-          }))
-        } : null;
+        const chatData =
+          messages.length > 0
+            ? {
+                messages: messages.map((msg) => ({
+                  ...msg,
+                  timestamp:
+                    msg.timestamp instanceof Date
+                      ? msg.timestamp.toISOString()
+                      : msg.timestamp,
+                })),
+              }
+            : null;
         const extendedCanvasData = {
           ...data.canvasData,
           chatData: chatData,
@@ -131,7 +137,8 @@ export function useCanvasAutoSave({
       console.log("💬 Chat messages changed, marking project as dirty", {
         messageCount: messages.length,
         projectId,
-        lastMessageContent: messages[messages.length - 1]?.content?.substring(0, 50) + "...",
+        lastMessageContent:
+          messages[messages.length - 1]?.content?.substring(0, 50) + "...",
       });
       markDirty();
     }
@@ -185,12 +192,18 @@ export function useCanvasAutoSave({
       console.log("💾 Manual save triggered");
       // Get fresh canvas data with current chat data
       const data = await getCurrentCanvasData();
-      const chatData = messages.length > 0 ? {
-        messages: messages.map(msg => ({
-          ...msg,
-          timestamp: msg.timestamp instanceof Date ? msg.timestamp.toISOString() : msg.timestamp,
-        }))
-      } : null;
+      const chatData =
+        messages.length > 0
+          ? {
+              messages: messages.map((msg) => ({
+                ...msg,
+                timestamp:
+                  msg.timestamp instanceof Date
+                    ? msg.timestamp.toISOString()
+                    : msg.timestamp,
+              })),
+            }
+          : null;
       const extendedCanvasData = {
         ...data.canvasData,
         chatData: chatData,

@@ -135,10 +135,15 @@ export class DatabaseService {
     console.log("✅ Project retrieved:", {
       name: data.name,
       hasCanvasSettings: !!data.canvas_settings,
-      canvasSettingsKeys: data.canvas_settings ? Object.keys(data.canvas_settings) : [],
+      canvasSettingsKeys: data.canvas_settings
+        ? Object.keys(data.canvas_settings)
+        : [],
       hasChatDataInSettings: !!data.canvas_settings?.chatData,
-      chatMessageCountInSettings: data.canvas_settings?.chatData?.messages?.length || 0,
-      canvasSettingsSize: data.canvas_settings ? JSON.stringify(data.canvas_settings).length : 0,
+      chatMessageCountInSettings:
+        data.canvas_settings?.chatData?.messages?.length || 0,
+      canvasSettingsSize: data.canvas_settings
+        ? JSON.stringify(data.canvas_settings).length
+        : 0,
     });
     return data;
   }
@@ -286,7 +291,7 @@ export class DatabaseService {
     projectId: string
   ): Promise<ProjectVersion | null> {
     console.log("🔍 Getting latest version for project:", projectId);
-    
+
     const { data, error } = await supabase
       .from("project_versions")
       .select("*")
@@ -296,7 +301,7 @@ export class DatabaseService {
       .single();
 
     if (error && error.code !== "PGRST116") throw error; // PGRST116 = no rows
-    
+
     console.log("📊 Latest version data:", {
       hasData: !!data,
       versionNumber: data?.version_number,
@@ -304,9 +309,11 @@ export class DatabaseService {
       canvasDataKeys: data?.canvas_data ? Object.keys(data.canvas_data) : [],
       hasChatDataInCanvas: !!data?.canvas_data?.chatData,
       chatMessageCount: data?.canvas_data?.chatData?.messages?.length || 0,
-      canvasDataSize: data?.canvas_data ? JSON.stringify(data.canvas_data).length : 0,
+      canvasDataSize: data?.canvas_data
+        ? JSON.stringify(data.canvas_data).length
+        : 0,
     });
-    
+
     return data;
   }
 
@@ -339,8 +346,13 @@ export class DatabaseService {
           .single();
 
         const nextVersionNumber = (latestVersion?.version_number || 0) + 1;
-        
-        console.log("💾 Creating version", nextVersionNumber, "for project", projectId);
+
+        console.log(
+          "💾 Creating version",
+          nextVersionNumber,
+          "for project",
+          projectId
+        );
 
         const { data, error } = await supabase
           .from("project_versions")
@@ -359,11 +371,17 @@ export class DatabaseService {
           .single();
 
         if (error) {
-          if (error.code === '23505' && retries > 1) {
+          if (error.code === "23505" && retries > 1) {
             // Duplicate key violation, retry with delay
-            console.warn("⚠️ Version number collision, retrying...", retries - 1, "attempts left");
+            console.warn(
+              "⚠️ Version number collision, retrying...",
+              retries - 1,
+              "attempts left"
+            );
             retries--;
-            await new Promise(resolve => setTimeout(resolve, Math.random() * 1000)); // Random delay
+            await new Promise((resolve) =>
+              setTimeout(resolve, Math.random() * 1000)
+            ); // Random delay
             continue;
           }
           throw error;
@@ -394,10 +412,12 @@ export class DatabaseService {
         }
         retries--;
         console.warn("⚠️ Version creation failed, retrying...", error);
-        await new Promise(resolve => setTimeout(resolve, Math.random() * 1000));
+        await new Promise((resolve) =>
+          setTimeout(resolve, Math.random() * 1000)
+        );
       }
     }
-    
+
     throw new Error("Failed to create version after multiple attempts");
   }
 

@@ -314,29 +314,12 @@ export function AIChatProvider({
                 }
 
                 // Update the message content in real-time
-                // For text-only responses, show the accumulated text content
-                // For circuit responses, show the raw JSON until parsing is complete
-                let displayContent = accumulatedContent;
-                if (chunkData.accumulatedContent && 
-                    chunkData.accumulatedContent.includes('"mode":"text-only"') && 
-                    !chunkData.isComplete) {
-                  // During streaming of text-only, try to extract just the textResponse
-                  try {
-                    const tempResponse = JSON.parse(chunkData.accumulatedContent);
-                    if (tempResponse.textResponse) {
-                      displayContent = tempResponse.textResponse;
-                    }
-                  } catch (e) {
-                    // JSON not complete yet, use accumulated content
-                  }
-                }
-
                 setMessages((prev) =>
                   prev.map((msg) =>
                     msg.id === aiMessageId
                       ? {
                           ...msg,
-                          content: displayContent,
+                          content: accumulatedContent,
                           status: chunkData.isComplete
                             ? "complete"
                             : "receiving",
@@ -383,9 +366,8 @@ export function AIChatProvider({
                           ? {
                               ...msg,
                               content:
-                                finalResponse.mode === "text-only"
-                                  ? finalResponse.textResponse || accumulatedContent
-                                  : finalResponse.metadata?.explanation || accumulatedContent,
+                                finalResponse.metadata?.explanation ||
+                                accumulatedContent,
                               status: "complete" as const,
                               circuitChanges:
                                 parsedResponse.operations.length > 0

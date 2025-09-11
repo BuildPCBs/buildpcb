@@ -150,7 +150,9 @@ export class ProjectService {
         chatMessageCount: chatData?.messages?.length || 0,
         extendedCanvasDataKeys: Object.keys(extendedCanvasData),
         extendedCanvasDataSize: JSON.stringify(extendedCanvasData).length,
-        chatDataPreview: chatData ? JSON.stringify(chatData).substring(0, 200) + "..." : "No chat data",
+        chatDataPreview: chatData
+          ? JSON.stringify(chatData).substring(0, 200) + "..."
+          : "No chat data",
       });
 
       // Update the project's last modified time and canvas settings
