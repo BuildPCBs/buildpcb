@@ -35,7 +35,8 @@ export function serializeCanvasToCircuit(
         (obj as any).data || (obj as any).componentData || {};
 
       // Get database component metadata if available
-      const dbMetadata = (obj as any).componentMetadata || (obj as any).databaseComponent;
+      const dbMetadata =
+        (obj as any).componentMetadata || (obj as any).databaseComponent;
 
       return {
         id: dbMetadata?.id || componentData.id || `comp_${index}`,
@@ -44,9 +45,14 @@ export function serializeCanvasToCircuit(
           componentData.componentName ||
           componentData.name ||
           `Component ${index + 1}`,
-        type: dbMetadata?.type || componentData.componentType || componentData.type || "unknown",
+        type:
+          dbMetadata?.type ||
+          componentData.componentType ||
+          componentData.type ||
+          "unknown",
         category: dbMetadata?.category || componentData.category || "general",
-        specifications: dbMetadata?.specifications || componentData.specifications || {},
+        specifications:
+          dbMetadata?.specifications || componentData.specifications || {},
         availability: componentData.availability || ("in-stock" as const),
         position: {
           x: obj.left || 0,

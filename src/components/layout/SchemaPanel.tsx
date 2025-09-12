@@ -4,7 +4,10 @@ import { HomeIcon, SearchIcon, WindowIcon } from "@/components/icons";
 import { useClickOutside } from "@/hooks/useClickOutside";
 import { r, responsive } from "@/lib/responsive";
 import { canvasCommandManager } from "@/canvas/canvas-command-manager";
-import { useDatabaseComponents, ComponentDisplayData } from "@/hooks/useDatabaseComponents";
+import {
+  useDatabaseComponents,
+  ComponentDisplayData,
+} from "@/hooks/useDatabaseComponents";
 
 interface ComponentItemProps {
   component: ComponentDisplayData;
@@ -46,8 +49,6 @@ function ComponentItem({ component, onClick }: ComponentItemProps) {
     </div>
   );
 }
-
-
 
 export function SchemaPanel() {
   const [isFullyExpanded, setIsFullyExpanded] = useState(false);
@@ -411,7 +412,9 @@ export function SchemaPanel() {
                   >
                     {componentsLoading ? (
                       <div className="flex items-center justify-center py-8">
-                        <div className="text-sm text-gray-500">Loading components...</div>
+                        <div className="text-sm text-gray-500">
+                          Loading components...
+                        </div>
                       </div>
                     ) : componentsError ? (
                       <div className="flex items-center justify-center py-8">
