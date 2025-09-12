@@ -1,2 +1,2 @@
 export { useCanvasPan } from "./useCanvasPan";
-export { useWiringTool } from "./useWiringTool";
+export { useSimpleWiringTool } from "./useSimpleWiringTool";

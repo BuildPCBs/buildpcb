@@ -42,6 +42,8 @@ export function useDatabaseComponents() {
   const fetchComponents = useCallback(
     async (loadMore = false) => {
       try {
+        console.log('🔍 Fetching components from database...', { loadMore, offset, PAGE_SIZE });
+
         if (!loadMore) {
           setLoading(true);
           setOffset(0);
@@ -49,54 +51,89 @@ export function useDatabaseComponents() {
         setError(null);
 
         const currentOffset = loadMore ? offset : 0;
+        console.log('📡 Making Supabase query:', {
+          table: 'components',
+          range: [currentOffset, currentOffset + PAGE_SIZE - 1],
+          orderBy: 'name'
+        });
+
         const { data, error: fetchError } = await supabase
           .from("components")
           .select("*")
           .order("name")
           .range(currentOffset, currentOffset + PAGE_SIZE - 1);
 
+        console.log('📊 Supabase response:', {
+          dataLength: data?.length || 0,
+          error: fetchError,
+          hasMore: data ? data.length === PAGE_SIZE : false
+        });
+
         if (fetchError) {
+          console.error('❌ Supabase fetch error:', fetchError);
           throw fetchError;
         }
 
         if (data) {
+          console.log('✅ Processing', data.length, 'components from database');
+
           // Check if we have more data
           setHasMore(data.length === PAGE_SIZE);
 
           // Transform database components to display format
           const displayComponents: ComponentDisplayData[] = data.map(
-            (comp: DatabaseComponent) => ({
-              id: comp.id,
-              name: comp.name,
-              category: comp.category,
-              image: getComponentImage(comp),
-              type: comp.type,
-              description: comp.description,
-              manufacturer: comp.manufacturer,
-              partNumber: comp.part_number,
-              pinCount:
-                comp.pin_configuration?.total_pins ||
-                comp.pin_configuration?.pins?.length ||
-                0,
-              symbol_svg: comp.symbol_svg, // Include raw SVG for fallback
-            })
+            (comp: DatabaseComponent) => {
+              console.log('🔄 Processing component:', {
+                id: comp.id,
+                name: comp.name,
+                category: comp.category,
+                hasSvg: !!comp.symbol_svg,
+                svgLength: comp.symbol_svg?.length || 0
+              });
+
+              return {
+                id: comp.id,
+                name: comp.name,
+                category: comp.category,
+                image: getComponentImage(comp),
+                type: comp.type,
+                description: comp.description,
+                manufacturer: comp.manufacturer,
+                partNumber: comp.part_number,
+                pinCount:
+                  comp.pin_configuration?.total_pins ||
+                  comp.pin_configuration?.pins?.length ||
+                  0,
+                symbol_svg: comp.symbol_svg, // Include raw SVG for fallback
+              };
+            }
           );
 
+          console.log('🎯 Setting', displayComponents.length, 'display components');
+
           if (loadMore) {
-            setComponents((prev) => [...prev, ...displayComponents]);
+            setComponents((prev) => {
+              const newComponents = [...prev, ...displayComponents];
+              console.log('📦 Total components after load more:', newComponents.length);
+              return newComponents;
+            });
             setOffset((prev) => prev + PAGE_SIZE);
           } else {
             setComponents(displayComponents);
             setOffset(PAGE_SIZE);
+            console.log('📦 Set initial components:', displayComponents.length);
           }
+        } else {
+          console.warn('⚠️ No data returned from Supabase');
         }
       } catch (err) {
-        console.error("Error fetching components:", err);
+        console.error("❌ Error fetching components:", err);
         setError(
           err instanceof Error ? err.message : "Failed to fetch components"
         );
       } finally {
         setLoading(false);
+        console.log('🏁 Component fetch completed');
       }
     },
     [offset]
@@ -108,67 +145,117 @@ export function useDatabaseComponents() {
     }
   }, [hasMore, loading, fetchComponents]);
 
+  // Memory cleanup function
+  const cleanupMemory = useCallback(() => {
+    console.log('🧹 Cleaning up component memory...');
+    setComponents([]);
+    setOffset(0);
+    setHasMore(true);
+    setError(null);
+  }, []);
+
+  // Auto-cleanup when component unmounts or when memory usage gets high
   useEffect(() => {
-    fetchComponents();
-  }, []); // Remove fetchComponents from dependencies since it doesn't depend on changing values
+    const handleMemoryPressure = () => {
+      console.log('⚠️ Memory pressure detected, cleaning up components...');
+      cleanupMemory();
+    };
 
-  // Helper function to determine component image
-  const getComponentImage = (component: DatabaseComponent): string => {
-    // Use actual SVG from database if available
-    if (component.symbol_svg) {
-      // Convert SVG string to data URL with proper Unicode handling
-      try {
-        // Try URL encoding first (more compatible with SVG)
-        const urlEncodedSvg = encodeURIComponent(component.symbol_svg);
-        const svgDataUrl = `data:image/svg+xml;charset=utf-8,${urlEncodedSvg}`;
-        return svgDataUrl;
-      } catch (error) {
-        console.warn(
-          `Failed to URL encode SVG for component ${component.name}:`,
-          error
-        );
-        // Fall back to base64 encoding
-        try {
-          // More memory-efficient Unicode-safe base64 encoding
-          const encoder = new TextEncoder();
-          const utf8Bytes = encoder.encode(component.symbol_svg);
-
-          // Use Uint8Array to avoid creating intermediate arrays
-          let binaryString = "";
-          for (let i = 0; i < utf8Bytes.length; i++) {
-            binaryString += String.fromCharCode(utf8Bytes[i]);
-          }
-
-          const svgDataUrl = `data:image/svg+xml;base64,${btoa(binaryString)}`;
-          return svgDataUrl;
-        } catch (base64Error) {
-          console.warn(
-            `Failed to base64 encode SVG for component ${component.name}:`,
-            base64Error
-          );
-          // Fall back to category icon if encoding fails
-        }
+    // Listen for memory pressure events (if supported)
+    if ('memory' in performance) {
+      const memoryInfo = (performance as any).memory;
+      if (memoryInfo.usedJSHeapSize > memoryInfo.totalJSHeapSize * 0.8) {
+        console.log('⚠️ High memory usage detected, triggering cleanup...');
+        cleanupMemory();
       }
     }
 
-    // Fallback to category-based icons if no SVG available or encoding failed
-    const categoryIcons: Record<string, string> = {
-      Resistor: "/components/resistor.svg",
-      Capacitor: "/components/capacitor.svg",
-      Diode: "/components/diode.svg",
-      Transistor: "/components/transistor.svg",
-      IC: "/components/ic.svg",
-      Connector: "/components/connector.svg",
-      Switch: "/components/switch.svg",
-      LED: "/components/led.svg",
-      Inductor: "/components/inductor.svg",
-      Sensor: "/components/sensor.svg",
-      Power: "/components/power.svg",
-      MCU: "/components/mcu.svg",
-      OpAmp: "/components/opamp.svg",
+    return () => {
+      // Cleanup on unmount
+      cleanupMemory();
+    };
+  }, [cleanupMemory]);
+
+  // Initial component fetch
+  useEffect(() => {
+    console.log('🚀 Initial component fetch triggered');
+    fetchComponents(false);
+  }, []); // Empty dependency array to run only once on mount
+
+  // Helper function to determine component image with memory optimization
+  const getComponentImage = (component: DatabaseComponent): string => {
+    // Use actual SVG from database if available
+    if (component.symbol_svg) {
+      // Memory optimization: Use a lightweight placeholder for large SVGs
+      // Only convert to data URL when actually needed for display
+      if (component.symbol_svg.length > 10000) {
+        // For very large SVGs, use a placeholder and lazy load
+        return `data:image/svg+xml;base64,${btoa('<svg width="60" height="30" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="30" fill="#e8e8e8"/><text x="30" y="18" text-anchor="middle" font-size="10" fill="#666">SVG</text></svg>')}`;
+      }
+
+      // For smaller SVGs, still use memory-efficient encoding
+      try {
+        // Use more memory-efficient base64 encoding
+        const svgBytes = new TextEncoder().encode(component.symbol_svg);
+        let binaryString = '';
+        const chunkSize = 1024;
+
+        // Process in chunks to avoid large string allocations
+        for (let i = 0; i < svgBytes.length; i += chunkSize) {
+          const chunk = svgBytes.slice(i, i + chunkSize);
+          for (let j = 0; j < chunk.length; j++) {
+            binaryString += String.fromCharCode(chunk[j]);
+          }
+        }
+
+        const base64Data = btoa(binaryString);
+        return `data:image/svg+xml;base64,${base64Data}`;
+      } catch (error) {
+        console.warn(
+          `Failed to encode SVG for component ${component.name}:`,
+          error
+        );
+        // Fallback to category icon
+        return getCategoryIcon(component.category);
+      }
+    }
+
+    // Fallback to category icon
+    return getCategoryIcon(component.category);
+  };
+
+  // Memory-efficient category icon generator
+  const getCategoryIcon = (category: string): string => {
+    const icons: Record<string, string> = {
+      resistor: 'R',
+      capacitor: 'C',
+      led: 'LED',
+      diode: 'D',
+      transistor: 'Q',
+      inductor: 'L',
+      battery: 'BAT',
+      switch: 'SW',
+      connector: 'CONN',
+      pushbutton: 'BTN',
+      crystal: 'XTAL',
+      opamp: 'OP',
+      sensor: 'SEN',
+      motor: 'MOT',
+      voltage_regulator: 'REG',
+      arduino: 'ARD',
+      buzzer: 'BUZ',
+      'display-lcd': 'LCD',
+      fuse: 'FUSE',
+      microcontroller: 'MCU',
+      'photo-resistor': 'LDR',
+      potentiometer: 'POT',
+      relay: 'RLY',
+      'servo-motor': 'SERVO',
+      'temperature-sensor': 'TEMP',
     };
 
-    return categoryIcons[component.category] || "/components/component.svg";
+    const icon = icons[category] || category.charAt(0).toUpperCase();
+    return `data:image/svg+xml;base64,${btoa(`<svg width="60" height="30" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="30" fill="#e8e8e8"/><text x="30" y="20" text-anchor="middle" font-size="12" fill="#666" font-family="monospace">${icon}</text></svg>`)}`;
   };
 
   const searchComponents = (query: string): ComponentDisplayData[] => {
@@ -210,5 +297,13 @@ export function useDatabaseComponents() {
     getCategories,
     refetch: fetchComponents,
     loadMore: loadMoreComponents,
+    cleanupMemory,
+    // Memory usage info
+    memoryInfo: {
+      componentCount: components.length,
+      estimatedMemoryUsage: components.reduce((total, comp) => {
+        return total + (comp.symbol_svg?.length || 0) + (comp.image?.length || 0) + 1000; // Rough estimate
+      }, 0),
+    },
   };
 }

@@ -1,14 +1,15 @@
 "use client";
 
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState, useCallback } from "react";
 import * as fabric from "fabric";
 import { useCanvasZoom } from "./hooks/useCanvasZoom";
 import { useCanvasPan } from "./hooks/useCanvasPan";
 import { useCanvasHotkeys } from "./hooks/useCanvasHotkeys";
-import { useWiringTool } from "./hooks/useWiringTool";
+import { useSimpleWiringTool } from "./hooks/useSimpleWiringTool";
 import { useCanvasViewport } from "./hooks/useCanvasViewport";
 import { useCanvasAutoSave } from "./hooks/useCanvasAutoSave";
 import { useHistoryStack } from "./hooks/useHistoryStack";
+import { memoryMonitor } from "@/lib/memory-monitor";
 import { canvasCommandManager } from "./canvas-command-manager";
 import { createSimpleComponent } from "./SimpleComponentFactory";
 import { createSVGComponent } from "./SVGComponentFactory";
@@ -85,8 +86,8 @@ export function IDEFabricCanvas({
   const panState = useCanvasPan(fabricCanvas);
   const viewportState = useCanvasViewport(fabricCanvas);
 
-  // Wire drawing tool - Professional-grade implementation
-  const wiringTool = useWiringTool({
+  // Simple Wiring Tool - Works with Database Pin Data
+  const wiringTool = useSimpleWiringTool({
     canvas: fabricCanvas,
     enabled: !!fabricCanvas,
   });
@@ -371,6 +372,9 @@ export function IDEFabricCanvas({
     // Register canvas with command manager
     canvasCommandManager.setCanvas(canvas);
 
+    // Start memory monitoring
+    memoryMonitor.startMonitoring();
+
     // Setup component handler with the new canvas
     setupComponentHandler(canvas);
 
@@ -383,6 +387,9 @@ export function IDEFabricCanvas({
     // Cleanup function to dispose canvas when component unmounts or useEffect re-runs
     return () => {
       console.log("Disposing canvas in cleanup function");
+
+      // Stop memory monitoring
+      memoryMonitor.stopMonitoring();
 
       // Clean up component event listeners
       if (componentEventUnsubscribe) {
@@ -714,7 +721,7 @@ export function IDEFabricCanvas({
         console.log(
           "🔄 Component moving - updating connected wires in real-time"
         );
-        wiringTool.updateConnectedWires(movingObject);
+        // Note: Simple wiring tool doesn't need wire updates on component move
       }
       // PART 3: No Follow Rule - If a wire is being moved, do nothing
       // Components should NOT follow wires
@@ -733,7 +740,7 @@ export function IDEFabricCanvas({
         movedObject.type === "group"
       ) {
         console.log("🎯 Component movement completed - final wire update");
-        wiringTool.updateConnectedWires(movedObject);
+        // Note: Simple wiring tool doesn't need wire updates on component move
       }
 
       // Save state for undo/redo
@@ -788,7 +795,65 @@ export function IDEFabricCanvas({
     };
   }, [fabricCanvas, wiringTool, saveState]);
 
-  // PART 1: Master Action Functions with "LOUD" Logging - The Single Source of Truth
+  // Canvas memory optimization
+  const optimizeCanvasMemory = useCallback(() => {
+    if (!fabricCanvas) return;
+
+    console.log('🧹 Optimizing canvas memory...');
+
+    const objects = fabricCanvas.getObjects();
+    let removedCount = 0;
+
+    // Remove objects that are off-screen and not visible
+    objects.forEach((obj) => {
+      const bounds = obj.getBoundingRect();
+      const canvasWidth = fabricCanvas.width || 0;
+      const canvasHeight = fabricCanvas.height || 0;
+
+      // Remove objects that are completely off-screen
+      if (bounds.left > canvasWidth + 100 ||
+          bounds.top > canvasHeight + 100 ||
+          bounds.left + bounds.width < -100 ||
+          bounds.top + bounds.height < -100) {
+
+        // Don't remove components or important objects
+        if (!(obj as any).componentType && !(obj as any).isAlignmentGuide) {
+          fabricCanvas.remove(obj);
+          removedCount++;
+        }
+      }
+    });
+
+    if (removedCount > 0) {
+      console.log(`🗑️ Removed ${removedCount} off-screen objects`);
+      fabricCanvas.renderAll();
+    }
+
+    // Force garbage collection hint (if available)
+    if (window.gc) {
+      window.gc();
+    }
+  }, [fabricCanvas]);
+
+  // Auto-optimize memory periodically
+  useEffect(() => {
+    if (!fabricCanvas) return;
+
+    const memoryCheckInterval = setInterval(() => {
+      // Check memory usage and optimize if needed
+      if ('memory' in performance) {
+        const memoryInfo = (performance as any).memory;
+        const memoryUsageRatio = memoryInfo.usedJSHeapSize / memoryInfo.totalJSHeapSize;
+
+        if (memoryUsageRatio > 0.7) { // If using more than 70% of heap
+          console.log('⚠️ High memory usage detected, optimizing canvas...');
+          optimizeCanvasMemory();
+        }
+      }
+    }, 30000); // Check every 30 seconds
+
+    return () => clearInterval(memoryCheckInterval);
+  }, [fabricCanvas, optimizeCanvasMemory]);
   const handleGroup = () => {
     console.log("--- ACTION START: handleGroup ---");
     if (!fabricCanvas) {
@@ -1427,18 +1492,32 @@ export function IDEFabricCanvas({
         Grid: {gridSize}px • INTELLIGENT SVG • R=rotate • W=wire ✓
       </div>
 
+      {/* Memory usage indicator */}
+      <div className="absolute bottom-2 right-2 bg-blue-600 bg-opacity-90 text-white px-2 py-1 rounded text-xs">
+        <button
+          onClick={() => {
+            memoryMonitor.logMemoryUsage('Manual Check');
+            optimizeCanvasMemory();
+          }}
+          className="hover:bg-blue-700 px-1 rounded text-xs"
+          title="Click to check memory and optimize"
+        >
+          RAM: {memoryMonitor.getMemoryInfo()?.formattedUsage || 'N/A'}
+        </button>
+      </div>
+
       {/* Wire mode indicator - Professional-grade wiring tool */}
       {wiringTool.isWireMode && (
         <div className="absolute top-2 right-2 bg-blue-600 bg-opacity-90 text-white px-3 py-2 rounded text-sm font-medium">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
             <span>
-              {wiringTool.wireState === "idle" &&
-                "Wire Mode - Click pin to start"}
-              {wiringTool.wireState === "drawing" &&
-                "Drawing - Click to add waypoint"}
-              {wiringTool.wireState === "finishing" &&
-                "Finishing - Click pin to complete"}
+              {wiringTool.isWireMode && !wiringTool.isDrawing && (
+                "Wire Mode - Click pin to start"
+              )}
+              {wiringTool.isWireMode && wiringTool.isDrawing && (
+                "Drawing - Click pin to complete"
+              )}
             </span>
           </div>
           <div className="text-xs opacity-80 mt-1">
@@ -1784,13 +1863,22 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
               // PART 1: THE COMPONENT "SANDWICH" 🥪
               // Creating a permanent, inseparable group with three layers
 
-              // BOTTOM BREAD: Original, invisible pin data (stores true location)
-              const invisiblePinData = pinsFromSVG.map((pin, index) => ({
-                originalX: pin.left! + (pin.width || 0) / 2,
-                originalY: pin.top! + (pin.height || 0) / 2,
-                pinId: `pin${index + 1}`,
-                pinNumber: index + 1,
-              }));
+              // BOTTOM BREAD: Original, invisible pin data (stores true location and database pin info)
+              const invisiblePinData = pinsFromSVG.map((pin, index) => {
+                // Try to get pin data from database component
+                const dbPins = componentInfo.databaseComponent?.pin_configuration?.pins || [];
+                const dbPin = dbPins[index] || dbPins.find((p: any) => p.number === (index + 1).toString());
+
+                return {
+                  originalX: pin.left! + (pin.width || 0) / 2,
+                  originalY: pin.top! + (pin.height || 0) / 2,
+                  pinId: `pin${index + 1}`,
+                  pinNumber: dbPin?.number || (index + 1).toString(),
+                  pinName: dbPin?.name || `Pin ${index + 1}`,
+                  electricalType: dbPin?.electrical_type || 'unknown',
+                  orientation: dbPin?.orientation || 0,
+                };
+              });
 
               // THE FILLING: Main component symbol (the SVG shape)
               console.log(
@@ -1888,13 +1976,17 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
                 console.log(`🎯 DEBUG: Pin ${index + 1} created successfully`);
 
                 // Add the pin metadata that the wiring tool expects
+                const pinData = invisiblePinData[index];
                 interactivePin.set("pin", true);
-                interactivePin.set("pinData", invisiblePinData[index]);
+                interactivePin.set("pinData", pinData);
+                interactivePin.set("componentId", componentId);
                 interactivePin.set("data", {
                   type: "pin",
                   componentId: componentId,
-                  pinId: `pin${index + 1}`,
-                  pinNumber: index + 1,
+                  pinId: pinData.pinId,
+                  pinNumber: pinData.pinNumber,
+                  pinName: pinData.pinName,
+                  electricalType: pinData.electricalType,
                   isConnectable: true,
                 });
 

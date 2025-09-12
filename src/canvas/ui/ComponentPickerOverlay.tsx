@@ -8,6 +8,63 @@ import {
 } from "@/hooks/useDatabaseComponents";
 import { canvasCommandManager } from "@/canvas/canvas-command-manager";
 
+// Lazy loading image component for memory optimization
+function LazyImage({
+  src,
+  alt,
+  className,
+  placeholder
+}: {
+  src: string;
+  alt: string;
+  className: string;
+  placeholder: React.ReactNode;
+}) {
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [isInView, setIsInView] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsInView(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
+  const handleLoad = () => setIsLoaded(true);
+  const handleError = () => setHasError(true);
+
+  return (
+    <div ref={containerRef} className="relative">
+      {!isLoaded && !hasError && placeholder}
+      {isInView && (
+        <img
+          ref={imgRef}
+          src={src}
+          alt={alt}
+          className={className}
+          onLoad={handleLoad}
+          onError={handleError}
+          style={{ display: isLoaded ? 'block' : 'none' }}
+        />
+      )}
+    </div>
+  );
+}
+
 interface ComponentPickerOverlayProps {
   isVisible: boolean;
   onClose: () => void;
@@ -205,6 +262,15 @@ export function ComponentPickerOverlay({
   const filteredComponents = searchQuery.trim()
     ? searchComponents(searchQuery)
     : databaseComponents;
+
+  console.log('🎯 ComponentPickerOverlay state:', {
+    databaseComponentsCount: databaseComponents.length,
+    componentsLoading,
+    componentsError,
+    hasMore,
+    searchQuery,
+    filteredComponentsCount: filteredComponents.length
+  });
 
   useEffect(() => {
     setSelectedIndex(0);
@@ -492,21 +558,16 @@ export function ComponentPickerOverlay({
                     >
                       <div className="flex items-center gap-3">
                         <div className="w-12 h-12 bg-gray-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                          <img
+                          <LazyImage
                             src={component.image}
                             alt={component.name}
                             className="w-10 h-10 object-contain"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.style.display = "none";
-                              target.nextElementSibling?.classList.remove(
-                                "hidden"
-                              );
-                            }}
+                            placeholder={
+                              <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center text-sm font-medium text-gray-600">
+                                {component.name.charAt(0)}
+                              </div>
+                            }
                           />
-                          <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center text-sm font-medium text-gray-600 hidden">
-                            {component.name.charAt(0)}
-                          </div>
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-gray-900 truncate">
