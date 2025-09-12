@@ -5,9 +5,9 @@ import * as fabric from "fabric";
 import { useProjectStore } from "@/store/projectStore";
 import { useAutoSave } from "@/hooks/useDatabase";
 import {
-  serializeCanvasToCircuit,
-  serializeCanvasData,
-} from "@/canvas/utils/canvasSerializer";
+  serializeCanvasToLogicalCircuit,
+  loadCanvasFromLogicalCircuit,
+} from "@/canvas/utils/logicalSerializer";
 import { useAIChat } from "@/contexts/AIChatContext";
 
 interface UseCanvasAutoSaveOptions {
@@ -50,7 +50,7 @@ export function useCanvasAutoSave({
       "@/canvas/utils/canvasSerializer"
     );
     const canvasData = serializeCanvasData(canvas);
-    const circuit = serializeCanvasToCircuit(canvas);
+    const circuit = serializeCanvasToLogicalCircuit(canvas);
 
     return { circuit, canvasData };
   }, [canvas]);

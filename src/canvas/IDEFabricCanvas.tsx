@@ -1593,6 +1593,10 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
               pinCount:
                 dbComponent.pin_configuration?.pins?.length ||
                 componentInfo.pinCount,
+              // Use database SVG if available, otherwise keep the provided svgPath
+              svgPath: dbComponent.symbol_svg
+                ? `data:image/svg+xml;base64,${btoa(dbComponent.symbol_svg)}`
+                : componentInfo.svgPath,
               // Store full database component for later use
               databaseComponent: dbComponent,
             };
@@ -1645,8 +1649,28 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
             return;
           }
 
-          fetch(componentInfo.svgPath)
-            .then((response) => response.text())
+          // Handle SVG loading - support both URLs and data URLs
+          let svgPromise: Promise<string>;
+
+          if (componentInfo.svgPath.startsWith('data:image/svg+xml;base64,')) {
+            // Handle data URL - extract SVG content directly
+            const base64Data = componentInfo.svgPath.split(',')[1];
+            const svgString = atob(base64Data);
+            svgPromise = Promise.resolve(svgString);
+            console.log(`📄 SVG extracted from data URL (${svgString.length} chars)`);
+          } else {
+            // Handle regular URL - fetch from server
+            svgPromise = fetch(componentInfo.svgPath)
+              .then((response) => {
+                if (!response.ok) {
+                  throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.text();
+              });
+            console.log(`📄 SVG fetched from URL: ${componentInfo.svgPath}`);
+          }
+
+          svgPromise
             .then((svgString) => {
               console.log(`📄 SVG loaded (${svgString.length} chars)`);
               return fabric.loadSVGFromString(svgString);

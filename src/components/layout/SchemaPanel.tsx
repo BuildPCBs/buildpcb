@@ -68,7 +68,9 @@ export function SchemaPanel() {
     components: databaseComponents,
     loading: componentsLoading,
     error: componentsError,
+    hasMore,
     searchComponents,
+    loadMore,
   } = useDatabaseComponents();
 
   // Allow scrolling within the panel
@@ -368,7 +370,7 @@ export function SchemaPanel() {
                   className="space-y-1 max-h-32 overflow-y-auto schema-scroll"
                   data-scrollable="true"
                 >
-                  {filteredComponents.map((component) => (
+                  {filteredComponents.map((component: ComponentDisplayData) => (
                     <ComponentItem
                       key={component.id}
                       component={component}
@@ -437,14 +439,38 @@ export function SchemaPanel() {
                               canvasCommandManager.executeCommand(
                                 "component:add",
                                 {
+                                  id: component.id,
                                   type: component.type,
                                   svgPath: component.image,
                                   name: component.name,
+                                  category: component.category,
+                                  description: component.description,
+                                  manufacturer: component.manufacturer,
+                                  partNumber: component.partNumber,
+                                  pinCount: component.pinCount,
                                 }
                               );
                             }}
                           />
                         ))}
+                        {hasMore && !componentsLoading && (
+                          <div className="flex justify-center py-4">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                loadMore();
+                              }}
+                              className="px-4 py-2 text-xs bg-[#0038DF] text-white rounded-md hover:bg-[#0038DF]/90 transition-colors focus:outline-none focus:ring-2 focus:ring-[#0038DF]/50"
+                            >
+                              Load More Components
+                            </button>
+                          </div>
+                        )}
+                        {componentsLoading && databaseComponents.length > 0 && (
+                          <div className="flex justify-center py-4">
+                            <div className="text-xs text-gray-500">Loading more components...</div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

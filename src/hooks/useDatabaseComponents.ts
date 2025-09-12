@@ -33,23 +33,34 @@ export function useDatabaseComponents() {
   const [components, setComponents] = useState<ComponentDisplayData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [offset, setOffset] = useState(0);
 
-  const fetchComponents = useCallback(async () => {
+  const PAGE_SIZE = 100; // Reduced from 1000 to 100 for better memory management
+
+  const fetchComponents = useCallback(async (loadMore = false) => {
     try {
-      setLoading(true);
+      if (!loadMore) {
+        setLoading(true);
+        setOffset(0);
+      }
       setError(null);
 
+      const currentOffset = loadMore ? offset : 0;
       const { data, error: fetchError } = await supabase
         .from("components")
         .select("*")
         .order("name")
-        .limit(1000); // Limit for performance, can be increased or paginated later
+        .range(currentOffset, currentOffset + PAGE_SIZE - 1);
 
       if (fetchError) {
         throw fetchError;
       }
 
       if (data) {
+        // Check if we have more data
+        setHasMore(data.length === PAGE_SIZE);
+
         // Transform database components to display format
         const displayComponents: ComponentDisplayData[] = data.map(
           (comp: DatabaseComponent) => ({
@@ -68,7 +79,13 @@ export function useDatabaseComponents() {
           })
         );
 
-        setComponents(displayComponents);
+        if (loadMore) {
+          setComponents(prev => [...prev, ...displayComponents]);
+          setOffset(prev => prev + PAGE_SIZE);
+        } else {
+          setComponents(displayComponents);
+          setOffset(PAGE_SIZE);
+        }
       }
     } catch (err) {
       console.error("Error fetching components:", err);
@@ -78,7 +95,13 @@ export function useDatabaseComponents() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [offset]);
+
+  const loadMoreComponents = useCallback(() => {
+    if (hasMore && !loading) {
+      fetchComponents(true);
+    }
+  }, [hasMore, loading, fetchComponents]);
 
   useEffect(() => {
     fetchComponents();
@@ -86,7 +109,29 @@ export function useDatabaseComponents() {
 
   // Helper function to determine component image
   const getComponentImage = (component: DatabaseComponent): string => {
-    // If we have a symbol_svg, we could use it, but for now use category-based icons
+    // Use actual SVG from database if available
+    if (component.symbol_svg) {
+      // Convert SVG string to data URL with proper Unicode handling
+      try {
+        // More memory-efficient Unicode-safe base64 encoding
+        const encoder = new TextEncoder();
+        const utf8Bytes = encoder.encode(component.symbol_svg);
+
+        // Use Uint8Array to avoid creating intermediate arrays
+        let binaryString = '';
+        for (let i = 0; i < utf8Bytes.length; i++) {
+          binaryString += String.fromCharCode(utf8Bytes[i]);
+        }
+
+        const svgDataUrl = `data:image/svg+xml;base64,${btoa(binaryString)}`;
+        return svgDataUrl;
+      } catch (error) {
+        console.warn(`Failed to encode SVG for component ${component.name}:`, error);
+        // Fall back to category icon if encoding fails
+      }
+    }
+
+    // Fallback to category-based icons if no SVG available or encoding failed
     const categoryIcons: Record<string, string> = {
       Resistor: "/components/resistor.svg",
       Capacitor: "/components/capacitor.svg",
@@ -139,9 +184,11 @@ export function useDatabaseComponents() {
     components,
     loading,
     error,
+    hasMore,
     searchComponents,
     getComponentsByCategory,
     getCategories,
     refetch: fetchComponents,
+    loadMore: loadMoreComponents,
   };
 }
