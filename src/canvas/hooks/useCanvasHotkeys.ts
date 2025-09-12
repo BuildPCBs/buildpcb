@@ -17,6 +17,8 @@ interface UseCanvasHotkeysProps {
   onRotate?: () => void; // Add rotation function
   onSave?: () => void; // Add save function
   onToggleGrid?: () => void; // Add grid toggle function
+  onComponentPicker?: () => void; // Add component picker function
+  onToggleWireMode?: () => void; // Add wire mode toggle function
 }
 
 /**
@@ -48,6 +50,8 @@ export function useCanvasHotkeys({
   onRotate,
   onSave,
   onToggleGrid,
+  onComponentPicker,
+  onToggleWireMode,
 }: UseCanvasHotkeysProps) {
   useEffect(() => {
     if (!enabled || !canvas) return;
@@ -149,11 +153,27 @@ export function useCanvasHotkeys({
           }
           break;
 
+        case "c":
+          if (!isModifierPressed && onComponentPicker) {
+            e.preventDefault();
+            console.log("TRIGGER: C key pressed - Opening component picker.");
+            onComponentPicker();
+          }
+          break;
+
         case "g":
           if (!isModifierPressed && onToggleGrid) {
             e.preventDefault();
             console.log("TRIGGER: G key pressed - Toggling grid.");
             onToggleGrid();
+          }
+          break;
+
+        case "w":
+          if (!isModifierPressed && onToggleWireMode) {
+            e.preventDefault();
+            console.log("TRIGGER: W key pressed - Toggling wire mode.");
+            onToggleWireMode();
           }
           break;
 
@@ -183,5 +203,7 @@ export function useCanvasHotkeys({
     onRotate,
     onSave,
     onToggleGrid,
+    onComponentPicker,
+    onToggleWireMode,
   ]);
 }

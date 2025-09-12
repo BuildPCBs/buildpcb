@@ -99,6 +99,24 @@ export function useWiringTool({
   const [isWireMode, setIsWireMode] = useState(false);
   const [wirePoints, setWirePoints] = useState<fabric.Point[]>([]);
 
+  // Use refs for frequently changing values to prevent infinite loops
+  const wiringStateRef = useRef({
+    isDrawingWire: false,
+    currentLine: null as fabric.Polyline | null,
+    startPin: null as fabric.Object | null,
+    wirePoints: [] as fabric.Point[],
+  });
+
+  // Sync ref with state for external access
+  useEffect(() => {
+    wiringStateRef.current = {
+      isDrawingWire: isDrawing,
+      currentLine: currentLine,
+      startPin: startPin,
+      wirePoints: wirePoints,
+    };
+  }, [isDrawing, currentLine, startPin, wirePoints]);
+
   // Legacy state for compatibility - we'll sync these with the new state
   const wiringState = {
     isDrawingWire: isDrawing,
@@ -118,19 +136,52 @@ export function useWiringTool({
     (point: fabric.Point): fabric.Object | null => {
       if (!canvas) return null;
 
+      console.log(`🔍 Finding pin at point: (${point.x}, ${point.y})`);
+
       const objects = canvas.getObjects();
+      console.log(`🔍 Checking ${objects.length} objects on canvas`);
+
       for (const obj of objects) {
+        console.log(
+          `🔍 Checking object: ${obj.type}, data:`,
+          (obj as any).data
+        );
+        console.log(`🔍 Object keys:`, Object.keys(obj));
+        console.log(`🔍 Object properties:`, {
+          componentType: (obj as any).componentType,
+          isComponentSandwich: (obj as any).data?.isComponentSandwich,
+          hasData: !!(obj as any).data,
+          dataType: typeof (obj as any).data,
+        });
+
         if ((obj as any).data?.isComponentSandwich && obj.type === "group") {
           const group = obj as fabric.Group;
           const groupObjects = group.getObjects();
+          console.log(
+            `🔍 Component sandwich found with ${groupObjects.length} sub-objects`
+          );
 
           for (const groupObj of groupObjects) {
+            console.log(
+              `🔍 Checking sub-object: ${groupObj.type}, pin: ${
+                (groupObj as any).pin
+              }, data:`,
+              (groupObj as any).data
+            );
+
             if ((groupObj as any).pin) {
               const pinPoint = fabric.util.transformPoint(
                 new fabric.Point(groupObj.left || 0, groupObj.top || 0),
                 group.calcTransformMatrix()
               );
-              if (point.distanceFrom(pinPoint) <= 8) {
+
+              const distance = point.distanceFrom(pinPoint);
+              console.log(
+                `🔍 Pin found at (${pinPoint.x}, ${pinPoint.y}), distance: ${distance}`
+              );
+
+              if (distance <= 8) {
+                console.log(`✅ Pin detected!`);
                 return groupObj;
               }
             }
@@ -154,6 +205,8 @@ export function useWiringTool({
           }
         }
       }
+
+      console.log(`❌ No pin found at point`);
       return null;
     },
     [canvas]
@@ -940,15 +993,17 @@ export function useWiringTool({
   const updateWirePreview = useCallback(
     (mousePoint: fabric.Point) => {
       if (
-        !wiringState.currentLine ||
+        !wiringStateRef.current.currentLine ||
         !canvas ||
-        wiringState.wirePoints.length === 0
+        wiringStateRef.current.wirePoints.length === 0
       )
         return;
 
       // Get the last fixed waypoint
       const lastWaypoint =
-        wiringState.wirePoints[wiringState.wirePoints.length - 1];
+        wiringStateRef.current.wirePoints[
+          wiringStateRef.current.wirePoints.length - 1
+        ];
 
       // Calculate orthogonal point from last waypoint to current mouse position
       const orthogonalPoint = calculateOrthogonalPointWithValidation(
@@ -957,29 +1012,24 @@ export function useWiringTool({
       );
 
       // Create new points array: all fixed waypoints + current orthogonal preview point
-      const newPoints = [...wiringState.wirePoints, orthogonalPoint];
+      const newPoints = [...wiringStateRef.current.wirePoints, orthogonalPoint];
 
       // Update polyline points
-      wiringState.currentLine.set({ points: newPoints });
+      wiringStateRef.current.currentLine.set({ points: newPoints });
 
       // CRITICAL: Force canvas update for live preview
       canvas.renderAll();
     },
-    [
-      wiringState.currentLine,
-      wiringState.wirePoints,
-      canvas,
-      calculateOrthogonalPointWithValidation,
-    ]
+    [canvas, calculateOrthogonalPointWithValidation]
   );
 
   // Add corner point when clicking on empty space - THE CORNER CREATION LOGIC
   const addCornerPoint = useCallback(
     (clickPoint: fabric.Point) => {
       if (
-        !wiringState.currentLine ||
+        !wiringStateRef.current.currentLine ||
         !canvas ||
-        wiringState.wirePoints.length === 0
+        wiringStateRef.current.wirePoints.length === 0
       )
         return;
 
@@ -987,7 +1037,9 @@ export function useWiringTool({
 
       // Get the last waypoint
       const lastWaypoint =
-        wiringState.wirePoints[wiringState.wirePoints.length - 1];
+        wiringStateRef.current.wirePoints[
+          wiringStateRef.current.wirePoints.length - 1
+        ];
 
       // Calculate orthogonal point from last waypoint to click location
       const orthogonalPoint = calculateOrthogonalPointWithValidation(
@@ -996,7 +1048,10 @@ export function useWiringTool({
       );
 
       // Add this point as a new fixed waypoint
-      const newWirePoints = [...wiringState.wirePoints, orthogonalPoint];
+      const newWirePoints = [
+        ...wiringStateRef.current.wirePoints,
+        orthogonalPoint,
+      ];
 
       // Update state with new waypoint using new state setters
       setWirePoints(newWirePoints);
@@ -1008,12 +1063,7 @@ export function useWiringTool({
         "- preview continues"
       );
     },
-    [
-      wiringState.currentLine,
-      wiringState.wirePoints,
-      canvas,
-      calculateOrthogonalPointWithValidation,
-    ]
+    [canvas, calculateOrthogonalPointWithValidation]
   );
 
   // RULE #2: Complete wire at junction (wire-to-wire connection)
@@ -1023,7 +1073,12 @@ export function useWiringTool({
       segmentIndex: number;
       intersectionPoint: fabric.Point;
     }) => {
-      if (!wiringState.currentLine || !wiringState.startPin || !canvas) return;
+      if (
+        !wiringStateRef.current.currentLine ||
+        !wiringStateRef.current.startPin ||
+        !canvas
+      )
+        return;
 
       console.log("🔗 Completing wire at junction point");
 
@@ -1031,7 +1086,9 @@ export function useWiringTool({
 
       // Get the last waypoint for orthogonal calculation
       const lastWaypoint =
-        wiringState.wirePoints[wiringState.wirePoints.length - 1];
+        wiringStateRef.current.wirePoints[
+          wiringStateRef.current.wirePoints.length - 1
+        ];
       const orthogonalJunctionPoint = calculateOrthogonalPointWithValidation(
         lastWaypoint,
         intersectionPoint
@@ -1039,17 +1096,18 @@ export function useWiringTool({
 
       // Create final points array: all waypoints + orthogonal segment + junction point
       const finalPoints = [
-        ...wiringState.wirePoints,
+        ...wiringStateRef.current.wirePoints,
         orthogonalJunctionPoint,
         intersectionPoint,
       ];
 
       // Get component IDs for wire memory
-      const startComponent = wiringState.startPin.group;
+      const startComponent = wiringStateRef.current.startPin.group;
       const startComponentId =
         (startComponent as any)?.id || `component_${Date.now()}_start`;
       const startPinIndex =
-        startComponent?.getObjects().indexOf(wiringState.startPin) || 0;
+        startComponent?.getObjects().indexOf(wiringStateRef.current.startPin) ||
+        0;
 
       // STEP 1: CREATE THE PERMANENT WIRE
       console.log("🔧 STEP 1: Creating permanent junction wire");
@@ -1071,7 +1129,7 @@ export function useWiringTool({
         hasBorders: true, // Show selection border for editing
         wireType: "connection",
         id: `wire_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // Unique wire ID
-        startPin: wiringState.startPin,
+        startPin: wiringStateRef.current.startPin,
         startComponentId: startComponentId,
         startPinIndex: startPinIndex,
         startComponent: startComponent,
@@ -1089,8 +1147,8 @@ export function useWiringTool({
 
       // APPLY AUTOMATIC NET COLORING FOR JUNCTION
       console.log("🎨 STEP 1.5: Applying automatic net coloring for junction");
-      if (wiringState.startPin) {
-        const startNet = findPinNet(wiringState.startPin);
+      if (wiringStateRef.current.startPin) {
+        const startNet = findPinNet(wiringStateRef.current.startPin);
         const existingWireNetId = (existingWire as any).netId;
 
         if (
@@ -1111,7 +1169,11 @@ export function useWiringTool({
           const existingNet = electricalNets.get(existingWireNetId);
           if (existingNet) {
             console.log("🎨 Junction adding to existing net");
-            addToNet(existingNet, [wiringState.startPin], [permanentWire]);
+            addToNet(
+              existingNet,
+              [wiringStateRef.current.startPin],
+              [permanentWire]
+            );
             applyNetColoring(existingNet);
           }
         } else if (startNet && !existingWireNetId) {
@@ -1123,7 +1185,7 @@ export function useWiringTool({
           // Creating new net for junction
           console.log("🎨 Junction creating new net");
           const newNet = createNewNet(
-            [wiringState.startPin],
+            [wiringStateRef.current.startPin],
             [permanentWire, existingWire]
           );
           applyNetColoring(newNet);
@@ -1146,7 +1208,7 @@ export function useWiringTool({
 
       // STEP 2: CLEAN UP THE TEMPORARY PREVIEW
       console.log("🧹 STEP 2: Removing temporary ghost wire");
-      const temporaryGhostWire = wiringState.currentLine;
+      const temporaryGhostWire = wiringStateRef.current.currentLine;
       if (temporaryGhostWire) {
         canvas.remove(temporaryGhostWire);
         console.log("✅ STEP 2: Temporary ghost wire removed");
@@ -1184,9 +1246,6 @@ export function useWiringTool({
       }, 100);
     },
     [
-      wiringState.currentLine,
-      wiringState.startPin,
-      wiringState.wirePoints,
       canvas,
       calculateOrthogonalPointWithValidation,
       createJunctionDot,
@@ -1203,7 +1262,12 @@ export function useWiringTool({
   // Complete wire at end pin
   const completeWireAtPin = useCallback(
     (endPin: fabric.Object) => {
-      if (!wiringState.currentLine || !wiringState.startPin || !canvas) return;
+      if (
+        !wiringStateRef.current.currentLine ||
+        !wiringStateRef.current.startPin ||
+        !canvas
+      )
+        return;
 
       console.log("🎯 Completing wire at end pin");
 
@@ -1211,7 +1275,9 @@ export function useWiringTool({
 
       // Get the last waypoint for orthogonal calculation
       const lastWaypoint =
-        wiringState.wirePoints[wiringState.wirePoints.length - 1];
+        wiringStateRef.current.wirePoints[
+          wiringStateRef.current.wirePoints.length - 1
+        ];
       const orthogonalEndPoint = calculateOrthogonalPointWithValidation(
         lastWaypoint,
         endPinCoords
@@ -1219,13 +1285,13 @@ export function useWiringTool({
 
       // Create final points array: all waypoints + orthogonal segment + end pin
       const finalPoints = [
-        ...wiringState.wirePoints,
+        ...wiringStateRef.current.wirePoints,
         orthogonalEndPoint,
         endPinCoords,
       ];
 
       // Get component IDs and pin indices for wire memory
-      const startComponent = wiringState.startPin.group;
+      const startComponent = wiringStateRef.current.startPin.group;
       const endComponent = endPin.group;
       const startComponentId =
         (startComponent as any)?.id || `component_${Date.now()}_start`;
@@ -1234,7 +1300,8 @@ export function useWiringTool({
 
       // Find pin indices within their respective components
       const startPinIndex =
-        startComponent?.getObjects().indexOf(wiringState.startPin) || 0;
+        startComponent?.getObjects().indexOf(wiringStateRef.current.startPin) ||
+        0;
       const endPinIndex = endComponent?.getObjects().indexOf(endPin) || 0;
 
       // STEP 1: CREATE THE PERMANENT WIRE
@@ -1257,7 +1324,7 @@ export function useWiringTool({
         hasBorders: true, // Show selection border for editing
         wireType: "connection",
         id: `wire_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // Unique wire ID
-        startPin: wiringState.startPin,
+        startPin: wiringStateRef.current.startPin,
         endPin: endPin,
         // PART 1: Wire Memory - Store connection information
         startComponentId: startComponentId,
@@ -1276,13 +1343,17 @@ export function useWiringTool({
 
       // APPLY AUTOMATIC NET COLORING
       console.log("🎨 STEP 1.5: Applying automatic net coloring");
-      if (wiringState.startPin && endPin) {
-        handleNetColoring(wiringState.startPin, endPin, permanentWire);
+      if (wiringStateRef.current.startPin && endPin) {
+        handleNetColoring(
+          wiringStateRef.current.startPin,
+          endPin,
+          permanentWire
+        );
       }
 
       // STEP 2: CLEAN UP THE TEMPORARY PREVIEW
       console.log("🧹 STEP 2: Removing temporary ghost wire");
-      const temporaryGhostWire = wiringState.currentLine;
+      const temporaryGhostWire = wiringStateRef.current.currentLine;
       if (temporaryGhostWire) {
         canvas.remove(temporaryGhostWire);
         console.log("✅ STEP 2: Temporary ghost wire removed");
@@ -1325,9 +1396,6 @@ export function useWiringTool({
       }, 100);
     },
     [
-      wiringState.currentLine,
-      wiringState.startPin,
-      wiringState.wirePoints,
       canvas,
       getPinWorldCoordinates,
       calculateOrthogonalPointWithValidation,
@@ -1645,10 +1713,13 @@ export function useWiringTool({
     const handleMouseMove = (options: any) => {
       const pointer = canvas.getPointer(options.e);
       const currentPoint = new fabric.Point(pointer.x, pointer.y);
+      console.log(`🖱️ Mouse move: (${currentPoint.x}, ${currentPoint.y})`);
+
       const pin = findPinAtPoint(currentPoint);
 
       // Handle pin highlighting and cursor changes
-      if (pin && pin !== wiringState.startPin) {
+      if (pin && pin !== wiringStateRef.current.startPin) {
+        console.log(`🎯 Pin found under cursor!`);
         highlightPin(pin);
         // Change cursor to "+" when hovering over a valid pin
         canvas.defaultCursor = "copy"; // "+" cursor
@@ -1659,7 +1730,7 @@ export function useWiringTool({
       }
 
       // PART 1 FIX: Update live wire preview
-      if (wiringState.isDrawingWire) {
+      if (wiringStateRef.current.isDrawingWire) {
         updateWirePreview(currentPoint);
       }
     };
@@ -1667,10 +1738,15 @@ export function useWiringTool({
     const handleMouseDown = (options: any) => {
       const pointer = canvas.getPointer(options.e);
       const currentPoint = new fabric.Point(pointer.x, pointer.y);
+      console.log(
+        `🖱️ Mouse down: (${currentPoint.x}, ${currentPoint.y}), button: ${options.e.button}`
+      );
+
       const pin = findPinAtPoint(currentPoint);
+      console.log(`🎯 Pin at click location:`, pin ? "YES" : "NO");
 
       // PART 3: Call the "Reset" Function - After Cancelling with a Right-Click
-      if (options.e.button === 2 && wiringState.isDrawingWire) {
+      if (options.e.button === 2 && wiringStateRef.current.isDrawingWire) {
         // Right-click
         console.log("❌ Wire cancelled by right-click");
         resetWiringTool();
@@ -1680,11 +1756,11 @@ export function useWiringTool({
       // RULE #2: Check for wire intersection when drawing
       const wireInfo = findWireAtPoint(currentPoint);
 
-      if (!wiringState.isDrawingWire && pin) {
+      if (!wiringStateRef.current.isDrawingWire && pin) {
         // Start new wire from pin
         startWireFromPin(pin, currentPoint);
-      } else if (wiringState.isDrawingWire) {
-        if (pin && pin !== wiringState.startPin) {
+      } else if (wiringStateRef.current.isDrawingWire) {
+        if (pin && pin !== wiringStateRef.current.startPin) {
           // Complete wire at end pin
           completeWireAtPin(pin);
         } else if (wireInfo && !pin) {
@@ -1727,7 +1803,6 @@ export function useWiringTool({
     canvas,
     enabled,
     isWireMode,
-    wiringState,
     findPinAtPoint,
     highlightPin,
     clearPinHighlight,
@@ -1755,7 +1830,7 @@ export function useWiringTool({
         toggleWireMode();
       } else if (e.key === "Escape") {
         e.preventDefault();
-        if (wiringState.isDrawingWire) {
+        if (wiringStateRef.current.isDrawingWire) {
           // PART 3: Call the "Reset" Function - After Cancelling with the Esc Key
           console.log("❌ Wire cancelled by user");
           resetWiringState();
@@ -1770,18 +1845,12 @@ export function useWiringTool({
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [
-    enabled,
-    toggleWireMode,
-    exitWireMode,
-    wiringState.isDrawingWire,
-    resetWiringState,
-  ]);
+  }, [enabled, toggleWireMode, exitWireMode, resetWiringState]);
 
   return {
     isWireMode,
-    isDrawingWire: wiringState.isDrawingWire,
-    wireState: wiringState.isDrawingWire ? "drawing" : "idle", // For UI compatibility
+    isDrawingWire: wiringStateRef.current.isDrawingWire,
+    wireState: wiringStateRef.current.isDrawingWire ? "drawing" : "idle", // For UI compatibility
     trafficLightState, // NEW: Traffic light state for perfect state management
     toggleWireMode,
     exitWireMode,

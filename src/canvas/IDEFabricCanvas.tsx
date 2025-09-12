@@ -15,6 +15,7 @@ import { createSVGComponent } from "./SVGComponentFactory";
 import { ContextMenu } from "./ui/ContextMenu";
 import { HorizontalRuler } from "./ui/HorizontalRuler";
 import { VerticalRuler } from "./ui/VerticalRuler";
+import { ComponentPickerOverlay } from "./ui/ComponentPickerOverlay";
 import { CanvasProvider } from "../contexts/CanvasContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { supabase } from "@/lib/supabase";
@@ -41,6 +42,8 @@ export function IDEFabricCanvas({
   const [currentZoom, setCurrentZoom] = useState(1); // Track current zoom level
   const lastZoomRef = useRef(1); // Use ref to avoid stale closure issues
   const [gridVisible, setGridVisible] = useState(false); // Manual grid toggle
+  const [isComponentPickerVisible, setIsComponentPickerVisible] =
+    useState(false);
 
   // Grid toggle function
   const toggleGrid = () => {
@@ -111,7 +114,7 @@ export function IDEFabricCanvas({
     if (fabricCanvas && initializeHistory) {
       initializeHistory();
     }
-  }, [fabricCanvas, initializeHistory]);
+  }, [fabricCanvas]); // Remove initializeHistory from deps to prevent re-running
 
   // Canvas restoration effect - only run once when both canvas and data are ready
   useEffect(() => {
@@ -1230,6 +1233,8 @@ export function IDEFabricCanvas({
     onRotate: handleRotate,
     onSave: autoSave.saveNow,
     onToggleGrid: toggleGrid, // Add grid toggle
+    onComponentPicker: () => setIsComponentPickerVisible(true), // Add component picker
+    onToggleWireMode: wiringTool.toggleWireMode, // Add wire mode toggle
   });
 
   // Right-click context menu handler - Completely refactored per specification
@@ -1419,7 +1424,7 @@ export function IDEFabricCanvas({
 
       {/* Grid and Snap indicator */}
       <div className="absolute bottom-2 left-2 bg-green-600 bg-opacity-90 text-white px-2 py-1 rounded text-xs">
-        Grid: {gridSize}px • INTELLIGENT SVG • R=rotate • W=wire
+        Grid: {gridSize}px • INTELLIGENT SVG • R=rotate • W=wire ✓
       </div>
 
       {/* Wire mode indicator - Professional-grade wiring tool */}
@@ -1476,6 +1481,12 @@ export function IDEFabricCanvas({
           )}
         </div>
       )}
+
+      {/* Component Picker Overlay */}
+      <ComponentPickerOverlay
+        isVisible={isComponentPickerVisible}
+        onClose={() => setIsComponentPickerVisible(false)}
+      />
     </div>
   );
 }
@@ -1531,7 +1542,19 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
       x?: number;
       y?: number;
     }) => {
-      console.log("🎯 Component command received for", payload.name);
+      console.log(
+        "🎯 IDEFabricCanvas: Component command received for",
+        payload.name
+      );
+      console.log("🎯 IDEFabricCanvas: Full payload:", payload);
+      console.log(
+        "🎯 IDEFabricCanvas: SVG path length:",
+        payload.svgPath?.length
+      );
+      console.log(
+        "🎯 IDEFabricCanvas: SVG path preview:",
+        payload.svgPath?.substring(0, 200) + "..."
+      );
 
       // New intelligent component creation logic with database metadata
       const createComponent = async (componentInfo: typeof payload) => {
@@ -1660,9 +1683,23 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
             console.log(
               `📄 SVG extracted from data URL (${svgString.length} chars)`
             );
+            console.log(`📄 SVG preview:`, svgString.substring(0, 200) + "...");
+          } else if (componentInfo.svgPath.startsWith("data:image/svg+xml")) {
+            // Handle URL-encoded data URL
+            const urlData = componentInfo.svgPath.split(",")[1];
+            const svgString = decodeURIComponent(urlData);
+            svgPromise = Promise.resolve(svgString);
+            console.log(
+              `📄 SVG extracted from URL-encoded data URL (${svgString.length} chars)`
+            );
+            console.log(`📄 SVG preview:`, svgString.substring(0, 200) + "...");
           } else {
             // Handle regular URL - fetch from server
+            console.log(`📄 Fetching SVG from URL: ${componentInfo.svgPath}`);
             svgPromise = fetch(componentInfo.svgPath).then((response) => {
+              console.log(
+                `📄 Fetch response: ${response.status} ${response.statusText}`
+              );
               if (!response.ok) {
                 throw new Error(
                   `HTTP ${response.status}: ${response.statusText}`
@@ -1676,11 +1713,26 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
           svgPromise
             .then((svgString) => {
               console.log(`📄 SVG loaded (${svgString.length} chars)`);
+              console.log(
+                `📄 SVG content preview:`,
+                svgString.substring(0, 300) + "..."
+              );
               return fabric.loadSVGFromString(svgString);
             })
             .then((result) => {
+              console.log(`🔍 Fabric loadSVGFromString result:`, result);
               const objects = result.objects.filter((obj) => !!obj);
               console.log(`🔍 Parsed ${objects.length} SVG objects`);
+              console.log(
+                `🔍 Objects details:`,
+                objects.map((obj, i) => ({
+                  index: i,
+                  type: obj.type,
+                  visible: obj.visible,
+                  width: obj.width,
+                  height: obj.height,
+                }))
+              );
               const pinsFromSVG: fabric.FabricObject[] = [];
               const symbolParts: fabric.FabricObject[] = [];
 
@@ -1709,6 +1761,25 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
               console.log(
                 `🔌 Found ${pinsFromSVG.length} pins and ${symbolParts.length} symbol parts`
               );
+
+              // DEBUG: Log details about pins found
+              if (pinsFromSVG.length === 0) {
+                console.log(
+                  "⚠️ WARNING: No pins found in SVG! This component won't be wireable."
+                );
+                console.log(
+                  "⚠️ Check SVG content for pin elements with id='pin'"
+                );
+              } else {
+                console.log(
+                  "✅ Found pins:",
+                  pinsFromSVG.map((pin, i) => ({
+                    index: i,
+                    position: `(${pin.left}, ${pin.top})`,
+                    size: `${pin.width}x${pin.height}`,
+                  }))
+                );
+              }
 
               // PART 1: THE COMPONENT "SANDWICH" 🥪
               // Creating a permanent, inseparable group with three layers
@@ -1930,6 +2001,20 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
                 componentName: componentInfo.name,
                 pins: interactivePins.map((_, index) => `pin${index + 1}`),
                 isComponentSandwich: true, // Mark this as a proper sandwich
+              });
+
+              console.log("✅ Component sandwich created with metadata:", {
+                componentId,
+                componentName: componentInfo.name,
+                pinCount: interactivePins.length,
+                isComponentSandwich: true,
+                hasInvisiblePinData: !!invisiblePinData,
+                pins: interactivePins.map((pin, i) => ({
+                  index: i,
+                  hasPinProperty: !!(pin as any).pin,
+                  visible: pin.visible,
+                  opacity: pin.opacity,
+                })),
               });
 
               // Attach full database component metadata for proper serialization

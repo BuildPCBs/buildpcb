@@ -27,6 +27,7 @@ export interface ComponentDisplayData {
   manufacturer?: string;
   partNumber?: string;
   pinCount?: number;
+  symbol_svg?: string; // Add raw SVG for fallback rendering
 }
 
 export function useDatabaseComponents() {
@@ -77,6 +78,7 @@ export function useDatabaseComponents() {
                 comp.pin_configuration?.total_pins ||
                 comp.pin_configuration?.pins?.length ||
                 0,
+              symbol_svg: comp.symbol_svg, // Include raw SVG for fallback
             })
           );
 
@@ -116,24 +118,36 @@ export function useDatabaseComponents() {
     if (component.symbol_svg) {
       // Convert SVG string to data URL with proper Unicode handling
       try {
-        // More memory-efficient Unicode-safe base64 encoding
-        const encoder = new TextEncoder();
-        const utf8Bytes = encoder.encode(component.symbol_svg);
-
-        // Use Uint8Array to avoid creating intermediate arrays
-        let binaryString = "";
-        for (let i = 0; i < utf8Bytes.length; i++) {
-          binaryString += String.fromCharCode(utf8Bytes[i]);
-        }
-
-        const svgDataUrl = `data:image/svg+xml;base64,${btoa(binaryString)}`;
+        // Try URL encoding first (more compatible with SVG)
+        const urlEncodedSvg = encodeURIComponent(component.symbol_svg);
+        const svgDataUrl = `data:image/svg+xml;charset=utf-8,${urlEncodedSvg}`;
         return svgDataUrl;
       } catch (error) {
         console.warn(
-          `Failed to encode SVG for component ${component.name}:`,
+          `Failed to URL encode SVG for component ${component.name}:`,
           error
         );
-        // Fall back to category icon if encoding fails
+        // Fall back to base64 encoding
+        try {
+          // More memory-efficient Unicode-safe base64 encoding
+          const encoder = new TextEncoder();
+          const utf8Bytes = encoder.encode(component.symbol_svg);
+
+          // Use Uint8Array to avoid creating intermediate arrays
+          let binaryString = "";
+          for (let i = 0; i < utf8Bytes.length; i++) {
+            binaryString += String.fromCharCode(utf8Bytes[i]);
+          }
+
+          const svgDataUrl = `data:image/svg+xml;base64,${btoa(binaryString)}`;
+          return svgDataUrl;
+        } catch (base64Error) {
+          console.warn(
+            `Failed to base64 encode SVG for component ${component.name}:`,
+            base64Error
+          );
+          // Fall back to category icon if encoding fails
+        }
       }
     }
 

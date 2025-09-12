@@ -236,7 +236,10 @@ export const builtInCanvasCommands = {
       console.log(
         `🎯 Command manager: Forwarding "component:add" for ${params?.name}`
       );
+      console.log(`🎯 Command manager: Canvas available: ${!!canvas}`);
+      console.log(`🎯 Command manager: Params:`, params);
       canvasCommandManager.emit("component:add", params);
+      console.log(`🎯 Command manager: Event emitted for ${params?.name}`);
     },
   } as CanvasCommand,
 

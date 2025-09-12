@@ -20,25 +20,80 @@ export function useHistoryStack({
   const [history, setHistory] = useState<HistoryState[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const isUndoRedoInProgress = useRef(false);
+  const isInitializing = useRef(false);
 
   // Save current canvas state to history
   const saveState = useCallback(() => {
     if (!canvas || isUndoRedoInProgress.current) return;
 
-    // Don't save if history is not initialized
+    // If history is not initialized, initialize it first
     if (historyIndex < 0) {
-      console.log("⚠️ Cannot save state: History not initialized");
-      return;
+      if (isInitializing.current) {
+        console.log("⏳ History initialization already in progress, waiting...");
+        return;
+      }
+
+      console.log("🎬 Auto-initializing history before saving state");
+      isInitializing.current = true;
+
+      try {
+        // Check if canvas is in a valid state
+        if (canvas.disposed) {
+          console.warn("⚠️ Canvas is disposed, cannot save state");
+          isInitializing.current = false;
+          return;
+        }
+
+        const canvasState = canvas.toObject();
+
+        // Additional validation
+        if (!canvasState) {
+          console.warn("⚠️ Canvas.toObject() returned null/undefined");
+          isInitializing.current = false;
+          return;
+        }
+
+        const initialState: HistoryState = {
+          canvasState,
+          timestamp: Date.now(),
+        };
+
+        // Use functional updates to avoid race conditions
+        setHistory([initialState]);
+        setHistoryIndex(0);
+
+        console.log("✅ History auto-initialized successfully");
+        isInitializing.current = false;
+
+        // Continue with saving the current state
+        // Don't return here, continue to save the current state
+      } catch (error) {
+        console.error("❌ Failed to auto-initialize history:", error);
+        isInitializing.current = false;
+        return;
+      }
     }
 
     console.log("💾 Saving canvas state to history");
 
     try {
+      // Check if canvas is in a valid state
+      if (canvas.disposed) {
+        console.warn("⚠️ Canvas is disposed, cannot save state");
+        return;
+      }
+
       const canvasState = canvas.toObject();
 
       // Validate that we have a valid canvas state
       if (!canvasState || typeof canvasState !== "object") {
         console.warn("⚠️ Invalid canvas state, skipping save");
+        return;
+      }
+
+      // Check if canvas has basic required properties
+      if (!canvasState.objects || !Array.isArray(canvasState.objects)) {
+        console.warn("⚠️ Canvas state missing objects array, skipping save");
         return;
       }
 
@@ -70,7 +125,7 @@ export function useHistoryStack({
     } catch (error) {
       console.error("Error saving canvas state:", error);
     }
-  }, [canvas, historyIndex, maxHistorySize]);
+  }, [canvas, maxHistorySize]); // Remove historyIndex to prevent recreation during initialization
 
   // Initialize history with empty canvas state
   const initializeHistory = useCallback(() => {
@@ -79,15 +134,50 @@ export function useHistoryStack({
       return;
     }
 
-    console.log("🎬 Initializing history stack");
-    const initialState: HistoryState = {
-      canvasState: canvas.toObject(),
-      timestamp: Date.now(),
-    };
+    // Don't reinitialize if already initialized
+    if (historyIndex >= 0) {
+      console.log("ℹ️ History already initialized, skipping");
+      return;
+    }
 
-    setHistory([initialState]);
-    setHistoryIndex(0);
-  }, [canvas]);
+    if (isInitializing.current) {
+      console.log("⏳ History initialization already in progress, skipping");
+      return;
+    }
+
+    console.log("🎬 Initializing history stack");
+    isInitializing.current = true;
+
+    try {
+      // Check if canvas is in a valid state
+      if (canvas.disposed) {
+        console.warn("⚠️ Canvas is disposed, cannot initialize history");
+        isInitializing.current = false;
+        return;
+      }
+
+      const canvasState = canvas.toObject();
+
+      // Additional validation
+      if (!canvasState) {
+        console.warn("⚠️ Canvas.toObject() returned null/undefined during initialization");
+        isInitializing.current = false;
+        return;
+      }
+
+      const initialState: HistoryState = {
+        canvasState,
+        timestamp: Date.now(),
+      };
+
+      setHistory([initialState]);
+      setHistoryIndex(0);
+      isInitializing.current = false;
+    } catch (error) {
+      console.error("❌ Failed to initialize history:", error);
+      isInitializing.current = false;
+    }
+  }, [canvas]); // Remove historyIndex to prevent re-running during initialization
 
   // Undo last action
   const handleUndo = useCallback(() => {
