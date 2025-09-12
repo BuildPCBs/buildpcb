@@ -341,6 +341,57 @@ export function ComponentPickerOverlay({
     }
   }, [selectedIndex]);
 
+  // Add scroll event listener to keep selection in sync with scroll position
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!listRef.current || filteredComponents.length === 0) return;
+
+      const container = listRef.current;
+      const containerScrollTop = container.scrollTop;
+      const containerHeight = container.clientHeight;
+
+      // Find the item that's most visible in the current scroll position
+      let bestIndex = 0;
+      let bestVisibility = 0;
+
+      for (let i = 0; i < filteredComponents.length; i++) {
+        const element = container.children[i] as HTMLElement;
+        if (!element) continue;
+
+        const elementTop = element.offsetTop;
+        const elementHeight = element.offsetHeight;
+        const elementBottom = elementTop + elementHeight;
+
+        // Calculate how much of the element is visible
+        const visibleTop = Math.max(containerScrollTop, elementTop);
+        const visibleBottom = Math.min(
+          containerScrollTop + containerHeight,
+          elementBottom
+        );
+        const visibleHeight = Math.max(0, visibleBottom - visibleTop);
+        const visibility = visibleHeight / elementHeight;
+
+        // If this element is more visible than the current best, update
+        if (visibility > bestVisibility) {
+          bestVisibility = visibility;
+          bestIndex = i;
+        }
+      }
+
+      // Only update if we found a significantly more visible item
+      if (bestVisibility > 0.5 && bestIndex !== selectedIndex) {
+        setSelectedIndex(bestIndex);
+        setSelectedComponent(filteredComponents[bestIndex] || null);
+      }
+    };
+
+    const container = listRef.current;
+    if (container) {
+      container.addEventListener("scroll", handleScroll, { passive: true });
+      return () => container.removeEventListener("scroll", handleScroll);
+    }
+  }, [filteredComponents, selectedIndex]);
+
   if (!isVisible) return null;
 
   return (

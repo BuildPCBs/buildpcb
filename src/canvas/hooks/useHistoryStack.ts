@@ -29,7 +29,9 @@ export function useHistoryStack({
     // If history is not initialized, initialize it first
     if (historyIndex < 0) {
       if (isInitializing.current) {
-        console.log("⏳ History initialization already in progress, waiting...");
+        console.log(
+          "⏳ History initialization already in progress, waiting..."
+        );
         return;
       }
 
@@ -160,7 +162,9 @@ export function useHistoryStack({
 
       // Additional validation
       if (!canvasState) {
-        console.warn("⚠️ Canvas.toObject() returned null/undefined during initialization");
+        console.warn(
+          "⚠️ Canvas.toObject() returned null/undefined during initialization"
+        );
         isInitializing.current = false;
         return;
       }
