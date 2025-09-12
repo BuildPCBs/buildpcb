@@ -3,7 +3,7 @@
  * Helps track and manage memory usage in the application
  */
 
-import React from 'react';
+import React from "react";
 
 export interface MemoryInfo {
   usedJSHeapSize: number;
@@ -26,7 +26,7 @@ export class MemoryMonitor {
   }
 
   getMemoryInfo(): MemoryInfo | null {
-    if (!('memory' in performance)) {
+    if (!("memory" in performance)) {
       return null;
     }
 
@@ -42,17 +42,20 @@ export class MemoryMonitor {
     };
   }
 
-  startMonitoring(callback?: (info: MemoryInfo) => void, interval = 10000): void {
+  startMonitoring(
+    callback?: (info: MemoryInfo) => void,
+    interval = 10000
+  ): void {
     if (this.monitoring) return;
 
     this.monitoring = true;
-    console.log('🧠 Memory monitoring started');
+    console.log("🧠 Memory monitoring started");
 
     this.intervalId = window.setInterval(() => {
       const info = this.getMemoryInfo();
       if (info) {
         if (info.usageRatio > 0.8) {
-          console.warn('⚠️ High memory usage detected:', info.formattedUsage);
+          console.warn("⚠️ High memory usage detected:", info.formattedUsage);
         }
 
         if (callback) {
@@ -70,19 +73,21 @@ export class MemoryMonitor {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
-    console.log('🧠 Memory monitoring stopped');
+    console.log("🧠 Memory monitoring stopped");
   }
 
   forceGarbageCollection(): void {
     if (window.gc) {
-      console.log('🗑️ Forcing garbage collection...');
+      console.log("🗑️ Forcing garbage collection...");
       window.gc();
     } else {
-      console.log('🗑️ Garbage collection not available (use --js-flags="--expose-gc" to enable)');
+      console.log(
+        '🗑️ Garbage collection not available (use --js-flags="--expose-gc" to enable)'
+      );
     }
   }
 
-  logMemoryUsage(label = 'Memory Usage'): void {
+  logMemoryUsage(label = "Memory Usage"): void {
     const info = this.getMemoryInfo();
     if (info) {
       console.log(`🧠 ${label}:`, {
@@ -92,7 +97,7 @@ export class MemoryMonitor {
         ratio: info.formattedUsage,
       });
     } else {
-      console.log('🧠 Memory monitoring not available');
+      console.log("🧠 Memory monitoring not available");
     }
   }
 }

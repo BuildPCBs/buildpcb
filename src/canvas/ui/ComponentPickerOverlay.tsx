@@ -13,7 +13,7 @@ function LazyImage({
   src,
   alt,
   className,
-  placeholder
+  placeholder,
 }: {
   src: string;
   alt: string;
@@ -58,7 +58,7 @@ function LazyImage({
           className={className}
           onLoad={handleLoad}
           onError={handleError}
-          style={{ display: isLoaded ? 'block' : 'none' }}
+          style={{ display: isLoaded ? "block" : "none" }}
         />
       )}
     </div>
@@ -263,13 +263,13 @@ export function ComponentPickerOverlay({
     ? searchComponents(searchQuery)
     : databaseComponents;
 
-  console.log('🎯 ComponentPickerOverlay state:', {
+  console.log("🎯 ComponentPickerOverlay state:", {
     databaseComponentsCount: databaseComponents.length,
     componentsLoading,
     componentsError,
     hasMore,
     searchQuery,
-    filteredComponentsCount: filteredComponents.length
+    filteredComponentsCount: filteredComponents.length,
   });
 
   useEffect(() => {

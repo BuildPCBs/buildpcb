@@ -799,7 +799,7 @@ export function IDEFabricCanvas({
   const optimizeCanvasMemory = useCallback(() => {
     if (!fabricCanvas) return;
 
-    console.log('🧹 Optimizing canvas memory...');
+    console.log("🧹 Optimizing canvas memory...");
 
     const objects = fabricCanvas.getObjects();
     let removedCount = 0;
@@ -811,11 +811,12 @@ export function IDEFabricCanvas({
       const canvasHeight = fabricCanvas.height || 0;
 
       // Remove objects that are completely off-screen
-      if (bounds.left > canvasWidth + 100 ||
-          bounds.top > canvasHeight + 100 ||
-          bounds.left + bounds.width < -100 ||
-          bounds.top + bounds.height < -100) {
-
+      if (
+        bounds.left > canvasWidth + 100 ||
+        bounds.top > canvasHeight + 100 ||
+        bounds.left + bounds.width < -100 ||
+        bounds.top + bounds.height < -100
+      ) {
         // Don't remove components or important objects
         if (!(obj as any).componentType && !(obj as any).isAlignmentGuide) {
           fabricCanvas.remove(obj);
@@ -841,12 +842,14 @@ export function IDEFabricCanvas({
 
     const memoryCheckInterval = setInterval(() => {
       // Check memory usage and optimize if needed
-      if ('memory' in performance) {
+      if ("memory" in performance) {
         const memoryInfo = (performance as any).memory;
-        const memoryUsageRatio = memoryInfo.usedJSHeapSize / memoryInfo.totalJSHeapSize;
+        const memoryUsageRatio =
+          memoryInfo.usedJSHeapSize / memoryInfo.totalJSHeapSize;
 
-        if (memoryUsageRatio > 0.7) { // If using more than 70% of heap
-          console.log('⚠️ High memory usage detected, optimizing canvas...');
+        if (memoryUsageRatio > 0.7) {
+          // If using more than 70% of heap
+          console.log("⚠️ High memory usage detected, optimizing canvas...");
           optimizeCanvasMemory();
         }
       }
@@ -1496,13 +1499,13 @@ export function IDEFabricCanvas({
       <div className="absolute bottom-2 right-2 bg-blue-600 bg-opacity-90 text-white px-2 py-1 rounded text-xs">
         <button
           onClick={() => {
-            memoryMonitor.logMemoryUsage('Manual Check');
+            memoryMonitor.logMemoryUsage("Manual Check");
             optimizeCanvasMemory();
           }}
           className="hover:bg-blue-700 px-1 rounded text-xs"
           title="Click to check memory and optimize"
         >
-          RAM: {memoryMonitor.getMemoryInfo()?.formattedUsage || 'N/A'}
+          RAM: {memoryMonitor.getMemoryInfo()?.formattedUsage || "N/A"}
         </button>
       </div>
 
@@ -1512,12 +1515,12 @@ export function IDEFabricCanvas({
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
             <span>
-              {wiringTool.isWireMode && !wiringTool.isDrawing && (
-                "Wire Mode - Click pin to start"
-              )}
-              {wiringTool.isWireMode && wiringTool.isDrawing && (
-                "Drawing - Click pin to complete"
-              )}
+              {wiringTool.isWireMode &&
+                !wiringTool.isDrawing &&
+                "Wire Mode - Click pin to start"}
+              {wiringTool.isWireMode &&
+                wiringTool.isDrawing &&
+                "Drawing - Click pin to complete"}
             </span>
           </div>
           <div className="text-xs opacity-80 mt-1">
@@ -1866,8 +1869,12 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
               // BOTTOM BREAD: Original, invisible pin data (stores true location and database pin info)
               const invisiblePinData = pinsFromSVG.map((pin, index) => {
                 // Try to get pin data from database component
-                const dbPins = componentInfo.databaseComponent?.pin_configuration?.pins || [];
-                const dbPin = dbPins[index] || dbPins.find((p: any) => p.number === (index + 1).toString());
+                const dbPins =
+                  componentInfo.databaseComponent?.pin_configuration?.pins ||
+                  [];
+                const dbPin =
+                  dbPins[index] ||
+                  dbPins.find((p: any) => p.number === (index + 1).toString());
 
                 return {
                   originalX: pin.left! + (pin.width || 0) / 2,
@@ -1875,7 +1882,7 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
                   pinId: `pin${index + 1}`,
                   pinNumber: dbPin?.number || (index + 1).toString(),
                   pinName: dbPin?.name || `Pin ${index + 1}`,
-                  electricalType: dbPin?.electrical_type || 'unknown',
+                  electricalType: dbPin?.electrical_type || "unknown",
                   orientation: dbPin?.orientation || 0,
                 };
               });

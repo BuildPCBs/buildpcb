@@ -42,7 +42,11 @@ export function useDatabaseComponents() {
   const fetchComponents = useCallback(
     async (loadMore = false) => {
       try {
-        console.log('🔍 Fetching components from database...', { loadMore, offset, PAGE_SIZE });
+        console.log("🔍 Fetching components from database...", {
+          loadMore,
+          offset,
+          PAGE_SIZE,
+        });
 
         if (!loadMore) {
           setLoading(true);
@@ -51,10 +55,10 @@ export function useDatabaseComponents() {
         setError(null);
 
         const currentOffset = loadMore ? offset : 0;
-        console.log('📡 Making Supabase query:', {
-          table: 'components',
+        console.log("📡 Making Supabase query:", {
+          table: "components",
           range: [currentOffset, currentOffset + PAGE_SIZE - 1],
-          orderBy: 'name'
+          orderBy: "name",
         });
 
         const { data, error: fetchError } = await supabase
@@ -63,19 +67,19 @@ export function useDatabaseComponents() {
           .order("name")
           .range(currentOffset, currentOffset + PAGE_SIZE - 1);
 
-        console.log('📊 Supabase response:', {
+        console.log("📊 Supabase response:", {
           dataLength: data?.length || 0,
           error: fetchError,
-          hasMore: data ? data.length === PAGE_SIZE : false
+          hasMore: data ? data.length === PAGE_SIZE : false,
         });
 
         if (fetchError) {
-          console.error('❌ Supabase fetch error:', fetchError);
+          console.error("❌ Supabase fetch error:", fetchError);
           throw fetchError;
         }
 
         if (data) {
-          console.log('✅ Processing', data.length, 'components from database');
+          console.log("✅ Processing", data.length, "components from database");
 
           // Check if we have more data
           setHasMore(data.length === PAGE_SIZE);
@@ -83,12 +87,12 @@ export function useDatabaseComponents() {
           // Transform database components to display format
           const displayComponents: ComponentDisplayData[] = data.map(
             (comp: DatabaseComponent) => {
-              console.log('🔄 Processing component:', {
+              console.log("🔄 Processing component:", {
                 id: comp.id,
                 name: comp.name,
                 category: comp.category,
                 hasSvg: !!comp.symbol_svg,
-                svgLength: comp.symbol_svg?.length || 0
+                svgLength: comp.symbol_svg?.length || 0,
               });
 
               return {
@@ -109,22 +113,29 @@ export function useDatabaseComponents() {
             }
           );
 
-          console.log('🎯 Setting', displayComponents.length, 'display components');
+          console.log(
+            "🎯 Setting",
+            displayComponents.length,
+            "display components"
+          );
 
           if (loadMore) {
             setComponents((prev) => {
               const newComponents = [...prev, ...displayComponents];
-              console.log('📦 Total components after load more:', newComponents.length);
+              console.log(
+                "📦 Total components after load more:",
+                newComponents.length
+              );
               return newComponents;
             });
             setOffset((prev) => prev + PAGE_SIZE);
           } else {
             setComponents(displayComponents);
             setOffset(PAGE_SIZE);
-            console.log('📦 Set initial components:', displayComponents.length);
+            console.log("📦 Set initial components:", displayComponents.length);
           }
         } else {
-          console.warn('⚠️ No data returned from Supabase');
+          console.warn("⚠️ No data returned from Supabase");
         }
       } catch (err) {
         console.error("❌ Error fetching components:", err);
@@ -133,7 +144,7 @@ export function useDatabaseComponents() {
         );
       } finally {
         setLoading(false);
-        console.log('🏁 Component fetch completed');
+        console.log("🏁 Component fetch completed");
       }
     },
     [offset]
@@ -147,7 +158,7 @@ export function useDatabaseComponents() {
 
   // Memory cleanup function
   const cleanupMemory = useCallback(() => {
-    console.log('🧹 Cleaning up component memory...');
+    console.log("🧹 Cleaning up component memory...");
     setComponents([]);
     setOffset(0);
     setHasMore(true);
@@ -157,15 +168,15 @@ export function useDatabaseComponents() {
   // Auto-cleanup when component unmounts or when memory usage gets high
   useEffect(() => {
     const handleMemoryPressure = () => {
-      console.log('⚠️ Memory pressure detected, cleaning up components...');
+      console.log("⚠️ Memory pressure detected, cleaning up components...");
       cleanupMemory();
     };
 
     // Listen for memory pressure events (if supported)
-    if ('memory' in performance) {
+    if ("memory" in performance) {
       const memoryInfo = (performance as any).memory;
       if (memoryInfo.usedJSHeapSize > memoryInfo.totalJSHeapSize * 0.8) {
-        console.log('⚠️ High memory usage detected, triggering cleanup...');
+        console.log("⚠️ High memory usage detected, triggering cleanup...");
         cleanupMemory();
       }
     }
@@ -178,7 +189,7 @@ export function useDatabaseComponents() {
 
   // Initial component fetch
   useEffect(() => {
-    console.log('🚀 Initial component fetch triggered');
+    console.log("🚀 Initial component fetch triggered");
     fetchComponents(false);
   }, []); // Empty dependency array to run only once on mount
 
@@ -190,14 +201,16 @@ export function useDatabaseComponents() {
       // Only convert to data URL when actually needed for display
       if (component.symbol_svg.length > 10000) {
         // For very large SVGs, use a placeholder and lazy load
-        return `data:image/svg+xml;base64,${btoa('<svg width="60" height="30" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="30" fill="#e8e8e8"/><text x="30" y="18" text-anchor="middle" font-size="10" fill="#666">SVG</text></svg>')}`;
+        return `data:image/svg+xml;base64,${btoa(
+          '<svg width="60" height="30" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="30" fill="#e8e8e8"/><text x="30" y="18" text-anchor="middle" font-size="10" fill="#666">SVG</text></svg>'
+        )}`;
       }
 
       // For smaller SVGs, still use memory-efficient encoding
       try {
         // Use more memory-efficient base64 encoding
         const svgBytes = new TextEncoder().encode(component.symbol_svg);
-        let binaryString = '';
+        let binaryString = "";
         const chunkSize = 1024;
 
         // Process in chunks to avoid large string allocations
@@ -227,35 +240,37 @@ export function useDatabaseComponents() {
   // Memory-efficient category icon generator
   const getCategoryIcon = (category: string): string => {
     const icons: Record<string, string> = {
-      resistor: 'R',
-      capacitor: 'C',
-      led: 'LED',
-      diode: 'D',
-      transistor: 'Q',
-      inductor: 'L',
-      battery: 'BAT',
-      switch: 'SW',
-      connector: 'CONN',
-      pushbutton: 'BTN',
-      crystal: 'XTAL',
-      opamp: 'OP',
-      sensor: 'SEN',
-      motor: 'MOT',
-      voltage_regulator: 'REG',
-      arduino: 'ARD',
-      buzzer: 'BUZ',
-      'display-lcd': 'LCD',
-      fuse: 'FUSE',
-      microcontroller: 'MCU',
-      'photo-resistor': 'LDR',
-      potentiometer: 'POT',
-      relay: 'RLY',
-      'servo-motor': 'SERVO',
-      'temperature-sensor': 'TEMP',
+      resistor: "R",
+      capacitor: "C",
+      led: "LED",
+      diode: "D",
+      transistor: "Q",
+      inductor: "L",
+      battery: "BAT",
+      switch: "SW",
+      connector: "CONN",
+      pushbutton: "BTN",
+      crystal: "XTAL",
+      opamp: "OP",
+      sensor: "SEN",
+      motor: "MOT",
+      voltage_regulator: "REG",
+      arduino: "ARD",
+      buzzer: "BUZ",
+      "display-lcd": "LCD",
+      fuse: "FUSE",
+      microcontroller: "MCU",
+      "photo-resistor": "LDR",
+      potentiometer: "POT",
+      relay: "RLY",
+      "servo-motor": "SERVO",
+      "temperature-sensor": "TEMP",
     };
 
     const icon = icons[category] || category.charAt(0).toUpperCase();
-    return `data:image/svg+xml;base64,${btoa(`<svg width="60" height="30" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="30" fill="#e8e8e8"/><text x="30" y="20" text-anchor="middle" font-size="12" fill="#666" font-family="monospace">${icon}</text></svg>`)}`;
+    return `data:image/svg+xml;base64,${btoa(
+      `<svg width="60" height="30" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="30" fill="#e8e8e8"/><text x="30" y="20" text-anchor="middle" font-size="12" fill="#666" font-family="monospace">${icon}</text></svg>`
+    )}`;
   };
 
   const searchComponents = (query: string): ComponentDisplayData[] => {
@@ -302,7 +317,12 @@ export function useDatabaseComponents() {
     memoryInfo: {
       componentCount: components.length,
       estimatedMemoryUsage: components.reduce((total, comp) => {
-        return total + (comp.symbol_svg?.length || 0) + (comp.image?.length || 0) + 1000; // Rough estimate
+        return (
+          total +
+          (comp.symbol_svg?.length || 0) +
+          (comp.image?.length || 0) +
+          1000
+        ); // Rough estimate
       }, 0),
     },
   };
