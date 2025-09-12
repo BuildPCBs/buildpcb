@@ -33,8 +33,10 @@ export function serializeCanvasToLogicalCircuit(
       const fabricObj = obj as any;
 
       // Get database component reference
-      const dbComponent = fabricObj.databaseComponent || fabricObj.componentMetadata;
-      const componentId = dbComponent?.id || fabricObj.data?.componentId || `comp_${index}`;
+      const dbComponent =
+        fabricObj.databaseComponent || fabricObj.componentMetadata;
+      const componentId =
+        dbComponent?.id || fabricObj.data?.componentId || `comp_${index}`;
 
       if (dbComponent) {
         logicalComponents.push({
@@ -49,9 +51,13 @@ export function serializeCanvasToLogicalCircuit(
           pinConfiguration: dbComponent.pin_configuration,
         });
 
-        console.log(`💾 Saved logical component: ${dbComponent.name} (${componentId})`);
+        console.log(
+          `💾 Saved logical component: ${dbComponent.name} (${componentId})`
+        );
       } else {
-        console.warn(`⚠️ Component ${index} has no database reference, skipping`);
+        console.warn(
+          `⚠️ Component ${index} has no database reference, skipping`
+        );
       }
     });
 
@@ -70,15 +76,17 @@ export function serializeCanvasToLogicalCircuit(
         id: wireData.id || wireObj.id || `conn_${index}`,
         from: {
           componentId: wireObj.startComponentId || "",
-          pin: wireObj.startPinIndex !== undefined
-            ? wireObj.startPinIndex.toString()
-            : "",
+          pin:
+            wireObj.startPinIndex !== undefined
+              ? wireObj.startPinIndex.toString()
+              : "",
         },
         to: {
           componentId: wireObj.endComponentId || "",
-          pin: wireObj.endPinIndex !== undefined
-            ? wireObj.endPinIndex.toString()
-            : "",
+          pin:
+            wireObj.endPinIndex !== undefined
+              ? wireObj.endPinIndex.toString()
+              : "",
         },
         type: "wire" as const,
         properties: {
@@ -87,7 +95,9 @@ export function serializeCanvasToLogicalCircuit(
         },
       });
 
-      console.log(`🔗 Saved wire connection: ${wireObj.startComponentId} → ${wireObj.endComponentId}`);
+      console.log(
+        `🔗 Saved wire connection: ${wireObj.startComponentId} → ${wireObj.endComponentId}`
+      );
     });
 
   return {
@@ -140,13 +150,16 @@ export async function loadCanvasFromLogicalCircuit(
 
       // Fetch component from database
       const { data: dbComponent, error } = await supabase
-        .from('components')
-        .select('*')
-        .eq('id', component.databaseId)
+        .from("components")
+        .select("*")
+        .eq("id", component.databaseId)
         .single();
 
       if (error || !dbComponent) {
-        console.error(`❌ Failed to load component ${component.databaseId}:`, error);
+        console.error(
+          `❌ Failed to load component ${component.databaseId}:`,
+          error
+        );
         continue;
       }
 
@@ -166,21 +179,27 @@ export async function loadCanvasFromLogicalCircuit(
         y: component.position.y,
       });
 
-      console.log(`✅ Added component: ${dbComponent.name} at (${component.position.x}, ${component.position.y})`);
-
+      console.log(
+        `✅ Added component: ${dbComponent.name} at (${component.position.x}, ${component.position.y})`
+      );
     } catch (error) {
-      console.error(`❌ Error loading component ${component.databaseId}:`, error);
+      console.error(
+        `❌ Error loading component ${component.databaseId}:`,
+        error
+      );
     }
   }
 
   // Wait for components to be fully loaded
-  await new Promise(resolve => setTimeout(resolve, 500));
+  await new Promise((resolve) => setTimeout(resolve, 500));
 
   // TODO: Restore wire connections
   // TODO: Restore wire connections
   // This will require mapping the logical connections to the newly created visual components
   if (circuit.connections && circuit.connections.length > 0) {
-    console.log(`🔗 TODO: Restore ${circuit.connections.length} wire connections`);
+    console.log(
+      `🔗 TODO: Restore ${circuit.connections.length} wire connections`
+    );
     // Wire restoration logic will be implemented next
   }
 
@@ -202,8 +221,11 @@ export async function loadProjectToCanvas(
   canvas.clear();
 
   // Check if this is a logical circuit (new format) or vector data (old format)
-  if (projectData.components && Array.isArray(projectData.components) &&
-      projectData.components[0]?.databaseId) {
+  if (
+    projectData.components &&
+    Array.isArray(projectData.components) &&
+    projectData.components[0]?.databaseId
+  ) {
     // New logical format - use logical loader
     console.log("📋 Detected logical circuit format, using logical loader");
     await loadCanvasFromLogicalCircuit(canvas, projectData);

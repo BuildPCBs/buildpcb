@@ -468,7 +468,9 @@ export function SchemaPanel() {
                         )}
                         {componentsLoading && databaseComponents.length > 0 && (
                           <div className="flex justify-center py-4">
-                            <div className="text-xs text-gray-500">Loading more components...</div>
+                            <div className="text-xs text-gray-500">
+                              Loading more components...
+                            </div>
                           </div>
                         )}
                       </div>

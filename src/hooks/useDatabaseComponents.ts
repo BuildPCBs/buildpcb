@@ -38,64 +38,67 @@ export function useDatabaseComponents() {
 
   const PAGE_SIZE = 100; // Reduced from 1000 to 100 for better memory management
 
-  const fetchComponents = useCallback(async (loadMore = false) => {
-    try {
-      if (!loadMore) {
-        setLoading(true);
-        setOffset(0);
-      }
-      setError(null);
-
-      const currentOffset = loadMore ? offset : 0;
-      const { data, error: fetchError } = await supabase
-        .from("components")
-        .select("*")
-        .order("name")
-        .range(currentOffset, currentOffset + PAGE_SIZE - 1);
-
-      if (fetchError) {
-        throw fetchError;
-      }
-
-      if (data) {
-        // Check if we have more data
-        setHasMore(data.length === PAGE_SIZE);
-
-        // Transform database components to display format
-        const displayComponents: ComponentDisplayData[] = data.map(
-          (comp: DatabaseComponent) => ({
-            id: comp.id,
-            name: comp.name,
-            category: comp.category,
-            image: getComponentImage(comp),
-            type: comp.type,
-            description: comp.description,
-            manufacturer: comp.manufacturer,
-            partNumber: comp.part_number,
-            pinCount:
-              comp.pin_configuration?.total_pins ||
-              comp.pin_configuration?.pins?.length ||
-              0,
-          })
-        );
-
-        if (loadMore) {
-          setComponents(prev => [...prev, ...displayComponents]);
-          setOffset(prev => prev + PAGE_SIZE);
-        } else {
-          setComponents(displayComponents);
-          setOffset(PAGE_SIZE);
+  const fetchComponents = useCallback(
+    async (loadMore = false) => {
+      try {
+        if (!loadMore) {
+          setLoading(true);
+          setOffset(0);
         }
+        setError(null);
+
+        const currentOffset = loadMore ? offset : 0;
+        const { data, error: fetchError } = await supabase
+          .from("components")
+          .select("*")
+          .order("name")
+          .range(currentOffset, currentOffset + PAGE_SIZE - 1);
+
+        if (fetchError) {
+          throw fetchError;
+        }
+
+        if (data) {
+          // Check if we have more data
+          setHasMore(data.length === PAGE_SIZE);
+
+          // Transform database components to display format
+          const displayComponents: ComponentDisplayData[] = data.map(
+            (comp: DatabaseComponent) => ({
+              id: comp.id,
+              name: comp.name,
+              category: comp.category,
+              image: getComponentImage(comp),
+              type: comp.type,
+              description: comp.description,
+              manufacturer: comp.manufacturer,
+              partNumber: comp.part_number,
+              pinCount:
+                comp.pin_configuration?.total_pins ||
+                comp.pin_configuration?.pins?.length ||
+                0,
+            })
+          );
+
+          if (loadMore) {
+            setComponents((prev) => [...prev, ...displayComponents]);
+            setOffset((prev) => prev + PAGE_SIZE);
+          } else {
+            setComponents(displayComponents);
+            setOffset(PAGE_SIZE);
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching components:", err);
+        setError(
+          err instanceof Error ? err.message : "Failed to fetch components"
+        );
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error("Error fetching components:", err);
-      setError(
-        err instanceof Error ? err.message : "Failed to fetch components"
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [offset]);
+    },
+    [offset]
+  );
 
   const loadMoreComponents = useCallback(() => {
     if (hasMore && !loading) {
@@ -118,7 +121,7 @@ export function useDatabaseComponents() {
         const utf8Bytes = encoder.encode(component.symbol_svg);
 
         // Use Uint8Array to avoid creating intermediate arrays
-        let binaryString = '';
+        let binaryString = "";
         for (let i = 0; i < utf8Bytes.length; i++) {
           binaryString += String.fromCharCode(utf8Bytes[i]);
         }
@@ -126,7 +129,10 @@ export function useDatabaseComponents() {
         const svgDataUrl = `data:image/svg+xml;base64,${btoa(binaryString)}`;
         return svgDataUrl;
       } catch (error) {
-        console.warn(`Failed to encode SVG for component ${component.name}:`, error);
+        console.warn(
+          `Failed to encode SVG for component ${component.name}:`,
+          error
+        );
         // Fall back to category icon if encoding fails
       }
     }
