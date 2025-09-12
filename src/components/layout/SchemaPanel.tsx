@@ -2,205 +2,12 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { HomeIcon, SearchIcon, WindowIcon } from "@/components/icons";
 import { useClickOutside } from "@/hooks/useClickOutside";
-import { r, responsive, responsiveFontSize } from "@/lib/responsive";
-import { COMPONENT_CATEGORIES } from "@/lib/constants";
+import { r, responsive } from "@/lib/responsive";
 import { canvasCommandManager } from "@/canvas/canvas-command-manager";
-
-// Mock component data - extended list to test scrolling
-const mockComponents = [
-  {
-    id: "1",
-    name: "Resistor",
-    category: "Resistors",
-    image: "/components/resistor.svg",
-    type: "resistor",
-  },
-  {
-    id: "2",
-    name: "Capacitor",
-    category: "Capacitors",
-    image: "/components/capacitor.svg",
-    type: "capacitor",
-  },
-  {
-    id: "3",
-    name: "LED",
-    category: "Diodes",
-    image: "/components/led.svg",
-    type: "led",
-  },
-  {
-    id: "4",
-    name: "Transistor",
-    category: "Transistors",
-    image: "/components/transistor.svg",
-    type: "transistor",
-  },
-  {
-    id: "5",
-    name: "Arduino Uno",
-    category: "ICs",
-    image: "/components/arduino.svg",
-    type: "arduino",
-  },
-  {
-    id: "6",
-    name: "Temperature Sensor",
-    category: "Sensors",
-    image: "/components/temperature-sensor.svg",
-    type: "sensor",
-  },
-  {
-    id: "7",
-    name: "Switch",
-    category: "Switches",
-    image: "/components/switch.svg",
-    type: "switch",
-  },
-  {
-    id: "8",
-    name: "Connector",
-    category: "Connectors",
-    image: "/components/connector.svg",
-    type: "connector",
-  },
-  {
-    id: "9",
-    name: "Inductor",
-    category: "Inductors",
-    image: "/components/inductor.svg",
-    type: "inductor",
-  },
-  {
-    id: "10",
-    name: "Op-Amp",
-    category: "ICs",
-    image: "/components/opamp.svg",
-    type: "opamp",
-  },
-  {
-    id: "11",
-    name: "Battery",
-    category: "Power",
-    image: "/components/battery.svg",
-    type: "battery",
-  },
-  {
-    id: "12",
-    name: "Motor",
-    category: "Other",
-    image: "/components/motor.svg",
-    type: "motor",
-  },
-  {
-    id: "13",
-    name: "Diode",
-    category: "Diodes",
-    image: "/components/diode.svg",
-    type: "diode",
-  },
-  {
-    id: "14",
-    name: "Voltage Regulator",
-    category: "ICs",
-    image: "/components/voltage_regulator.svg",
-    type: "voltage_regulator",
-  },
-  {
-    id: "15",
-    name: "Crystal Oscillator",
-    category: "Other",
-    image: "/components/crystal.svg",
-    type: "crystal",
-  },
-  {
-    id: "16",
-    name: "Push Button",
-    category: "Switches",
-    image: "/components/pushbutton.svg",
-    type: "pushbutton",
-  },
-  {
-    id: "17",
-    name: "Potentiometer",
-    category: "Resistors",
-    image: "/components/potentiometer.svg",
-  },
-  {
-    id: "18",
-    name: "Relay",
-    category: "Other",
-    image: "/components/relay.svg",
-  },
-  {
-    id: "19",
-    name: "Fuse",
-    category: "Protection",
-    image: "/components/fuse.svg",
-  },
-  {
-    id: "20",
-    name: "Microcontroller",
-    category: "ICs",
-    image: "/components/microcontroller.svg",
-  },
-  {
-    id: "21",
-    name: "Display LCD",
-    category: "Display",
-    image: "/components/display-lcd.svg",
-  },
-  {
-    id: "22",
-    name: "Buzzer",
-    category: "Audio",
-    image: "/components/buzzer.svg",
-  },
-  {
-    id: "23",
-    name: "Photo Resistor",
-    category: "Sensors",
-    image: "/components/photo-resistor.svg",
-  },
-  {
-    id: "24",
-    name: "Servo Motor",
-    category: "Motors",
-    image: "/components/servo-motor.svg",
-  },
-];
-
-const mockSchemas = [
-  {
-    id: "1",
-    name: "Basic LED Circuit",
-    description: "Simple LED with resistor",
-  },
-  {
-    id: "2",
-    name: "Arduino Blink",
-    description: "Arduino with LED blink circuit",
-  },
-  {
-    id: "3",
-    name: "Temperature Monitor",
-    description: "Temperature sensor with display",
-  },
-  { id: "4", name: "Power Supply", description: "5V regulated power supply" },
-  {
-    id: "5",
-    name: "Audio Amplifier",
-    description: "Simple audio amplifier circuit",
-  },
-  {
-    id: "6",
-    name: "Motor Driver",
-    description: "H-bridge motor control circuit",
-  },
-];
+import { useDatabaseComponents, ComponentDisplayData } from "@/hooks/useDatabaseComponents";
 
 interface ComponentItemProps {
-  component: (typeof mockComponents)[0];
+  component: ComponentDisplayData;
   onClick: (e: React.MouseEvent) => void;
 }
 
@@ -240,31 +47,7 @@ function ComponentItem({ component, onClick }: ComponentItemProps) {
   );
 }
 
-interface SchemaItemProps {
-  schema: (typeof mockSchemas)[0];
-  onClick: () => void;
-}
 
-function SchemaItem({ schema, onClick }: SchemaItemProps) {
-  return (
-    <div
-      className="bg-white border border-gray-200 rounded-lg p-2 hover:border-[#0038DF] hover:shadow-sm transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#0038DF] focus:border-[#0038DF]"
-      onClick={onClick}
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onClick();
-        }
-      }}
-    >
-      <div className="font-medium text-sm text-gray-900 mb-1 truncate">
-        {schema.name}
-      </div>
-      <div className="text-xs text-gray-600 truncate">{schema.description}</div>
-    </div>
-  );
-}
 
 export function SchemaPanel() {
   const [isFullyExpanded, setIsFullyExpanded] = useState(false);
@@ -278,6 +61,14 @@ export function SchemaPanel() {
   const router = useRouter();
   const rippleRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Use database components hook
+  const {
+    components: databaseComponents,
+    loading: componentsLoading,
+    error: componentsError,
+    searchComponents,
+  } = useDatabaseComponents();
 
   // Allow scrolling within the panel
   useEffect(() => {
@@ -376,12 +167,10 @@ export function SchemaPanel() {
     }, 100);
   };
 
-  // Filter components based on search
-  const filteredComponents = mockComponents.filter(
-    (component) =>
-      component.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      component.category.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter components based on search using database components
+  const filteredComponents = searchQuery.trim()
+    ? searchComponents(searchQuery)
+    : databaseComponents;
 
   // Determine panel state and styles
   const getPanelStyles = () => {
@@ -589,9 +378,15 @@ export function SchemaPanel() {
                           `[${timestamp}] CLICK: Adding ${component.name} to canvas`
                         );
                         canvasCommandManager.executeCommand("component:add", {
+                          id: component.id,
                           type: component.type,
                           svgPath: component.image,
                           name: component.name,
+                          category: component.category,
+                          description: component.description,
+                          manufacturer: component.manufacturer,
+                          partNumber: component.partNumber,
+                          pinCount: component.pinCount,
                         });
                       }}
                     />
@@ -614,29 +409,41 @@ export function SchemaPanel() {
                     data-scrollable="true"
                     style={{ height: "0", minHeight: "100%" }}
                   >
-                    <div className="space-y-1">
-                      {mockComponents.map((component) => (
-                        <ComponentItem
-                          key={component.id}
-                          component={component}
-                          onClick={(e) => {
-                            e.stopPropagation(); // THE FIX - Prevent multiple event firing
-                            const timestamp = new Date().toISOString();
-                            console.log(
-                              `[${timestamp}] CLICK: Adding ${component.name} to canvas`
-                            );
-                            canvasCommandManager.executeCommand(
-                              "component:add",
-                              {
-                                type: component.type,
-                                svgPath: component.image,
-                                name: component.name,
-                              }
-                            );
-                          }}
-                        />
-                      ))}
-                    </div>
+                    {componentsLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <div className="text-sm text-gray-500">Loading components...</div>
+                      </div>
+                    ) : componentsError ? (
+                      <div className="flex items-center justify-center py-8">
+                        <div className="text-sm text-red-500 text-center">
+                          Error loading components: {componentsError}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        {databaseComponents.map((component) => (
+                          <ComponentItem
+                            key={component.id}
+                            component={component}
+                            onClick={(e) => {
+                              e.stopPropagation(); // THE FIX - Prevent multiple event firing
+                              const timestamp = new Date().toISOString();
+                              console.log(
+                                `[${timestamp}] CLICK: Adding ${component.name} to canvas`
+                              );
+                              canvasCommandManager.executeCommand(
+                                "component:add",
+                                {
+                                  type: component.type,
+                                  svgPath: component.image,
+                                  name: component.name,
+                                }
+                              );
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div
@@ -645,13 +452,9 @@ export function SchemaPanel() {
                     style={{ height: "0", minHeight: "100%" }}
                   >
                     <div className="space-y-2">
-                      {mockSchemas.map((schema) => (
-                        <SchemaItem
-                          key={schema.id}
-                          schema={schema}
-                          onClick={() => console.log(`Selected ${schema.name}`)}
-                        />
-                      ))}
+                      <div className="text-sm text-gray-500 text-center py-8">
+                        Schemas feature coming soon...
+                      </div>
                     </div>
                   </div>
                 )}

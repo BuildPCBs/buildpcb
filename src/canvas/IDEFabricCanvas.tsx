@@ -17,6 +17,7 @@ import { HorizontalRuler } from "./ui/HorizontalRuler";
 import { VerticalRuler } from "./ui/VerticalRuler";
 import { CanvasProvider } from "../contexts/CanvasContext";
 import { useProject } from "@/contexts/ProjectContext";
+import { supabase } from "@/lib/supabase";
 
 interface IDEFabricCanvasProps {
   className?: string;
@@ -1516,17 +1517,24 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
   // Store the unsubscribe function for cleanup
   componentEventUnsubscribe = canvasCommandManager.on(
     "component:add",
-    (payload: {
+    async (payload: {
+      id: string;
       type: string;
       svgPath: string;
       name: string;
+      category?: string;
+      description?: string;
+      manufacturer?: string;
+      partNumber?: string;
+      pinCount?: number;
+      databaseComponent?: any;
       x?: number;
       y?: number;
     }) => {
-      console.log("🎯 SVG: Component command received for", payload.name);
+      console.log("🎯 Component command received for", payload.name);
 
-      // New intelligent component creation logic
-      const createComponent = (componentInfo: typeof payload) => {
+      // New intelligent component creation logic with database metadata
+      const createComponent = async (componentInfo: typeof payload) => {
         console.log(
           `🎯 DEBUG: ===== STARTING COMPONENT CREATION FOR ${componentInfo.name} =====`
         );
@@ -1547,6 +1555,40 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
           );
           return;
         }
+
+        try {
+          // Fetch full component data from database using the component ID
+          console.log(`🔍 Fetching database component data for ID: ${componentInfo.id}`);
+          const { data: dbComponent, error: dbError } = await supabase
+            .from('components')
+            .select('*')
+            .eq('id', componentInfo.id)
+            .single();
+
+          if (dbError) {
+            console.warn(`⚠️ Could not fetch database component data:`, dbError);
+            console.log(`🔄 Proceeding with provided component info only`);
+          } else if (dbComponent) {
+            console.log(`✅ Retrieved full database component data:`, {
+              name: dbComponent.name,
+              manufacturer: dbComponent.manufacturer,
+              partNumber: dbComponent.part_number,
+              category: dbComponent.category,
+              hasPins: dbComponent.pin_configuration?.pins?.length > 0,
+            });
+
+            // Merge database data with provided info
+            componentInfo = {
+              ...componentInfo,
+              category: dbComponent.category || componentInfo.category,
+              description: dbComponent.description || componentInfo.description,
+              manufacturer: dbComponent.manufacturer || componentInfo.manufacturer,
+              partNumber: dbComponent.part_number || componentInfo.partNumber,
+              pinCount: dbComponent.pin_configuration?.pins?.length || componentInfo.pinCount,
+              // Store full database component for later use
+              databaseComponent: dbComponent,
+            };
+          }
 
         // Check for duplicate components at the same position (more lenient)
         const existingComponents = currentCanvas
@@ -1853,6 +1895,27 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
               isComponentSandwich: true, // Mark this as a proper sandwich
             });
 
+            // Attach full database component metadata for proper serialization
+            if (componentInfo.databaseComponent) {
+              componentSandwich.set("databaseComponent", componentInfo.databaseComponent);
+              componentSandwich.set("componentMetadata", {
+                id: componentInfo.databaseComponent.id,
+                name: componentInfo.databaseComponent.name,
+                type: componentInfo.databaseComponent.type,
+                category: componentInfo.databaseComponent.category,
+                description: componentInfo.databaseComponent.description,
+                manufacturer: componentInfo.databaseComponent.manufacturer,
+                partNumber: componentInfo.databaseComponent.part_number,
+                specifications: componentInfo.databaseComponent.specifications,
+                pinConfiguration: componentInfo.databaseComponent.pin_configuration,
+                kicadSymRaw: componentInfo.databaseComponent.kicad_sym_raw,
+                kicadLibrarySource: componentInfo.databaseComponent.kicad_library_source,
+                datasheetUrl: componentInfo.databaseComponent.datasheet_url,
+                keywords: componentInfo.databaseComponent.keywords,
+              });
+              console.log(`💾 Attached database metadata to component: ${componentInfo.name}`);
+            }
+
             // 5. Add the COMPONENT SANDWICH to the canvas - physically impossible to separate
             console.log(
               `🎯 Adding ${componentInfo.name} to canvas (${
@@ -1990,12 +2053,20 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
               isProcessingComponent = false;
             }
           });
+        } catch (error) {
+          console.error(
+            `❌ COMPONENT CREATION: Failed to create component ${componentInfo.name}:`,
+            error
+          );
+          isProcessingComponent = false;
+        }
       };
 
       // Use the new createComponent function
       createComponent(payload);
     }
   );
+
 
   isComponentHandlerSetup = true;
 }

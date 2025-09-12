@@ -13,6 +13,7 @@ interface CanvasComponent {
   rotation: number;
   properties: Record<string, any>;
   pins: any[];
+  databaseComponent?: any; // Full database component metadata
 }
 
 /**
@@ -33,15 +34,19 @@ export function serializeCanvasToCircuit(
       const componentData =
         (obj as any).data || (obj as any).componentData || {};
 
+      // Get database component metadata if available
+      const dbMetadata = (obj as any).componentMetadata || (obj as any).databaseComponent;
+
       return {
-        id: componentData.id || `comp_${index}`,
+        id: dbMetadata?.id || componentData.id || `comp_${index}`,
         name:
+          dbMetadata?.name ||
           componentData.componentName ||
           componentData.name ||
           `Component ${index + 1}`,
-        type: componentData.componentType || componentData.type || "unknown",
-        category: componentData.category || "general",
-        specifications: componentData.specifications || {},
+        type: dbMetadata?.type || componentData.componentType || componentData.type || "unknown",
+        category: dbMetadata?.category || componentData.category || "general",
+        specifications: dbMetadata?.specifications || componentData.specifications || {},
         availability: componentData.availability || ("in-stock" as const),
         position: {
           x: obj.left || 0,
@@ -49,7 +54,9 @@ export function serializeCanvasToCircuit(
         },
         rotation: obj.angle || 0,
         properties: componentData.properties || {},
-        pins: componentData.pins || [],
+        pins: dbMetadata?.pinConfiguration?.pins || componentData.pins || [],
+        // Include full database metadata for proper restoration
+        databaseComponent: dbMetadata,
       };
     });
 
