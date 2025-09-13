@@ -283,13 +283,41 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
       }
 
       try {
+        // Import the circuit serializer
+        const { serializeCanvasToCircuit } = await import(
+          "@/canvas/utils/canvasSerializer"
+        );
+
+        // Get the current canvas from the canvas command manager
+        const { canvasCommandManager } = await import(
+          "@/canvas/canvas-command-manager"
+        );
+        const canvasInstance = canvasCommandManager.getCanvas();
+
+        // Serialize canvas to circuit format instead of raw data
+        const circuitFromCanvas = serializeCanvasToCircuit(canvasInstance);
+
+        // Merge with provided circuit data
+        const finalCircuitData = {
+          ...circuitData,
+          ...circuitFromCanvas,
+          components: [
+            ...(circuitData.components || []),
+            ...(circuitFromCanvas?.components || []),
+          ],
+          connections: [
+            ...(circuitData.connections || []),
+            ...(circuitFromCanvas?.connections || []),
+          ],
+        } as Circuit;
+
         await ProjectService.saveProject(
           currentProject.id,
-          circuitData,
+          finalCircuitData,
           canvasData,
           chatData
         );
-        setCurrentCircuit(circuitData);
+        setCurrentCircuit(finalCircuitData);
 
         // Update the project's updated_at time and canvas_settings in our local state
         // Include chat data in the canvas_settings for proper local state sync
@@ -373,22 +401,22 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
         delete canvasDataWithoutChat.chatData;
 
         // Import the canvas restoration function
-        const { loadCanvasFromData } = await import(
+        const { loadCanvasFromCircuit } = await import(
           "@/canvas/utils/canvasSerializer"
         );
 
-        await loadCanvasFromData(
-          canvas,
-          canvasDataWithoutChat,
-          (netlist: any) => {
-            // Restore netlist data by dispatching a custom event
-            window.dispatchEvent(
-              new CustomEvent("netlistRestored", {
-                detail: { netlist },
-              })
-            );
-          }
-        );
+        // Load circuit data to recreate components
+        if (currentCircuit) {
+          await loadCanvasFromCircuit(canvas, currentCircuit);
+        }
+
+        // Then apply any additional canvas layout data from canvasDataWithoutChat
+        if (canvasDataWithoutChat.viewportTransform) {
+          canvas.setViewportTransform(canvasDataWithoutChat.viewportTransform);
+        }
+        if (canvasDataWithoutChat.zoom) {
+          canvas.setZoom(canvasDataWithoutChat.zoom);
+        }
 
         // Restore chat data if available
         if (chatData) {

@@ -115,7 +115,25 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
               manufacturer: dbComponent.manufacturer,
               partNumber: dbComponent.part_number,
               category: dbComponent.category,
-              hasPins: dbComponent.pin_configuration?.pins?.length > 0,
+              hasPins: dbComponent.pin_configuration ? "checking..." : false,
+              pinConfigKeys:
+                typeof dbComponent.pin_configuration === "string"
+                  ? "JSON string"
+                  : Object.keys(dbComponent.pin_configuration || {}),
+              pinConfigType: typeof dbComponent.pin_configuration,
+              pinConfigSample:
+                typeof dbComponent.pin_configuration === "string"
+                  ? (() => {
+                      try {
+                        return (
+                          JSON.parse(dbComponent.pin_configuration).pins?.[0] ||
+                          "parse error"
+                        );
+                      } catch (e) {
+                        return "invalid json";
+                      }
+                    })()
+                  : dbComponent.pin_configuration?.pins?.[0] || "no pins",
             });
 
             // Merge database data with provided info
@@ -259,6 +277,10 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
                   visible: obj?.visible,
                   opacity: obj?.opacity,
                   hasEl: !!obj?.el,
+                  // Log the actual element attributes if available
+                  elementId: obj?.el?.id,
+                  elementClass: obj?.el?.className,
+                  elementTag: obj?.el?.tagName,
                 });
 
                 if (obj && obj.id === "pin") {
@@ -271,52 +293,72 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
                 }
               });
 
+              // BOTTOM BREAD: Original, invisible pin data (stores true location and database pin info)
+              let dbPins = [];
+              try {
+                const pinConfig =
+                  componentInfo.databaseComponent?.pin_configuration;
+                if (typeof pinConfig === "string") {
+                  const parsedConfig = JSON.parse(pinConfig);
+                  dbPins = parsedConfig.pins || [];
+                } else if (pinConfig && typeof pinConfig === "object") {
+                  dbPins = pinConfig.pins || [];
+                }
+                console.log(`🔍 Parsed pin configuration:`, {
+                  pinConfigType: typeof pinConfig,
+                  parsedPins: dbPins.length,
+                });
+              } catch (error) {
+                console.error(`❌ Error parsing pin configuration:`, error);
+                dbPins = [];
+              }
+
+              // PIN COORDINATE TRANSFORMATION: Convert KiCad mm coordinates to canvas px
+              // KiCad uses mm with Y flipped compared to canvas coordinates
+              const MM_TO_PX = 6; // Scale factor: 1mm = 10px (adjust as needed for symbol size)
+
+              const invisiblePinData = dbPins.map(
+                (dbPin: any, index: number) => {
+                  // Transform coordinates: scale mm→px, flip Y, store as relative to component center
+                  const pinX = dbPin.x * MM_TO_PX;
+                  const pinY = -dbPin.y * MM_TO_PX; // Flip Y coordinate
+
+                  return {
+                    originalX: pinX, // Store transformed coordinates
+                    originalY: pinY,
+                    pinId: `pin${dbPin.number}`,
+                    pinNumber: dbPin.number,
+                    pinName: dbPin.name || `Pin ${dbPin.number}`,
+                    electricalType: dbPin.electrical_type || "unknown",
+                    orientation: dbPin.orientation || 0,
+                  };
+                }
+              );
+
               console.log(
-                `🔌 Found ${pinsFromSVG.length} pins and ${symbolParts.length} symbol parts`
+                `🔌 Found ${pinsFromSVG.length} pins in SVG and ${invisiblePinData.length} pins in database`
               );
 
               // DEBUG: Log details about pins found
-              if (pinsFromSVG.length === 0) {
+              if (invisiblePinData.length === 0) {
                 console.log(
-                  "⚠️ WARNING: No pins found in SVG! This component won't be wireable."
+                  "⚠️ WARNING: No pins found in database! This component won't be wireable."
                 );
                 console.log(
-                  "⚠️ Check SVG content for pin elements with id='pin'"
+                  "⚠️ Check database component data for pin_configuration.pins"
                 );
               } else {
                 console.log(
-                  "✅ Found pins:",
-                  pinsFromSVG.map((pin, i) => ({
+                  "✅ Found pins in database:",
+                  invisiblePinData.map((pin: any, i: number) => ({
                     index: i,
-                    position: `(${pin.left}, ${pin.top})`,
-                    size: `${pin.width}x${pin.height}`,
+                    number: pin.pinNumber,
+                    name: pin.pinName,
+                    rawPosition: `(${dbPins[i].x}, ${dbPins[i].y})mm`, // Show original mm coordinates
+                    canvasPosition: `(${pin.originalX}, ${pin.originalY})px`, // Show transformed px coordinates
                   }))
                 );
               }
-
-              // PART 1: THE COMPONENT "SANDWICH" 🥪
-              // Creating a permanent, inseparable group with three layers
-
-              // BOTTOM BREAD: Original, invisible pin data (stores true location and database pin info)
-              const invisiblePinData = pinsFromSVG.map((pin, index) => {
-                // Try to get pin data from database component
-                const dbPins =
-                  componentInfo.databaseComponent?.pin_configuration?.pins ||
-                  [];
-                const dbPin =
-                  dbPins[index] ||
-                  dbPins.find((p: any) => p.number === (index + 1).toString());
-
-                return {
-                  originalX: pin.left! + (pin.width || 0) / 2,
-                  originalY: pin.top! + (pin.height || 0) / 2,
-                  pinId: `pin${index + 1}`,
-                  pinNumber: dbPin?.number || (index + 1).toString(),
-                  pinName: dbPin?.name || `Pin ${index + 1}`,
-                  electricalType: dbPin?.electrical_type || "unknown",
-                  orientation: dbPin?.orientation || 0,
-                };
-              });
 
               // THE FILLING: Main component symbol (the SVG shape)
               console.log(
@@ -382,7 +424,7 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
 
               // TOP BREAD: Visible, interactive pin circles (transparent green)
               console.log(
-                `🎯 DEBUG: Creating ${pinsFromSVG.length} interactive pins`
+                `🎯 DEBUG: Creating ${invisiblePinData.length} interactive pins from database`
               );
 
               // Generate a single component ID for all pins in this component
@@ -390,46 +432,52 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
                 .toString(36)
                 .substr(2, 9)}`;
 
-              const interactivePins = pinsFromSVG.map((pin, index) => {
-                console.log(
-                  `🎯 DEBUG: Creating pin ${index + 1} at (${pin.left}, ${
-                    pin.top
-                  })`
-                );
+              const interactivePins = invisiblePinData.map(
+                (pinInfo: any, index: number) => {
+                  console.log(
+                    `🎯 DEBUG: Creating pin ${index + 1} (${
+                      pinInfo.pinNumber
+                    }) at (${pinInfo.originalX}, ${
+                      pinInfo.originalY
+                    }) [transformed from mm to px]`
+                  );
 
-                const interactivePin = new fabric.Circle({
-                  radius: 4,
-                  fill: "rgba(0, 255, 0, 0.8)", // Bright green for visibility
-                  stroke: "#059669",
-                  strokeWidth: 1,
-                  left: pin.left! + (pin.width || 0) / 2,
-                  top: pin.top! + (pin.height || 0) / 2,
-                  originX: "center",
-                  originY: "center",
-                  // PART 3: PIN VISIBILITY RULE - Start hidden
-                  opacity: 0,
-                  visible: false,
-                });
+                  const interactivePin = new fabric.Circle({
+                    radius: 4,
+                    fill: "rgba(0, 255, 0, 0.8)", // Bright green for visibility
+                    stroke: "#059669",
+                    strokeWidth: 1,
+                    left: pinInfo.originalX,
+                    top: pinInfo.originalY,
+                    originX: "center",
+                    originY: "center",
+                    // PART 3: PIN VISIBILITY RULE - Start hidden
+                    opacity: 0,
+                    visible: false,
+                  });
 
-                console.log(`🎯 DEBUG: Pin ${index + 1} created successfully`);
+                  console.log(
+                    `🎯 DEBUG: Pin ${index + 1} created successfully`
+                  );
 
-                // Add the pin metadata that the wiring tool expects
-                const pinData = invisiblePinData[index];
-                interactivePin.set("pin", true);
-                interactivePin.set("pinData", pinData);
-                interactivePin.set("componentId", componentId);
-                interactivePin.set("data", {
-                  type: "pin",
-                  componentId: componentId,
-                  pinId: pinData.pinId,
-                  pinNumber: pinData.pinNumber,
-                  pinName: pinData.pinName,
-                  electricalType: pinData.electricalType,
-                  isConnectable: true,
-                });
+                  // Add the pin metadata that the wiring tool expects
+                  const pinData = pinInfo;
+                  interactivePin.set("pin", true);
+                  interactivePin.set("pinData", pinData);
+                  interactivePin.set("componentId", componentId);
+                  interactivePin.set("data", {
+                    type: "pin",
+                    componentId: componentId,
+                    pinId: pinData.pinId,
+                    pinNumber: pinData.pinNumber,
+                    pinName: pinData.pinName,
+                    electricalType: pinData.electricalType,
+                    isConnectable: true,
+                  });
 
-                return interactivePin;
-              });
+                  return interactivePin;
+                }
+              );
 
               // THE GOLDEN RULE: Lock all three layers together into ONE inseparable group
               // This is the COMPONENT SANDWICH - it moves as one unit forever
@@ -529,7 +577,9 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
                 componentId: componentId,
                 componentType: componentInfo.type,
                 componentName: componentInfo.name,
-                pins: interactivePins.map((_, index) => `pin${index + 1}`),
+                pins: interactivePins.map(
+                  (_: any, index: number) => `pin${index + 1}`
+                ),
                 isComponentSandwich: true, // Mark this as a proper sandwich
               });
 
@@ -539,7 +589,7 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
                 pinCount: interactivePins.length,
                 isComponentSandwich: true,
                 hasInvisiblePinData: !!invisiblePinData,
-                pins: interactivePins.map((pin, i) => ({
+                pins: interactivePins.map((pin: any, i: number) => ({
                   index: i,
                   hasPinProperty: !!(pin as any).pin,
                   visible: pin.visible,

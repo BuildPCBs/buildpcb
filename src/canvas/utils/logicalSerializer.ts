@@ -232,9 +232,15 @@ export async function loadProjectToCanvas(
   } else if (projectData.objects || projectData.canvasData) {
     // Old vector format - use traditional loader
     console.log("📋 Detected vector format, using traditional loader");
-    const { loadCanvasFromData } = await import("./canvasSerializer");
-    await loadCanvasFromData(canvas, projectData.canvasData || projectData);
-  } else {
+    // For old vector format, use Fabric.js built-in loader
+    if (canvas && (projectData.canvasData || projectData)) {
+      await new Promise<void>((resolve) => {
+        canvas.loadFromJSON(projectData.canvasData || projectData, () => {
+          console.log("✅ Loaded canvas from vector data");
+          resolve();
+        });
+      });
+    }
     console.warn("⚠️ Unknown project format");
   }
 

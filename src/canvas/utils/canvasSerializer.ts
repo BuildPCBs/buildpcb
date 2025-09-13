@@ -1,23 +1,9 @@
 import * as fabric from "fabric";
-import { Circuit, Connection } from "@/types";
-
-// Simplified component format for canvas serialization
-interface CanvasComponent {
-  id: string;
-  name: string;
-  type: string;
-  category: string;
-  specifications: Record<string, any>;
-  availability: "in-stock" | "out-of-stock" | "discontinued";
-  position: { x: number; y: number };
-  rotation: number;
-  properties: Record<string, any>;
-  pins: any[];
-  databaseComponent?: any; // Full database component metadata
-}
+import { Circuit, ConnectionModel } from "@/lib/schemas/circuit";
+import { canvasCommandManager } from "../canvas-command-manager";
 
 /**
- * Serialize Fabric.js canvas to Circuit format
+ * Serialize Fabric.js canvas to Circuit format with proper component handling
  */
 export function serializeCanvasToCircuit(
   canvas: fabric.Canvas | null
@@ -26,48 +12,67 @@ export function serializeCanvasToCircuit(
 
   const objects = canvas.getObjects();
 
-  // Extract components from canvas objects
-  const components: CanvasComponent[] = objects
-    .filter((obj) => obj.type !== "line" && obj.type !== "path") // Exclude wires
-    .map((obj, index) => {
-      // Get component metadata from fabric object
-      const componentData =
-        (obj as any).data || (obj as any).componentData || {};
+  // Separate components from other objects (wires, etc.)
+  const componentGroups: fabric.Group[] = [];
+  const otherObjects: fabric.Object[] = [];
 
-      // Get database component metadata if available
-      const dbMetadata =
-        (obj as any).componentMetadata || (obj as any).databaseComponent;
+  objects.forEach((obj) => {
+    // Check if this is a component sandwich (has component metadata)
+    const objData = (obj as any).data;
+    if (
+      objData &&
+      objData.type === "component" &&
+      objData.isComponentSandwich
+    ) {
+      componentGroups.push(obj as fabric.Group);
+    } else {
+      otherObjects.push(obj);
+    }
+  });
 
-      return {
-        id: dbMetadata?.id || componentData.id || `comp_${index}`,
-        name:
-          dbMetadata?.name ||
-          componentData.componentName ||
-          componentData.name ||
-          `Component ${index + 1}`,
-        type:
-          dbMetadata?.type ||
-          componentData.componentType ||
-          componentData.type ||
-          "unknown",
+  // Extract components from component groups and map to ComponentModel format
+  const components: any[] = componentGroups.map((group, index) => {
+    const componentData = (group as any).data || {};
+    const dbMetadata =
+      (group as any).componentMetadata || (group as any).databaseComponent;
+
+    return {
+      id: dbMetadata?.id || componentData.id || `comp_${index}`,
+      type:
+        dbMetadata?.type ||
+        componentData.componentType ||
+        componentData.type ||
+        "unknown",
+      value:
+        dbMetadata?.name ||
+        componentData.componentName ||
+        componentData.name ||
+        `Component ${index + 1}`,
+      position: {
+        x: group.left || 0,
+        y: group.top || 0,
+      },
+      explanation:
+        dbMetadata?.description ||
+        componentData.description ||
+        "Component added to circuit",
+      datasheet: dbMetadata?.datasheet,
+      // Store additional metadata for recreation
+      metadata: {
         category: dbMetadata?.category || componentData.category || "general",
         specifications:
           dbMetadata?.specifications || componentData.specifications || {},
-        availability: componentData.availability || ("in-stock" as const),
-        position: {
-          x: obj.left || 0,
-          y: obj.top || 0,
-        },
-        rotation: obj.angle || 0,
+        availability: componentData.availability || "in-stock",
         properties: componentData.properties || {},
         pins: dbMetadata?.pinConfiguration?.pins || componentData.pins || [],
-        // Include full database metadata for proper restoration
         databaseComponent: dbMetadata,
-      };
-    });
+        rotation: group.angle || 0,
+      },
+    };
+  });
 
-  // Extract connections from canvas objects (wires)
-  const connections: Connection[] = objects
+  // Extract connections from other objects (wires)
+  const connections: ConnectionModel[] = otherObjects
     .filter(
       (obj) =>
         obj.type === "line" || obj.type === "path" || obj.type === "polyline"
@@ -78,7 +83,6 @@ export function serializeCanvasToCircuit(
       const wireData = wireObj.wireData || wireObj;
 
       return {
-        id: wireData.id || wireObj.id || `conn_${index}`,
         from: wireData.from || {
           componentId: wireObj.startComponentId || "",
           pin:
@@ -93,29 +97,13 @@ export function serializeCanvasToCircuit(
               ? wireObj.endPinIndex.toString()
               : "",
         },
-        type: wireData.type || ("wire" as const),
-        properties: wireData.properties || {},
       };
     });
 
   return {
-    components: components as any, // Type assertion for database compatibility
+    mode: "full" as const,
+    components: components as any,
     connections,
-    layout: {
-      layers: [],
-      dimensions: {
-        width: canvas.getWidth(),
-        height: canvas.getHeight(),
-      },
-      grid: { size: 10, visible: true },
-      zoom: canvas.getZoom(),
-      viewBox: {
-        x: 0,
-        y: 0,
-        width: canvas.getWidth(),
-        height: canvas.getHeight(),
-      },
-    },
   };
 }
 
@@ -158,412 +146,122 @@ export function serializeCanvasData(
           startComponent: fabricObj.startComponent,
           endComponent: fabricObj.endComponent,
 
-          // Electrical net information
+          // Wire properties
           netId: fabricObj.netId,
+          wireData: fabricObj.wireData,
+          properties: fabricObj.properties || {},
 
-          // Junction information
-          endsAtJunction: fabricObj.endsAtJunction,
-          junctionWire: fabricObj.junctionWire,
-          junctionPoint: fabricObj.junctionPoint,
-          junctionDot: fabricObj.junctionDot,
-          connectedWires: fabricObj.connectedWires,
-          junctionDots: fabricObj.junctionDots,
-
-          // Wire editing properties
-          isWireEndpoint: fabricObj.isWireEndpoint,
+          // Vertex information for complex wires
           isWireVertex: fabricObj.isWireVertex,
           vertexIndex: fabricObj.vertexIndex,
-
-          // Original object index for restoration
-          objectIndex: index,
         };
-
-        console.log(`🔌 Preserving electrical metadata for wire ${index}:`, {
-          wireType: fabricObj.wireType,
-          netId: fabricObj.netId,
-          startComponentId: fabricObj.startComponentId,
-          endComponentId: fabricObj.endComponentId,
-        });
       }
 
-      // Also preserve component metadata and pin information
-      if (fabricObj.componentType) {
+      // Preserve component metadata
+      if (fabricObj.data && fabricObj.data.type === "component") {
         electricalMetadata[`component_${index}`] = {
           componentType: fabricObj.componentType,
           id: fabricObj.id,
           data: fabricObj.data,
+          pins: fabricObj.data.pins || [],
           objectIndex: index,
         };
-
-        // If this is a group component, preserve pin information
-        if (fabricObj.type === "group") {
-          const groupObjects = (fabricObj as fabric.Group).getObjects();
-          const pinInfo: any[] = [];
-
-          groupObjects.forEach((groupObj: any, groupIndex: number) => {
-            if (
-              groupObj.pin ||
-              (groupObj.data && groupObj.data.type === "pin")
-            ) {
-              pinInfo.push({
-                pinId: groupObj.data?.pinId || `pin_${groupIndex}`,
-                pin: groupObj.pin,
-                data: groupObj.data,
-                type: groupObj.type,
-                radius: groupObj.radius,
-                fill: groupObj.fill,
-                stroke: groupObj.stroke,
-                strokeWidth: groupObj.strokeWidth,
-                left: groupObj.left,
-                top: groupObj.top,
-                originX: groupObj.originX,
-                originY: groupObj.originY,
-              });
-            }
-          });
-
-          if (pinInfo.length > 0) {
-            electricalMetadata[`component_${index}`].pins = pinInfo;
-            console.log(
-              `🔌 Preserving ${pinInfo.length} pins for component ${fabricObj.componentType}:`,
-              pinInfo.map((p) => p.pinId)
-            );
-          }
-        }
       }
     });
 
-    return {
+    // Add electrical metadata to canvas data
+    const extendedCanvasData = {
       ...canvasData,
-      viewport: {
-        zoom: canvas.getZoom(),
-        transform: canvas.viewportTransform,
-      },
       electricalMetadata,
       netlist: netlist || null,
-      timestamp: new Date().toISOString(),
     };
+
+    console.log("💾 Canvas data serialized with electrical metadata:", {
+      objectCount: canvas.getObjects().length,
+      electricalMetadataCount: Object.keys(electricalMetadata).length,
+      hasNetlist: !!netlist,
+    });
+
+    return extendedCanvasData;
   } catch (error) {
-    console.error("Failed to serialize canvas:", error);
+    console.error("❌ Failed to serialize canvas data:", error);
     return {};
   }
 }
 
 /**
- * Restore Fabric.js canvas from raw canvas data with electrical metadata restoration
+ * Load canvas from circuit data by recreating components using the component handler
  */
-export function loadCanvasFromData(
+export async function loadCanvasFromCircuit(
   canvas: fabric.Canvas,
-  canvasData: Record<string, any>,
-  onNetlistRestored?: (netlist: any) => void
+  circuit: Partial<Circuit>
 ): Promise<void> {
   return new Promise(async (resolve, reject) => {
     try {
-      console.log("🔄 Loading canvas from data:", {
-        objectCount: canvasData.objects?.length || 0,
-        hasViewport: !!canvasData.viewportTransform,
-        zoom: canvasData.zoom,
-        hasElectricalMetadata: !!canvasData.electricalMetadata,
+      console.log("🔄 Loading canvas from circuit data:", {
+        componentCount: circuit.components?.length || 0,
+        connectionCount: circuit.connections?.length || 0,
       });
 
-      canvas.loadFromJSON(canvasData, async () => {
+      // Clear existing canvas
+      canvas.clear();
+
+      // Note: Layout information (dimensions, zoom) should be loaded from canvasData separately
+
+      // Recreate components using the component handler
+      if (circuit.components && circuit.components.length > 0) {
         console.log(
-          "📊 Canvas loaded, objects on canvas:",
-          canvas.getObjects().length
+          `��️ Recreating ${circuit.components.length} components...`
         );
 
-        // Restore electrical metadata for wires and components
-        if (canvasData.electricalMetadata) {
-          const objects = canvas.getObjects();
-
-          for (const [key, metadata] of Object.entries(
-            canvasData.electricalMetadata
-          ) as [string, any][]) {
-            if (
-              metadata.objectIndex !== undefined &&
-              objects[metadata.objectIndex]
-            ) {
-              const obj = objects[metadata.objectIndex] as any;
-
-              // Restore wire electrical properties
-              if (key.startsWith("wire_")) {
-                console.log(
-                  `🔌 Restoring electrical metadata for wire at index ${metadata.objectIndex}`
-                );
-
-                // Core wire identification
-                obj.wireType = metadata.wireType;
-                obj.id = metadata.id;
-
-                // Pin connections
-                obj.startPin = metadata.startPin;
-                obj.endPin = metadata.endPin;
-                obj.startComponentId = metadata.startComponentId;
-                obj.endComponentId = metadata.endComponentId;
-                obj.startPinIndex = metadata.startPinIndex;
-                obj.endPinIndex = metadata.endPinIndex;
-                obj.startComponent = metadata.startComponent;
-                obj.endComponent = metadata.endComponent;
-
-                // Electrical net information
-                obj.netId = metadata.netId;
-
-                // Junction information
-                obj.endsAtJunction = metadata.endsAtJunction;
-                obj.junctionWire = metadata.junctionWire;
-                obj.junctionPoint = metadata.junctionPoint;
-                obj.junctionDot = metadata.junctionDot;
-                obj.connectedWires = metadata.connectedWires;
-                obj.junctionDots = metadata.junctionDots;
-
-                // Wire editing properties
-                obj.isWireEndpoint = metadata.isWireEndpoint;
-                obj.isWireVertex = metadata.isWireVertex;
-                obj.vertexIndex = metadata.vertexIndex;
-
-                // Ensure wire is selectable and interactive
-                obj.selectable = true;
-                obj.evented = true;
-                obj.lockMovementX = true;
-                obj.lockMovementY = true;
-                obj.lockRotation = true;
-                obj.lockScalingX = true;
-                obj.lockScalingY = true;
-                obj.hasControls = false;
-                obj.hasBorders = true;
-
-                console.log(`✅ Wire electrical properties restored:`, {
-                  wireType: obj.wireType,
-                  netId: obj.netId,
-                  startComponentId: obj.startComponentId,
-                  endComponentId: obj.endComponentId,
-                });
-              }
-
-              // Restore component metadata
-              if (key.startsWith("component_")) {
-                obj.componentType = metadata.componentType;
-                obj.id = metadata.id;
-                obj.data = metadata.data;
-
-                // Ensure component is selectable and interactive
-                obj.selectable = true;
-                obj.evented = true;
-                obj.lockUniScaling = true;
-                obj.hasControls = true;
-                obj.hasBorders = true;
-                obj.centeredRotation = true;
-
-                // Restore pin properties if they were preserved
-                if (metadata.pins && obj.type === "group") {
-                  const groupObjects = (obj as fabric.Group).getObjects();
-
-                  metadata.pins.forEach((pinData: any) => {
-                    // Find the pin by pinId instead of index
-                    const pinObj = groupObjects.find(
-                      (groupObj: any) =>
-                        groupObj.data && groupObj.data.pinId === pinData.pinId
-                    ) as any;
-
-                    if (pinObj) {
-                      pinObj.pin = pinData.pin;
-                      pinObj.data = pinData.data;
-                      console.log(
-                        `✅ Restored pin properties for pin ${pinData.pinId}`
-                      );
-                    } else {
-                      console.warn(
-                        `⚠️ Could not find pin with ID ${pinData.pinId} in component ${obj.componentType}`
-                      );
-                    }
-                  });
-
-                  console.log(
-                    `✅ Restored ${metadata.pins.length} pins for component ${obj.componentType}`
-                  );
-                }
-
-                // Check if this component needs pin recreation (fallback)
-                if (obj.type === "group" && obj.componentType) {
-                  console.log(
-                    `🔌 Checking pins for component ${obj.componentType} at index ${metadata.objectIndex}`
-                  );
-
-                  // Check if the component has pins
-                  const groupObjects = (obj as fabric.Group).getObjects();
-                  const hasPins = groupObjects.some(
-                    (groupObj: any) =>
-                      groupObj.pin ||
-                      (groupObj.data && groupObj.data.type === "pin")
-                  );
-
-                  if (!hasPins) {
-                    console.log(
-                      `⚠️ Component ${obj.componentType} missing pins, attempting recreation`
-                    );
-
-                    // Try to recreate pins for this component
-                    try {
-                      // Import the SVG component factory dynamically
-                      const { recreateComponentPins } = await import(
-                        "../SVGComponentFactory"
-                      );
-                      const recreatedComponent = recreateComponentPins(
-                        obj as fabric.Group,
-                        canvas
-                      );
-
-                      if (recreatedComponent && recreatedComponent !== obj) {
-                        // Replace the old component with the recreated one
-                        const index = canvas.getObjects().indexOf(obj);
-                        if (index !== -1) {
-                          canvas.remove(obj);
-                          canvas.add(recreatedComponent);
-                          console.log(
-                            `✅ Successfully recreated pins for component ${obj.componentType}`
-                          );
-                        }
-                      }
-                    } catch (error) {
-                      console.error(
-                        `❌ Failed to recreate pins for component ${obj.componentType}:`,
-                        error
-                      );
-                    }
-                  } else {
-                    console.log(
-                      `✅ Component ${obj.componentType} already has pins`
-                    );
-                  }
-                }
-              }
-            }
-          }
-
-          console.log(
-            `🔌 Electrical metadata restoration completed for ${
-              Object.keys(canvasData.electricalMetadata).length
-            } objects`
-          );
-        } // Preserve the grid background if it was set
-        const currentBg = canvas.backgroundColor;
-        if (!currentBg || typeof currentBg === "string") {
-          // Create and apply grid pattern if background is not already a pattern
-          const patternCanvas = document.createElement("canvas");
-          const patternCtx = patternCanvas.getContext("2d");
-          if (patternCtx) {
-            patternCanvas.width = 10;
-            patternCanvas.height = 10;
-            patternCtx.strokeStyle = "#CCCCCC";
-            patternCtx.lineWidth = 1;
-            patternCtx.beginPath();
-            patternCtx.moveTo(10, 0);
-            patternCtx.lineTo(10, 10);
-            patternCtx.moveTo(0, 10);
-            patternCtx.lineTo(10, 10);
-            patternCtx.stroke();
-
-            const gridPattern = new fabric.Pattern({
-              source: patternCanvas,
-              repeat: "repeat",
-            });
-            canvas.backgroundColor = gridPattern;
-          }
-        }
-
-        // Restore viewport settings
-        if (canvasData.viewport) {
-          if (canvasData.viewport.zoom) {
-            canvas.setZoom(canvasData.viewport.zoom);
-          }
-          if (canvasData.viewport.transform) {
-            canvas.setViewportTransform(canvasData.viewport.transform);
-          }
-        } else if (canvasData.viewportTransform) {
-          canvas.setViewportTransform(canvasData.viewportTransform);
-        }
-        if (canvasData.zoom) {
-          canvas.setZoom(canvasData.zoom);
-        }
-
-        canvas.renderAll();
-        console.log("✅ Canvas restoration completed with electrical metadata");
-
-        // Restore netlist data if available
-        if (canvasData.netlist && onNetlistRestored) {
-          console.log("🔗 Restoring netlist data:", {
-            netCount: canvasData.netlist.nets?.length || 0,
-            totalConnections:
-              canvasData.netlist.nets?.reduce(
-                (sum: number, net: any) => sum + (net.connections?.length || 0),
-                0
-              ) || 0,
-          });
-          onNetlistRestored(canvasData.netlist);
-        }
-
-        // Trigger pin visibility update after restoration
-        // This ensures pins are properly shown/hidden based on current wiring tool state
-        setTimeout(() => {
-          const objects = canvas.getObjects();
-          let pinCount = 0;
-
-          objects.forEach((obj) => {
-            // Handle new Component Sandwich architecture
-            if (
-              (obj as any).data?.isComponentSandwich &&
-              obj.type === "group"
-            ) {
-              const componentSandwich = obj as fabric.Group;
-              const sandwichLayers = componentSandwich.getObjects();
-
-              sandwichLayers.forEach((layer) => {
-                if ((layer as any).pin && layer.type === "circle") {
-                  pinCount++;
-                  // Set default pin visibility (will be overridden by wiring tool if active)
-                  layer.set({
-                    opacity: 0.8, // Default visible state
-                    strokeWidth: 1,
-                    fill: "#10B981", // Default green
-                    stroke: "#059669",
-                    visible: true,
-                  });
-                }
-              });
-            }
-
-            // Legacy support for old component structure
-            else if ((obj as any).componentType && obj.type === "group") {
-              const group = obj as fabric.Group;
-              const groupObjects = group.getObjects();
-
-              groupObjects.forEach((groupObj) => {
-                if ((groupObj as any).pin) {
-                  pinCount++;
-                  groupObj.set({
-                    opacity: 0.8,
-                    strokeWidth: 1,
-                    fill: "#10B981",
-                    stroke: "#059669",
-                    visible: true,
-                  });
-                }
-              });
-            }
-          });
-
-          if (pinCount > 0) {
-            canvas.renderAll();
+        for (const component of circuit.components as any[]) {
+          try {
             console.log(
-              `✅ PIN RESTORATION: Made ${pinCount} pins visible after canvas load`
+              `🎯 Recreating component: ${component.value} at (${component.position.x}, ${component.position.y})`
+            );
+
+            // Use the canvas command manager to add the component
+            // This will trigger the proper component creation with pins
+            canvasCommandManager.executeCommand("component:add", {
+              id: component.id,
+              type: component.type,
+              name: component.value, // Use value as name
+              category: component.metadata?.category || "general",
+              svgPath: component.metadata?.databaseComponent?.symbol_svg
+                ? `data:image/svg+xml;base64,${btoa(
+                    component.metadata.databaseComponent.symbol_svg
+                  )}`
+                : "", // We'll need to fetch this from database
+              databaseComponent: component.metadata?.databaseComponent,
+              x: component.position.x,
+              y: component.position.y,
+              rotation: component.metadata?.rotation || 0,
+            });
+
+            // Wait a bit for component creation to complete
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          } catch (error) {
+            console.error(
+              `❌ Failed to recreate component ${component.value}:`,
+              error
             );
           }
-        }, 100); // Small delay to ensure everything is settled
+        }
+      }
 
-        resolve();
-      });
+      // TODO: Recreate connections/wires
+      if (circuit.connections && circuit.connections.length > 0) {
+        console.log(
+          `🔗 Would recreate ${circuit.connections.length} connections...`
+        );
+        // This will need to be implemented once wire recreation is working
+      }
+
+      console.log("✅ Canvas loaded from circuit data");
+      canvas.renderAll();
+      resolve();
     } catch (error) {
-      console.error("❌ Failed to load canvas from data:", error);
+      console.error("❌ Failed to load canvas from circuit:", error);
       reject(error);
     }
   });
