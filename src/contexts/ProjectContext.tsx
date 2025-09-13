@@ -124,14 +124,12 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
         setCurrentCircuit(circuit);
 
         // Store canvas data for later restoration (when canvas is ready)
-        // Prioritize latest version data (which has the most recent chat data)
-        const canvasData =
-          latestVersion?.canvas_data || project.canvas_settings;
+        // ALWAYS prioritize latest version data over project settings
+        const canvasData = latestVersion?.canvas_data;
 
         console.log("🔄 Canvas data selection:", {
           usingLatestVersion: !!latestVersion?.canvas_data,
-          usingProjectSettings:
-            !latestVersion?.canvas_data && !!project.canvas_settings,
+          hasProjectSettings: !!project.canvas_settings,
           finalCanvasDataKeys: canvasData ? Object.keys(canvasData) : [],
           hasChatData: !!canvasData?.chatData,
           chatMessageCount: canvasData?.chatData?.messages?.length || 0,
@@ -223,9 +221,8 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
 
       setCurrentCircuit(circuit);
 
-      // Load canvas data with chat data - prioritize latest version
-      const canvasData =
-        latestVersion?.canvas_data || result.project.canvas_settings;
+      // Load canvas data - ALWAYS prioritize latest version data
+      const canvasData = latestVersion?.canvas_data;
 
       console.log("🔄 Loading canvas data for project:", {
         projectName: result.project.name,
@@ -244,6 +241,7 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
         finalHasChatData: !!canvasData?.chatData,
       });
 
+      // Only update project canvas_settings if we have latest version data
       if (canvasData) {
         setCurrentProject((prev) =>
           prev
