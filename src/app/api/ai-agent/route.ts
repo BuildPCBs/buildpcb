@@ -273,7 +273,7 @@ IMPORTANT: Your response must be PURE JSON with no additional text, markdown, or
       try {
         completion = await openai.chat.completions.create(
           {
-            model: "gpt-4o",
+            model: "gpt-5",
             messages,
             stream: true, // Enable streaming
             response_format: { type: "json_object" },
@@ -283,11 +283,11 @@ IMPORTANT: Your response must be PURE JSON with no additional text, markdown, or
           }
         );
       } catch (modelError) {
-        console.warn("⚠️ gpt-4o failed, trying gpt-3.5-turbo...");
-        // Fallback to gpt-3.5-turbo if gpt-4o fails
+        console.warn("⚠️ gpt-5 failed, trying gpt-5...");
+
         completion = await openai.chat.completions.create(
           {
-            model: "gpt-3.5-turbo",
+            model: "gpt-5",
             messages,
             stream: true, // Enable streaming for fallback too
             response_format: { type: "json_object" },
@@ -447,7 +447,7 @@ export async function GET() {
       });
 
       const testResponse = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: "gpt-5",
         messages: [{ role: "user", content: "Hello" }],
         max_tokens: 5,
       });
@@ -464,7 +464,7 @@ export async function GET() {
         version: "1.0",
         test: {
           timestamp: new Date().toISOString(),
-          model: "gpt-3.5-turbo",
+          model: "gpt-5",
           response: testResponse.choices[0]?.message?.content || "No response",
         },
       });
