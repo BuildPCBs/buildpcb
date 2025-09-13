@@ -20,11 +20,17 @@ export function IDECanvas() {
   // Canvas state for the provider
   const [canvas, setCanvas] = useState<any>(null);
   const [isCanvasReady, setIsCanvasReady] = useState(false);
+  const [getNetlist, setGetNetlist] = useState<(() => any) | null>(null);
 
   const handleCanvasReady = (fabricCanvas: any) => {
     console.log("🎨 Canvas is ready!", fabricCanvas);
     setCanvas(fabricCanvas);
     setIsCanvasReady(true);
+  };
+
+  const handleNetlistReady = (getNetlistFn: () => any) => {
+    console.log("🔗 Netlist access ready");
+    setGetNetlist(() => getNetlistFn);
   };
 
   return (
@@ -45,6 +51,7 @@ export function IDECanvas() {
               <IDEFabricCanvas
                 className="w-full h-full"
                 onCanvasReady={handleCanvasReady}
+                onNetlistReady={handleNetlistReady}
               />
             </div>
 
@@ -52,7 +59,7 @@ export function IDECanvas() {
             <SchemaPanel />
 
             {/* Top Toolbar positioned absolutely on top of canvas */}
-            <TopToolbar />
+            <TopToolbar getNetlist={getNetlist} />
 
             {/* AI Chat Interface - positioned above PromptEntry */}
             <div

@@ -17,9 +17,10 @@ import { useAIChat } from "@/contexts/AIChatContext";
 
 interface TopToolbarProps {
   className?: string;
+  getNetlist?: (() => any) | null;
 }
 
-export function TopToolbar({ className = "" }: TopToolbarProps) {
+export function TopToolbar({ className = "", getNetlist }: TopToolbarProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [showAnalyticsPanel, setShowAnalyticsPanel] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -92,7 +93,8 @@ export function TopToolbar({ className = "" }: TopToolbarProps) {
       const { serializeCanvasData } = await import(
         "@/canvas/utils/canvasSerializer"
       );
-      const canvasData = serializeCanvasData(canvas);
+      const netlistData = getNetlist ? getNetlist() : null;
+      const canvasData = serializeCanvasData(canvas, netlistData);
 
       // Get circuit data - use current circuit or create empty one
       const circuitData: Circuit = currentCircuit || {

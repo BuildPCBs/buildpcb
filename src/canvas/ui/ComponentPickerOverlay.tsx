@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import { SearchIcon } from "@/components/icons";
 import {
   useDatabaseComponents,
@@ -259,18 +265,31 @@ export function ComponentPickerOverlay({
     loadMore,
   } = useDatabaseComponents();
 
-  const filteredComponents = searchQuery.trim()
-    ? searchComponents(searchQuery)
-    : databaseComponents;
+  const filteredComponents = useMemo(() => {
+    return searchQuery.trim()
+      ? searchComponents(searchQuery)
+      : databaseComponents;
+  }, [searchQuery, databaseComponents, searchComponents]);
 
-  console.log("🎯 ComponentPickerOverlay state:", {
-    databaseComponentsCount: databaseComponents.length,
+  // Debug logging - only in development
+  useEffect(() => {
+    if (process.env.NODE_ENV === "development") {
+      console.log("🎯 ComponentPickerOverlay state:", {
+        databaseComponentsCount: databaseComponents.length,
+        componentsLoading,
+        componentsError,
+        hasMore,
+        searchQuery,
+        filteredComponentsCount: filteredComponents.length,
+      });
+    }
+  }, [
+    databaseComponents.length,
     componentsLoading,
     componentsError,
     hasMore,
     searchQuery,
-    filteredComponentsCount: filteredComponents.length,
-  });
+  ]);
 
   useEffect(() => {
     setSelectedIndex(0);

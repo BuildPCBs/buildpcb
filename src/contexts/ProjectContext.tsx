@@ -377,7 +377,18 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
           "@/canvas/utils/canvasSerializer"
         );
 
-        await loadCanvasFromData(canvas, canvasDataWithoutChat);
+        await loadCanvasFromData(
+          canvas,
+          canvasDataWithoutChat,
+          (netlist: any) => {
+            // Restore netlist data by dispatching a custom event
+            window.dispatchEvent(
+              new CustomEvent("netlistRestored", {
+                detail: { netlist },
+              })
+            );
+          }
+        );
 
         // Restore chat data if available
         if (chatData) {

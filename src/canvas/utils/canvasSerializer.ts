@@ -123,7 +123,8 @@ export function serializeCanvasToCircuit(
  * Serialize Fabric.js canvas to raw canvas data format with electrical metadata preservation
  */
 export function serializeCanvasData(
-  canvas: fabric.Canvas | null
+  canvas: fabric.Canvas | null,
+  netlist?: any
 ): Record<string, any> {
   if (!canvas) return {};
 
@@ -239,6 +240,7 @@ export function serializeCanvasData(
         transform: canvas.viewportTransform,
       },
       electricalMetadata,
+      netlist: netlist || null,
       timestamp: new Date().toISOString(),
     };
   } catch (error) {
@@ -252,7 +254,8 @@ export function serializeCanvasData(
  */
 export function loadCanvasFromData(
   canvas: fabric.Canvas,
-  canvasData: Record<string, any>
+  canvasData: Record<string, any>,
+  onNetlistRestored?: (netlist: any) => void
 ): Promise<void> {
   return new Promise(async (resolve, reject) => {
     try {
@@ -485,6 +488,19 @@ export function loadCanvasFromData(
 
         canvas.renderAll();
         console.log("✅ Canvas restoration completed with electrical metadata");
+
+        // Restore netlist data if available
+        if (canvasData.netlist && onNetlistRestored) {
+          console.log("🔗 Restoring netlist data:", {
+            netCount: canvasData.netlist.nets?.length || 0,
+            totalConnections:
+              canvasData.netlist.nets?.reduce(
+                (sum: number, net: any) => sum + (net.connections?.length || 0),
+                0
+              ) || 0,
+          });
+          onNetlistRestored(canvasData.netlist);
+        }
 
         // Trigger pin visibility update after restoration
         // This ensures pins are properly shown/hidden based on current wiring tool state
