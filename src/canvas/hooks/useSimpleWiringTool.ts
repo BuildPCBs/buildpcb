@@ -1,6 +1,26 @@
 /**
  * Simple Wiring Tool - Works with Database Pin Data
- * A clean, straightforward implementation for connecting component pins
+ * A clean, straightforward           if (data && data.type === "pin") {
+            console.log(
+              `🔍 Found pin: ${pinData.pinNumber} of component ${pinData.componentId}`
+            );
+            // Get the pin's center point, transforming if it's inside a group
+            let pinCenter = obj.getCenterPoint();
+            if (groupTransform) {
+              pinCenter = fabric.util.transformPoint(pinCenter, groupTransform);
+            }
+
+            console.log(`🔍 Pin local center: (${obj.getCenterPoint().x.toFixed(1)}, ${obj.getCenterPoint().y.toFixed(1)})`);
+            console.log(`🔍 Pin transformed center: (${pinCenter.x.toFixed(1)}, ${pinCenter.y.toFixed(1)})`);
+            console.log(`🔍 Mouse point: (${point.x.toFixed(1)}, ${point.y.toFixed(1)})`);
+
+            // Check if mouse is within pin bounds (simple circle collision)
+            const distance = Math.sqrt(
+              Math.pow(point.x - pinCenter.x, 2) +
+                Math.pow(point.y - pinCenter.y, 2)
+            );
+
+            console.log(`🔍 Distance: ${distance.toFixed(2)}px (threshold: 6px)`);for connecting component pins
  * Integrated with netlist management for electrical connectivity tracking
  */
 
@@ -217,6 +237,7 @@ export function useSimpleWiringTool({
             }`
           : "none"
       );
+      console.log("🔗 Total objects on canvas:", canvas.getObjects().length);
 
       if (clickedPin) {
         const pinData = (clickedPin as any).data;
@@ -435,6 +456,20 @@ export function useSimpleWiringTool({
 
           if (data && data.type === "pin") {
             console.log(`${indent}✅ Found pin! Setting visible...`);
+            console.log(
+              `${indent}📍 Pin position: left=${obj.left}, top=${obj.top}`
+            );
+            console.log(`${indent}📍 Pin center:`, obj.getCenterPoint());
+            if (obj.group) {
+              console.log(
+                `${indent}📍 Pin is in group, group position: left=${obj.group.left}, top=${obj.group.top}`
+              );
+              const transformedCenter = fabric.util.transformPoint(
+                obj.getCenterPoint(),
+                obj.group.calcTransformMatrix()
+              );
+              console.log(`${indent}📍 Transformed center:`, transformedCenter);
+            }
             obj.set({
               visible: true,
               opacity: 1,

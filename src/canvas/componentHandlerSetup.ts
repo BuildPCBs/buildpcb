@@ -315,7 +315,7 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
 
               // PIN COORDINATE TRANSFORMATION: Convert KiCad mm coordinates to canvas px
               // KiCad uses mm with Y flipped compared to canvas coordinates
-              const MM_TO_PX = 6; // Scale factor: 1mm = 10px (adjust as needed for symbol size)
+              const MM_TO_PX = 3.78; // 96 DPI / 25.4 mm per inch ≈ 3.78 px per mm
 
               const invisiblePinData = dbPins.map(
                 (dbPin: any, index: number) => {
@@ -334,7 +334,6 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
                   };
                 }
               );
-
               console.log(
                 `🔌 Found ${pinsFromSVG.length} pins in SVG and ${invisiblePinData.length} pins in database`
               );
@@ -382,11 +381,22 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
               console.log(
                 `🎯 DEBUG: SVG Symbol created with ${symbolParts.length} parts`
               );
+              const svgBounds = svgSymbol.getBoundingRect();
+              console.log(`🎯 DEBUG: SVG Symbol bounds:`, {
+                left: svgBounds.left,
+                top: svgBounds.top,
+                width: svgBounds.width,
+                height: svgBounds.height,
+                centerX: svgBounds.left + svgBounds.width / 2,
+                centerY: svgBounds.top + svgBounds.height / 2,
+              });
+
+              // Calculate SVG center offset - pins should be relative to SVG center, not group center
+              const svgCenterX = svgBounds.left + svgBounds.width / 2;
+              const svgCenterY = svgBounds.top + svgBounds.height / 2;
               console.log(
-                `🎯 DEBUG: SVG Symbol bounds:`,
-                svgSymbol.getBoundingRect()
+                `🎯 DEBUG: SVG center offset: (${svgCenterX}, ${svgCenterY})`
               );
-              console.log(`🎯 DEBUG: Symbol parts:`, symbolParts);
 
               // DEBUG: Ensure all symbol parts are visible
               symbolParts.forEach((part, index) => {
@@ -434,12 +444,16 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
 
               const interactivePins = invisiblePinData.map(
                 (pinInfo: any, index: number) => {
+                  // Position pins relative to SVG center, not component center
+                  const pinLeft = pinInfo.originalX - svgCenterX;
+                  const pinTop = pinInfo.originalY - svgCenterY;
+
                   console.log(
                     `🎯 DEBUG: Creating pin ${index + 1} (${
                       pinInfo.pinNumber
                     }) at (${pinInfo.originalX}, ${
                       pinInfo.originalY
-                    }) [transformed from mm to px]`
+                    }) -> relative (${pinLeft}, ${pinTop}) [SVG center: ${svgCenterX}, ${svgCenterY}]`
                   );
 
                   const interactivePin = new fabric.Circle({
@@ -447,8 +461,8 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
                     fill: "rgba(0, 255, 0, 0.8)", // Bright green for visibility
                     stroke: "#059669",
                     strokeWidth: 1,
-                    left: pinInfo.originalX,
-                    top: pinInfo.originalY,
+                    left: pinLeft,
+                    top: pinTop,
                     originX: "center",
                     originY: "center",
                     // PART 3: PIN VISIBILITY RULE - Start hidden
@@ -457,11 +471,21 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
                   });
 
                   console.log(
-                    `🎯 DEBUG: Pin ${index + 1} created successfully`
+                    `🎯 DEBUG: Pin ${index + 1} created at relative position (${
+                      pinInfo.originalX
+                    }, ${pinInfo.originalY})`
+                  );
+                  console.log(
+                    `🎯 DEBUG: Pin center point:`,
+                    interactivePin.getCenterPoint()
                   );
 
                   // Add the pin metadata that the wiring tool expects
-                  const pinData = pinInfo;
+                  const pinData = {
+                    ...pinInfo,
+                    originalX: pinLeft, // Update to use SVG-relative coordinates
+                    originalY: pinTop,
+                  };
                   interactivePin.set("pin", true);
                   interactivePin.set("pinData", pinData);
                   interactivePin.set("componentId", componentId);

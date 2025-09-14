@@ -8,9 +8,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "migrate:symbols": "npx tsx migrate_symbols_to_supabase.ts",
-    "test:migration": "npx tsx test_migration.ts",
-    "populate:svgs": "npx tsx populate-svg-symbols.ts"
+    "migrate:symbols": "npx tsx scripts/migrate_symbols_to_supabase.ts",
+    "test:migration": "npx tsx scripts/test_migration.ts",
+    "populate:svgs": "npx tsx scripts/populate-svg-symbols.ts",
+    "update:components": "npx tsx scripts/update_component_data.ts",
+    "parse:symbols": "npx tsx scripts/parse_kicad_symbols.ts",
+    "check:components": "npx tsx scripts/check_components.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.0",
