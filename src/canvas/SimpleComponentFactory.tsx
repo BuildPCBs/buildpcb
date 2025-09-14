@@ -1,4 +1,5 @@
 import * as fabric from "fabric";
+import { logger } from "@/lib/logger";
 
 // Component styling configuration
 const componentStyles = {
@@ -64,14 +65,11 @@ export const createSimpleComponent = (
     id?: string; // Add optional id parameter
   }
 ) => {
-  console.log(
-    `🏭 ENHANCED: Creating ${componentInfo.name} on canvas:`,
-    !!fabricCanvas
-  );
-  console.log(`🏭 Canvas type:`, fabricCanvas?.constructor?.name);
+  logger.canvas(`Creating ${componentInfo.name} on canvas:`, !!fabricCanvas);
+  logger.canvas(`Canvas type:`, fabricCanvas?.constructor?.name);
 
   if (!fabricCanvas) {
-    console.error("❌ No fabric canvas provided to createSimpleComponent");
+    logger.canvas("No fabric canvas provided to createSimpleComponent");
     return;
   }
 
@@ -138,7 +136,7 @@ export const createSimpleComponent = (
       isConnectable: true,
     },
   });
-  console.log("🔌 Pin1 created with pin=true and metadata");
+  logger.canvas("Pin1 created with pin=true and metadata");
 
   const pin2 = new fabric.Circle({
     radius: 4,
@@ -159,7 +157,7 @@ export const createSimpleComponent = (
       isConnectable: true,
     },
   });
-  console.log("🔌 Pin2 created with pin=true and metadata");
+  logger.canvas("Pin2 created with pin=true and metadata");
 
   // Group all parts with component metadata
   const component = new fabric.Group([componentShape, label, pin1, pin2], {
@@ -188,24 +186,21 @@ export const createSimpleComponent = (
   });
 
   // Add to canvas
-  console.log(
-    `🎨 Adding component to canvas at position:`,
+  logger.canvas(
+    `Adding component to canvas at position:`,
     component.left,
     component.top
   );
-  console.log(
-    `🎨 Canvas objects before add:`,
-    fabricCanvas.getObjects().length
-  );
+  logger.canvas(`Canvas objects before add:`, fabricCanvas.getObjects().length);
 
   fabricCanvas.add(component);
 
-  console.log(`🎨 Canvas objects after add:`, fabricCanvas.getObjects().length);
-  console.log(`🎨 Component added successfully:`, componentInfo.name);
+  logger.canvas(`Canvas objects after add:`, fabricCanvas.getObjects().length);
+  logger.canvas(`Component added successfully:`, componentInfo.name);
 
   fabricCanvas.renderAll();
 
-  console.log(`✅ ENHANCED: Added ${componentInfo.name} with functional pins!`);
+  logger.canvas(`Added ${componentInfo.name} with functional pins!`);
 };
 
 // Function to recreate pins for pasted simple components
@@ -219,14 +214,12 @@ export const recreateSimpleComponentPins = (
   const componentType = (component as any).componentType;
 
   if (!componentData || componentData.type !== "component" || !componentType) {
-    console.log("🔄 Not a simple component, skipping pin recreation");
+    logger.canvas("Not a simple component, skipping pin recreation");
     return component;
   }
 
-  console.log(
-    `🔄 Recreating simple pins for ${
-      componentData.componentName || componentType
-    }`
+  logger.canvas(
+    `Recreating simple pins for ${componentData.componentName || componentType}`
   );
 
   const style =
@@ -311,8 +304,8 @@ export const recreateSimpleComponentPins = (
     centeredRotation: true,
   });
 
-  console.log(
-    `✅ Simple pin recreation: Added functional pins to pasted component`
+  logger.canvas(
+    `Simple pin recreation: Added functional pins to pasted component`
   );
   return newComponent;
 };

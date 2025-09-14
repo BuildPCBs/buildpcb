@@ -8,6 +8,7 @@ import { ResponsiveContainer } from "@/components/layout/ResponsiveContainer";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { DatabaseService, Project } from "@/lib/database";
 import { Folder, Clock, Users } from "lucide-react";
+import { logger } from "@/lib/logger";
 import { responsive as r } from "@/lib/responsive";
 
 const databaseService = new DatabaseService();
@@ -29,10 +30,10 @@ const ProjectsContent = () => {
       try {
         setIsLoading(true);
         setError(null);
-        console.log("📂 Loading projects for user:", user.id);
+        logger.api("Loading projects for user:", user.id);
 
         const userProjects = await DatabaseService.getUserProjects();
-        console.log("📂 Loaded projects:", userProjects);
+        logger.api("Loaded projects:", userProjects);
 
         setProjects(userProjects);
       } catch (err) {
@@ -53,7 +54,7 @@ const ProjectsContent = () => {
     if (!user) return;
 
     try {
-      console.log("➕ Creating new project for user:", user.id);
+      logger.api("Creating new project for user:", user.id);
 
       const newProject = await DatabaseService.createProject({
         name: `Untitled Project ${new Date().toLocaleDateString()}`,
@@ -61,7 +62,7 @@ const ProjectsContent = () => {
         owner_id: user.id,
       });
 
-      console.log("✅ Created new project:", newProject);
+      logger.api("Created new project:", newProject);
 
       // Navigate to the new project
       router.push(`/project/${newProject.id}`);
@@ -73,7 +74,7 @@ const ProjectsContent = () => {
 
   // Open existing project
   const handleOpenProject = (projectId: string) => {
-    console.log("🔀 Opening project:", projectId);
+    logger.api("Opening project:", projectId);
     router.push(`/project/${projectId}`);
   };
 

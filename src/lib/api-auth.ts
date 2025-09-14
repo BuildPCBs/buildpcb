@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { logger } from "./logger";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -24,30 +25,33 @@ export async function authenticateApiRequest(
   try {
     // Get Authorization header
     const authHeader = request.headers.get("authorization");
-    
+
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      console.log("❌ API Auth: Missing or invalid Authorization header");
+      logger.api("Missing or invalid Authorization header");
       return null;
     }
 
     // Extract token
     const token = authHeader.replace("Bearer ", "");
-    
+
     if (!token) {
-      console.log("❌ API Auth: No token provided");
+      logger.api("No token provided");
       return null;
     }
 
     // Verify token with Supabase
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser(token);
 
     if (error || !user) {
-      console.log("❌ API Auth: Invalid token:", error?.message);
+      logger.api("Invalid token:", error?.message);
       return null;
     }
 
-    console.log("✅ API Auth: User authenticated:", user.email);
-    
+    logger.api("User authenticated:", user.email);
+
     return {
       id: user.id,
       email: user.email || "",
@@ -55,7 +59,7 @@ export async function authenticateApiRequest(
       role: user.role,
     };
   } catch (error) {
-    console.error("❌ API Auth: Authentication error:", error);
+    logger.api("Authentication error:", error);
     return null;
   }
 }
@@ -63,19 +67,21 @@ export async function authenticateApiRequest(
 /**
  * Middleware wrapper for protected API routes
  */
-export function withAuth(handler: (request: NextRequest, user: AuthenticatedUser) => Promise<Response>) {
+export function withAuth(
+  handler: (request: NextRequest, user: AuthenticatedUser) => Promise<Response>
+) {
   return async (request: NextRequest): Promise<Response> => {
     const user = await authenticateApiRequest(request);
-    
+
     if (!user) {
       return new Response(
-        JSON.stringify({ 
-          error: "Unauthorized", 
-          message: "Valid authentication token required" 
+        JSON.stringify({
+          error: "Unauthorized",
+          message: "Valid authentication token required",
         }),
-        { 
+        {
           status: 401,
-          headers: { "Content-Type": "application/json" }
+          headers: { "Content-Type": "application/json" },
         }
       );
     }
@@ -87,10 +93,15 @@ export function withAuth(handler: (request: NextRequest, user: AuthenticatedUser
 /**
  * Helper to get user from client-side session
  */
-export async function getUserFromSession(sessionToken: string): Promise<AuthenticatedUser | null> {
+export async function getUserFromSession(
+  sessionToken: string
+): Promise<AuthenticatedUser | null> {
   try {
-    const { data: { user }, error } = await supabase.auth.getUser(sessionToken);
-    
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser(sessionToken);
+
     if (error || !user) {
       return null;
     }
@@ -102,7 +113,7 @@ export async function getUserFromSession(sessionToken: string): Promise<Authenti
       role: user.role,
     };
   } catch (error) {
-    console.error("Error getting user from session:", error);
+    logger.api("Error getting user from session:", error);
     return null;
   }
 }

@@ -56,7 +56,7 @@ export class MemoryMonitor {
       const info = this.getMemoryInfo();
       if (info) {
         if (info.usageRatio > 0.8) {
-          console.warn("⚠️ High memory usage detected:", info.formattedUsage);
+          logger.canvas("High memory usage detected:", info.formattedUsage);
         }
 
         if (callback) {
@@ -79,11 +79,11 @@ export class MemoryMonitor {
 
   forceGarbageCollection(): void {
     if (window.gc) {
-      console.log("🗑️ Forcing garbage collection...");
+      logger.canvas("Forcing garbage collection...");
       window.gc();
     } else {
-      console.log(
-        '🗑️ Garbage collection not available (use --js-flags="--expose-gc" to enable)'
+      logger.canvas(
+        'Garbage collection not available (use --js-flags="--expose-gc" to enable)'
       );
     }
   }
@@ -91,14 +91,14 @@ export class MemoryMonitor {
   logMemoryUsage(label = "Memory Usage"): void {
     const info = this.getMemoryInfo();
     if (info) {
-      console.log(`🧠 ${label}:`, {
+      logger.canvas(`${label}:`, {
         used: `${(info.usedJSHeapSize / 1024 / 1024).toFixed(1)} MB`,
         total: `${(info.totalJSHeapSize / 1024 / 1024).toFixed(1)} MB`,
         limit: `${(info.jsHeapSizeLimit / 1024 / 1024).toFixed(1)} MB`,
         ratio: info.formattedUsage,
       });
     } else {
-      console.log("🧠 Memory monitoring not available");
+      logger.canvas("Memory monitoring not available");
     }
   }
 }

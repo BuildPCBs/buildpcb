@@ -10,6 +10,7 @@ import { eventManager, IDE_EVENTS } from "./event-manager";
 import { initializeState, stateManager, STATE_PATHS } from "./state-manager";
 import { fileSystemManager } from "./file-system";
 import { pluginManager } from "./plugin-manager";
+import { logger } from "../lib/logger";
 
 export interface IDEConfig {
   debug?: boolean;
@@ -28,19 +29,19 @@ class IDECore {
    */
   async initialize(config: IDEConfig = {}): Promise<void> {
     if (this.initialized) {
-      console.warn("IDE already initialized");
+      logger.api("IDE already initialized");
       return;
     }
 
     this.config = { ...this.getDefaultConfig(), ...config };
 
     try {
-      console.log("Initializing BuildPCBs IDE...");
+      logger.api("Initializing BuildPCBs IDE...");
 
       // Set debug mode
       if (this.config.debug) {
         eventManager.setDebugMode(true);
-        console.log("Debug mode enabled");
+        logger.api("Debug mode enabled");
       }
 
       // Initialize core systems in order
@@ -50,7 +51,7 @@ class IDECore {
       await this.postInitialize();
 
       this.initialized = true;
-      console.log("IDE initialization complete!");
+      logger.api("IDE initialization complete!");
 
       // Emit initialization event
       await eventManager.emit(IDE_EVENTS.APP_INITIALIZED, {
@@ -58,7 +59,7 @@ class IDECore {
         config: this.config,
       });
     } catch (error) {
-      console.error("Failed to initialize IDE:", error);
+      logger.api("Failed to initialize IDE:", error);
       throw error;
     }
   }
@@ -71,7 +72,7 @@ class IDECore {
       return;
     }
 
-    console.log("Shutting down IDE...");
+    logger.api("Shutting down IDE...");
 
     try {
       // Emit shutdown event
@@ -85,7 +86,7 @@ class IDECore {
         try {
           await pluginManager.deactivatePlugin(plugin.id);
         } catch (error) {
-          console.error(`Error deactivating plugin ${plugin.id}:`, error);
+          logger.api(`Error deactivating plugin ${plugin.id}:`, error);
         }
       }
 
@@ -98,9 +99,9 @@ class IDECore {
       stateManager.clearHistory();
 
       this.initialized = false;
-      console.log("IDE shutdown complete");
+      logger.api("IDE shutdown complete");
     } catch (error) {
-      console.error("Error during shutdown:", error);
+      logger.api("Error during shutdown:", error);
     }
   }
 
@@ -133,7 +134,7 @@ class IDECore {
   }
 
   private async initializeCoreSystem(): Promise<void> {
-    console.log("Initializing core system...");
+    logger.api("Initializing core system...");
 
     // Initialize state first (other systems depend on it)
     initializeState();
@@ -142,22 +143,22 @@ class IDECore {
     // Initialize error handling
     if (this.config.errorHandling) {
       initializeErrorHandling();
-      console.log("✓ Error handling initialized");
+      logger.api("✓ Error handling initialized");
     }
 
     // Initialize keyboard shortcuts
     if (this.config.shortcuts) {
       initializeKeyboardShortcuts();
-      console.log("✓ Keyboard shortcuts initialized");
+      logger.api("✓ Keyboard shortcuts initialized");
     }
 
     // Initialize command system
     // initializeCommandSystem();
-    console.log("✓ Command system initialized");
+    logger.api("✓ Command system initialized");
   }
 
   private async initializeManagers(): Promise<void> {
-    console.log("Initializing managers...");
+    logger.api("Initializing managers...");
 
     // Set up event listeners for cross-system communication
     this.setupEventListeners();
@@ -165,7 +166,7 @@ class IDECore {
     // Set up keyboard shortcuts for commands
     this.setupKeyboardIntegration();
 
-    console.log("✓ Managers initialized");
+    logger.api("✓ Managers initialized");
   }
 
   private async initializePlugins(): Promise<void> {
@@ -173,15 +174,15 @@ class IDECore {
       return;
     }
 
-    console.log("Initializing plugins...");
+    logger.api("Initializing plugins...");
 
     // In a real implementation, this would load plugins from files/URLs
     // For now, we'll just log the plugin IDs
     for (const pluginId of this.config.plugins) {
-      console.log(`- Plugin: ${pluginId}`);
+      logger.api(`- Plugin: ${pluginId}`);
     }
 
-    console.log("✓ Plugins initialized");
+    logger.api("✓ Plugins initialized");
   }
 
   private async postInitialize(): Promise<void> {
@@ -195,37 +196,37 @@ class IDECore {
     // Create initial snapshot
     stateManager.createSnapshot("Initial state");
 
-    console.log("✓ Post-initialization complete");
+    logger.api("✓ Post-initialization complete");
   }
 
   private setupEventListeners(): void {
     // File events
     eventManager.subscribe(IDE_EVENTS.FILE_OPENED, async (event) => {
-      console.log("File opened:", event.payload.fileName);
+      logger.api("File opened:", event.payload.fileName);
       // Update recent files, etc.
     });
 
     eventManager.subscribe(IDE_EVENTS.FILE_SAVED, async (event) => {
-      console.log("File saved:", event.payload.fileName);
+      logger.api("File saved:", event.payload.fileName);
       // Mark project as not modified, etc.
     });
 
     // Error events
     eventManager.subscribe(IDE_EVENTS.ERROR_OCCURRED, async (event) => {
       const error = event.payload;
-      console.error("IDE Error:", error.message);
+      logger.api("IDE Error:", error.message);
 
       // Handle critical errors
       if (error.severity === "critical") {
         // Emergency save, etc.
-        console.log("Handling critical error...");
+        logger.api("Handling critical error...");
       }
     });
 
     // Component events
     eventManager.subscribe(IDE_EVENTS.COMPONENT_ADDED, async (event) => {
       const { componentId, componentType, position } = event.payload;
-      console.log(
+      logger.api(
         `Component added: ${componentType} at (${position.x}, ${position.y})`
       );
 
@@ -246,12 +247,12 @@ class IDECore {
     // Simulation events
     eventManager.subscribe(IDE_EVENTS.SIMULATION_STARTED, async (event) => {
       const { simulationId, type } = event.payload;
-      console.log(`Simulation started: ${type} (${simulationId})`);
+      logger.api(`Simulation started: ${type} (${simulationId})`);
       stateManager.set(STATE_PATHS.SIMULATION_RUNNING, true);
     });
 
     eventManager.subscribe(IDE_EVENTS.SIMULATION_COMPLETED, async (event) => {
-      console.log("Simulation completed");
+      logger.api("Simulation completed");
       stateManager.set(STATE_PATHS.SIMULATION_RUNNING, false);
     });
   }
@@ -292,10 +293,11 @@ class IDECore {
           stateManager.set(key, value, "user-preferences");
         });
 
-        console.log("✓ User preferences loaded");
+        logger.api("✓ User preferences loaded");
+        logger.api("✓ User preferences loaded");
       }
     } catch (error) {
-      console.warn("Failed to load user preferences:", error);
+      logger.api("Failed to load user preferences:", error);
     }
   }
 

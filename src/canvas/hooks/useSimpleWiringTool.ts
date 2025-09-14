@@ -1,29 +1,3 @@
-/**
- * Simple Wiring Tool - Works with Database Pin Data
- * A clean, straightforward           if (data && data.type === "pin") {
-            logger.wire(
-              `Found pin: ${pinData.pinNumber} of component ${pinData.componentId}`
-            );
-            // Get the pin's center point, transforming if it's inside a group
-            let pinCenter = obj.getCenterPoint();
-            if (groupTransform) {
-              pinCenter = fabric.util.transformPoint(pinCenter, groupTransform);
-            }
-
-            logger.wire(`Pin local center: (${obj.getCenterPoint().x.toFixed(1)}, ${obj.getCenterPoint().y.toFixed(1)})`);
-            logger.wire(`Pin transformed center: (${pinCenter.x.toFixed(1)}, ${pinCenter.y.toFixed(1)})`);
-            logger.wire(`Mouse point: (${point.x.toFixed(1)}, ${point.y.toFixed(1)})`);
-
-            // Check if mouse is within pin bounds (simple circle collision)
-            const distance = Math.sqrt(
-              Math.pow(point.x - pinCenter.x, 2) +
-                Math.pow(point.y - pinCenter.y, 2)
-            );
-
-            logger.wire(`Distance: ${distance.toFixed(2)}px (threshold: 6px)`);for connecting component pins
- * Integrated with netlist management for electrical connectivity tracking
- */
-
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import * as fabric from "fabric";
 import { useNetlist, NetConnection } from "./useNetlist";
@@ -264,7 +238,7 @@ export function useSimpleWiringTool({
 
           // Check if trying to connect same component
           if (startPinRef.current.componentId === pinData.componentId) {
-            console.warn("Cannot connect pin to same component");
+            logger.wire("Cannot connect pin to same component");
             return;
           }
 
@@ -273,7 +247,7 @@ export function useSimpleWiringTool({
             startPinRef.current.pinNumber === toPinData.pinNumber.toString() &&
             startPinRef.current.componentId === pinData.componentId
           ) {
-            console.warn("Cannot connect pin to itself");
+            logger.wire("Cannot connect pin to itself");
             return;
           }
 
@@ -634,8 +608,8 @@ export function useSimpleWiringTool({
       const allConnections = netlist.getAllConnections();
       // Note: This is a simplified restoration - in a full implementation,
       // you might want to recreate the wire objects on the canvas
-      console.log(
-        "🔗 Netlist restored with",
+      logger.wire(
+        "Netlist restored with",
         allConnections.length,
         "connections"
       );

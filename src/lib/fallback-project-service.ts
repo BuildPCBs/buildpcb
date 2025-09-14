@@ -2,6 +2,7 @@
 
 import { Project } from "@/lib/database";
 import { Circuit } from "@/lib/schemas/circuit";
+import { logger } from "./logger";
 
 export interface ProjectLoadResult {
   project: Project;
@@ -22,7 +23,7 @@ export class FallbackProjectService {
    */
   static async loadOrCreateProject(): Promise<ProjectLoadResult> {
     try {
-      console.log("🔄 Using fallback project service (localStorage)");
+      logger.api("Using fallback project service (localStorage)");
 
       // Check if this is the first time the user is using the app
       const isFirstTimeUser = !localStorage.getItem(this.USER_KEY);
@@ -31,8 +32,8 @@ export class FallbackProjectService {
       const existingProject = this.loadFromStorage();
 
       if (existingProject) {
-        console.log(
-          "👋 Returning user - loading existing project:",
+        logger.api(
+          "Returning user - loading existing project:",
           existingProject.name
         );
         return {
@@ -43,7 +44,7 @@ export class FallbackProjectService {
       }
 
       // Create new project for first-time or returning users without saved projects
-      console.log("🆕 Creating new project for user");
+      logger.api("Creating new project for user");
       const newProject = this.createUntitledProject();
       this.saveToStorage(newProject);
 
@@ -130,7 +131,7 @@ export class FallbackProjectService {
             })
           );
 
-          console.log("💾 Project saved to localStorage");
+          logger.api("Project saved to localStorage");
         }
         resolve();
       } catch (error) {
@@ -152,7 +153,7 @@ export class FallbackProjectService {
       project.name = newName;
       project.updated_at = new Date().toISOString();
       this.saveToStorage(project);
-      console.log("✅ Project renamed to:", newName);
+      logger.api("Project renamed to:", newName);
     }
     return project!;
   }
@@ -225,7 +226,7 @@ export class FallbackProjectService {
   static clearFallbackData(): void {
     localStorage.removeItem(this.STORAGE_KEY);
     localStorage.removeItem(this.USER_KEY);
-    console.log("🧹 Fallback data cleared");
+    logger.api("Fallback data cleared");
   }
 }
 

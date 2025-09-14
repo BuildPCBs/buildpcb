@@ -2,6 +2,8 @@
  * Comprehensive error handling system for the IDE
  */
 
+import { logger } from "../lib/logger";
+
 export enum ErrorSeverity {
   LOW = "low",
   MEDIUM = "medium",
@@ -300,7 +302,7 @@ export const ErrorFactories = {
         id: "retry",
         label: "Retry",
         description: "Retry the network operation",
-        action: () => console.log("Retrying network operation"),
+        action: () => logger.api("Retrying network operation"),
         primary: true,
       },
     ],
