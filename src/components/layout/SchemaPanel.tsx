@@ -4,6 +4,7 @@ import { HomeIcon, SearchIcon, WindowIcon } from "@/components/icons";
 import { useClickOutside } from "@/hooks/useClickOutside";
 import { r, responsive } from "@/lib/responsive";
 import { canvasCommandManager } from "@/canvas/canvas-command-manager";
+import { logger } from "@/lib/logger";
 import {
   useDatabaseComponents,
   ComponentDisplayData,
@@ -377,8 +378,8 @@ export function SchemaPanel() {
                       onClick={(e) => {
                         e.stopPropagation(); // THE FIX - Prevent multiple event firing
                         const timestamp = new Date().toISOString();
-                        console.log(
-                          `[${timestamp}] CLICK: Adding ${component.name} to canvas`
+                        logger.component(
+                          `CLICK: Adding ${component.name} to canvas`
                         );
                         canvasCommandManager.executeCommand("component:add", {
                           id: component.id,
@@ -433,8 +434,8 @@ export function SchemaPanel() {
                             onClick={(e) => {
                               e.stopPropagation(); // THE FIX - Prevent multiple event firing
                               const timestamp = new Date().toISOString();
-                              console.log(
-                                `[${timestamp}] CLICK: Adding ${component.name} to canvas`
+                              logger.component(
+                                `CLICK: Adding ${component.name} to canvas`
                               );
                               canvasCommandManager.executeCommand(
                                 "component:add",

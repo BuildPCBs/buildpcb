@@ -7,6 +7,7 @@ import { useCanvasStateSnapshot } from "../../hooks/useCanvasState";
 import type { ChatMessage } from "../../contexts/AIChatContext";
 import { BRAND_COLORS } from "@/lib/constants";
 import { responsive } from "@/lib/responsive";
+import { logger } from "@/lib/logger";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
@@ -60,12 +61,12 @@ export function AIChatInterface({
   };
 
   const handleFeedback = (messageId: string, type: "positive" | "negative") => {
-    console.log(`Feedback for message ${messageId}:`, type);
+    logger.api(`Feedback for message ${messageId}:`, type);
     // TODO: Send feedback to analytics/improvement system
   };
 
   const handleRegenerate = (messageId: string) => {
-    console.log(`Regenerate message ${messageId}`);
+    logger.api(`Regenerate message ${messageId}`);
     // TODO: Implement regeneration logic
     // Find the original prompt and resubmit it
   };
@@ -109,7 +110,7 @@ export function AIChatInterface({
   const handleCopy = async (content: string) => {
     try {
       await navigator.clipboard.writeText(content);
-      console.log("Content copied to clipboard");
+      logger.api("Content copied to clipboard");
       // TODO: Show toast notification
     } catch (error) {
       console.error("Failed to copy to clipboard:", error);

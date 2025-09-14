@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { Circuit } from "@/types";
+import { logger } from "@/lib/logger";
 
 interface ProjectState {
   // Current project context
@@ -48,7 +49,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   // Actions
   setProject: (projectId: string, versionId: string, projectName: string) => {
-    console.log("🔄 Setting project:", { projectId, versionId, projectName });
+    logger.component("Setting project:", { projectId, versionId, projectName });
     set({
       projectId,
       versionId,
@@ -61,7 +62,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   setCircuit: (circuit: Circuit) => {
     const state = get();
-    console.log("🔄 Updating circuit data, marking dirty");
+    logger.component("Updating circuit data, marking dirty");
     set({
       circuit,
       isDirty: true,
@@ -69,12 +70,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   markDirty: () => {
-    console.log("🔄 Marking project as dirty (unsaved changes)");
+    logger.component("Marking project as dirty (unsaved changes)");
     set({ isDirty: true });
   },
 
   markClean: () => {
-    console.log("✅ Marking project as clean (saved)");
+    logger.component("Marking project as clean (saved)");
     set({
       isDirty: false,
       lastSaved: new Date(),
@@ -86,7 +87,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   clearProject: () => {
-    console.log("🧹 Clearing project context");
+    logger.component("Clearing project context");
     set({
       projectId: null,
       versionId: null,
@@ -98,12 +99,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   setAutoSaveEnabled: (enabled: boolean) => {
-    console.log("⚙️ Auto-save enabled:", enabled);
+    logger.component("Auto-save enabled:", enabled);
     set({ autoSaveEnabled: enabled });
   },
 
   setAutoSaveInterval: (interval: number) => {
-    console.log("⚙️ Auto-save interval set to:", interval, "ms");
+    logger.component("Auto-save interval set to:", interval, "ms");
     set({ autoSaveInterval: interval });
   },
 }));

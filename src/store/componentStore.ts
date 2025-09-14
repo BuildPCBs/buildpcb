@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { logger } from "@/lib/logger";
 
 interface ComponentStore {
   componentToAdd: string | null;
@@ -11,11 +12,11 @@ interface ComponentStore {
 export const useComponentStore = create<ComponentStore>((set) => ({
   componentToAdd: null,
   addComponent: (componentType: string) => {
-    console.log("Store addComponent called with:", componentType);
+    logger.component("Store addComponent called with:", componentType);
     set({ componentToAdd: componentType });
   },
   clearComponentToAdd: () => {
-    console.log("Store clearComponentToAdd called");
+    logger.component("Store clearComponentToAdd called");
     set({ componentToAdd: null });
   },
 }));

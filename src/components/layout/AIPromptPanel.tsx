@@ -6,6 +6,7 @@ import { PromptEntry } from "./PromptEntry";
 import { useAIChat } from "../../contexts/AIChatContext";
 import { useCanvas } from "../../contexts/CanvasContext";
 import { useCanvasStateSnapshot } from "../../hooks/useCanvasState";
+import { logger } from "../../lib/logger";
 
 interface AIPromptPanelProps {
   className?: string;
@@ -32,18 +33,18 @@ export function AIPromptPanel({
   const currentIsThinking = contextIsThinking || isThinking || localIsThinking;
 
   const handlePromptSubmit = async (prompt: string) => {
-    console.log("🚀 AI Prompt submitted:", prompt);
-    console.log("🎨 Canvas available:", !!canvas);
-    console.log("📊 Canvas state:", canvasState);
-    console.log("🔧 Canvas type:", canvas?.constructor?.name);
+    logger.api("AI Prompt submitted:", prompt);
+    logger.api("Canvas available:", !!canvas);
+    logger.api("Canvas state:", canvasState);
+    logger.api("Canvas type:", canvas?.constructor?.name);
 
     if (onPromptSubmit) {
       // Use external handler if provided
       await onPromptSubmit(prompt);
     } else {
       // Use context handler with canvas state and canvas
-      console.log(
-        "📤 Calling context handlePromptSubmit with canvas:",
+      logger.api(
+        "Calling context handlePromptSubmit with canvas:",
         !!canvas
       );
       await contextHandlePromptSubmit(prompt, canvasState, canvas);
@@ -51,17 +52,17 @@ export function AIPromptPanel({
   };
 
   const handleMicClick = () => {
-    console.log("Microphone button clicked - Voice input");
+    logger.api("Microphone button clicked - Voice input");
     // Voice input functionality here
   };
 
   const handleDotsClick = () => {
-    console.log("Dots button clicked - More options");
+    logger.api("Dots button clicked - More options");
     // More options functionality here
   };
 
   const handleSendClick = () => {
-    console.log("Send button clicked - Process input");
+    logger.api("Send button clicked - Process input");
     // Send/process functionality here
   };
 

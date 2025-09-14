@@ -4,6 +4,7 @@ import { useState, createContext, useContext, ReactNode, useEffect } from "react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { authStorage } from '@/lib/auth-storage';
+import { logger } from '@/lib/logger';
 import { AuthContextType, AuthUser } from '@/types/auth';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -27,9 +28,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // First check if we have a session in localStorage
         const hasStoredSession = authStorage.hasStoredSession();
         if (hasStoredSession) {
-          console.log('Found stored session data');
+          logger.auth('Found stored session data');
           const userData = authStorage.getUser();
-          console.log('Last login:', authStorage.getLastLogin());
+          logger.auth('Last login:', authStorage.getLastLogin());
         }
 
         const { data: { session }, error } = await supabase.auth.getSession();
@@ -65,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.email);
+        logger.auth('Auth state changed:', event, session?.user?.email);
         
         setSession(session);
         setUser(session?.user || null);
@@ -82,15 +83,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           
           // Close auth overlay on successful auth
           setIsAuthOverlayOpen(false);
-          console.log('User signed in:', session.user.email);
+          logger.auth('User signed in:', session.user.email);
           
         } else if (event === 'SIGNED_OUT') {
           // Clear user data from localStorage
           authStorage.removeUser();
-          console.log('User signed out');
+          logger.auth('User signed out');
           
         } else if (event === 'TOKEN_REFRESHED') {
-          console.log('Token refreshed for user:', session?.user?.email);
+          logger.auth('Token refreshed for user:', session?.user?.email);
         }
       }
     );

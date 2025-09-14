@@ -13,6 +13,7 @@ import {
   ComponentDisplayData,
 } from "@/hooks/useDatabaseComponents";
 import { canvasCommandManager } from "@/canvas/canvas-command-manager";
+import { logger } from "@/lib/logger";
 
 // Lazy loading image component for memory optimization
 function LazyImage({
@@ -180,8 +181,8 @@ function ComponentPreview({ component, onClose }: ComponentPreviewProps) {
 
       <button
         onClick={() => {
-          console.log("🎯 Add to Canvas clicked for:", component.name);
-          console.log("Component data:", {
+          logger.component("Add to Canvas clicked for:", component.name);
+          logger.component("Component data:", {
             id: component.id,
             type: component.type,
             image: component.image,
@@ -192,20 +193,20 @@ function ComponentPreview({ component, onClose }: ComponentPreviewProps) {
             partNumber: component.partNumber,
             pinCount: component.pinCount,
           });
-          console.log(
+          logger.component(
             "Image starts with:",
             component.image.substring(0, 50) + "..."
           );
-          console.log("Image length:", component.image.length);
+          logger.component("Image length:", component.image.length);
 
           const timestamp = new Date().toISOString();
-          console.log(
-            `[${timestamp}] Adding ${component.name} to canvas from overlay`
+          logger.component(
+            `Adding ${component.name} to canvas from overlay`
           );
 
           try {
-            console.log(
-              "🎯 Canvas command manager canvas:",
+            logger.component(
+              "Canvas command manager canvas:",
               canvasCommandManager.getCanvas()
             );
             const result = canvasCommandManager.executeCommand(
@@ -223,10 +224,10 @@ function ComponentPreview({ component, onClose }: ComponentPreviewProps) {
               }
             );
 
-            console.log("Command execution result:", result);
+            logger.component("Command execution result:", result);
 
             if (result) {
-              console.log("✅ Component added successfully");
+              logger.component("Component added successfully");
               onClose();
             } else {
               console.error(
@@ -274,7 +275,7 @@ export function ComponentPickerOverlay({
   // Debug logging - only in development
   useEffect(() => {
     if (process.env.NODE_ENV === "development") {
-      console.log("🎯 ComponentPickerOverlay state:", {
+      logger.component("ComponentPickerOverlay state:", {
         databaseComponentsCount: databaseComponents.length,
         componentsLoading,
         componentsError,
@@ -309,7 +310,7 @@ export function ComponentPickerOverlay({
       hasMore &&
       !componentsLoading
     ) {
-      console.log("No search results found, loading more components...");
+      logger.component("No search results found, loading more components...");
       loadMore();
     }
   }, [
@@ -356,10 +357,10 @@ export function ComponentPickerOverlay({
         case "Enter":
           if (selectedComponent) {
             const timestamp = new Date().toISOString();
-            console.log(
-              `[${timestamp}] Adding ${selectedComponent.name} to canvas from overlay`
+            logger.component(
+              `Adding ${selectedComponent.name} to canvas from overlay`
             );
-            console.log(`🔍 ComponentPickerOverlay: Selected component data:`, {
+            logger.component(`Selected component data:`, {
               id: selectedComponent.id,
               name: selectedComponent.name,
               type: selectedComponent.type,

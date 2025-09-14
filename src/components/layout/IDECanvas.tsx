@@ -11,6 +11,7 @@ import { useOverrideBrowserControls } from "@/hooks/useOverrideBrowserControls";
 import { AIChatProvider } from "../../contexts/AIChatContext";
 import { CanvasProvider } from "../../contexts/CanvasContext";
 import { responsive } from "@/lib/responsive";
+import { logger } from "@/lib/logger";
 import * as fabric from "fabric";
 
 export function IDECanvas() {
@@ -23,13 +24,13 @@ export function IDECanvas() {
   const [getNetlist, setGetNetlist] = useState<(() => any) | null>(null);
 
   const handleCanvasReady = (fabricCanvas: any) => {
-    console.log("🎨 Canvas is ready!", fabricCanvas);
+    logger.canvas("Canvas is ready!", fabricCanvas);
     setCanvas(fabricCanvas);
     setIsCanvasReady(true);
   };
 
   const handleNetlistReady = (getNetlistFn: () => any) => {
-    console.log("🔗 Netlist access ready");
+    logger.wire("Netlist access ready");
     setGetNetlist(() => getNetlistFn);
   };
 
@@ -72,7 +73,7 @@ export function IDECanvas() {
             >
               <AIChatInterface
                 onCircuitUpdate={(changes) => {
-                  console.log("Circuit changes from AI:", changes);
+                  logger.api("Circuit changes from AI:", changes);
                   // TODO: Apply circuit changes to canvas
                 }}
               />

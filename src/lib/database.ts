@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { Circuit } from "@/lib/schemas/circuit";
+import { logger } from "./logger";
 
 export interface Project {
   id: string;

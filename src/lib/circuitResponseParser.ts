@@ -2,6 +2,7 @@
 
 import * as fabric from "fabric";
 import { ComponentData, ConnectionData } from "../hooks/useCanvasState";
+import { logger } from "./logger";
 
 // Circuit response interfaces matching the schema
 export interface CircuitComponent {
@@ -122,12 +123,12 @@ export function parseCircuitResponse(response: any): ParsedCircuitResponse {
   const operations: CanvasOperation[] = [];
   const affectedComponents: string[] = [];
 
-  console.log("🔍 Starting to parse circuit response:", response);
+  logger.api("Starting to parse circuit response:", response);
 
   try {
     // Handle text-only responses
     if (response.mode === "text-only" || !response.circuit) {
-      console.log("📝 Text-only response detected");
+      logger.api("Text-only response detected");
       return {
         operations: [],
         explanation:
@@ -160,17 +161,17 @@ export function parseCircuitResponse(response: any): ParsedCircuitResponse {
       };
     }
 
-    console.log(
-      "✅ Found",
+    logger.api(
+      "Found",
       response.circuit.components.length,
       "components to process"
     );
 
     // Process components
     for (const component of response.circuit.components) {
-      console.log("🔧 Processing component:", component.id, component.type);
+      logger.api("Processing component:", component.id, component.type);
       if (!isValidComponent(component)) {
-        console.error("❌ Invalid component:", component);
+        logger.api("Invalid component:", component);
         errors.push(`Invalid component: ${JSON.stringify(component)}`);
         continue;
       }
@@ -318,12 +319,12 @@ export async function applyCircuitToCanvas(
   const errors: string[] = [];
   let appliedOperations = 0;
 
-  console.log("🎨 Starting to apply circuit to canvas");
-  console.log("📊 Operations to apply:", parsedResponse.operations.length);
-  console.log("✅ Is valid:", parsedResponse.isValid);
+  logger.api("Starting to apply circuit to canvas");
+  logger.api("Operations to apply:", parsedResponse.operations.length);
+  logger.api("Is valid:", parsedResponse.isValid);
 
   if (!parsedResponse.isValid) {
-    console.log("❌ Response is not valid, skipping application");
+    logger.api("Response is not valid, skipping application");
     return {
       success: false,
       appliedOperations: 0,
@@ -346,20 +347,20 @@ export async function applyCircuitToCanvas(
       (op) => op.type === "modify_component"
     );
 
-    console.log("🔧 Operation breakdown:");
-    console.log("  - Add components:", addComponentOps.length);
-    console.log("  - Add wires:", addWireOps.length);
-    console.log("  - Remove components:", removeOps.length);
-    console.log("  - Modify components:", modifyOps.length);
+    logger.api("Operation breakdown:");
+    logger.api("  - Add components:", addComponentOps.length);
+    logger.api("  - Add wires:", addWireOps.length);
+    logger.api("  - Remove components:", removeOps.length);
+    logger.api("  - Modify components:", modifyOps.length);
 
     // Process removals first
     for (const operation of removeOps) {
       try {
-        console.log("🗑️ Removing component:", operation.componentId);
+        logger.api("Removing component:", operation.componentId);
         await removeComponentFromCanvas(operation.componentId!, canvas);
         appliedOperations++;
       } catch (error) {
-        console.error("❌ Failed to remove component:", error);
+        logger.api("Failed to remove component:", error);
         errors.push(
           `Failed to remove component ${operation.componentId}: ${error}`
         );
@@ -369,15 +370,15 @@ export async function applyCircuitToCanvas(
     // Process additions
     for (const operation of addComponentOps) {
       try {
-        console.log(
-          "➕ Adding component:",
+        logger.api(
+          "Adding component:",
           operation.componentId,
           operation.componentType
         );
         await addComponentToCanvas(operation, canvas);
         appliedOperations++;
       } catch (error) {
-        console.error("❌ Failed to add component:", error);
+        logger.api("Failed to add component:", error);
         errors.push(
           `Failed to add component ${operation.componentId}: ${error}`
         );
@@ -397,7 +398,7 @@ export async function applyCircuitToCanvas(
     }
 
     // Small delay to ensure components are fully added before creating wires
-    console.log("⏳ Waiting for components to be fully added...");
+    logger.api("Waiting for components to be fully added...");
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     // Force canvas render to ensure all components are visible
@@ -406,8 +407,8 @@ export async function applyCircuitToCanvas(
     // Process wire additions last
     for (const operation of addWireOps) {
       try {
-        console.log(
-          "🔗 Adding wire from",
+        logger.api(
+          "Adding wire from",
           operation.fromConnection,
           "to",
           operation.toConnection
@@ -420,9 +421,9 @@ export async function applyCircuitToCanvas(
       }
     }
 
-    console.log("✅ Circuit application complete:");
-    console.log("  - Applied operations:", appliedOperations);
-    console.log("  - Errors:", errors.length);
+    logger.api("Circuit application complete:");
+    logger.api("  - Applied operations:", appliedOperations);
+    logger.api("  - Errors:", errors.length);
 
     return {
       success: errors.length === 0,
@@ -430,7 +431,7 @@ export async function applyCircuitToCanvas(
       errors,
     };
   } catch (error) {
-    console.error("❌ Error applying circuit to canvas:", error);
+    logger.api("Error applying circuit to canvas:", error);
     return {
       success: false,
       appliedOperations,
@@ -451,15 +452,15 @@ async function addComponentToCanvas(
   operation: CanvasOperation,
   canvas: fabric.Canvas
 ): Promise<void> {
-  console.log(
-    "🏭 Creating component:",
+  logger.api(
+    "Creating component:",
     operation.componentType,
     "at position:",
     operation.position
   );
 
   if (!operation.componentType || !operation.position) {
-    console.error("❌ Missing component type or position");
+    logger.api("Missing component type or position");
     throw new Error("Missing component type or position");
   }
 
@@ -468,7 +469,7 @@ async function addComponentToCanvas(
     "../canvas/SimpleComponentFactory"
   );
 
-  console.log("🔧 Calling createSimpleComponent with:", {
+  logger.api("Calling createSimpleComponent with:", {
     type: operation.componentType,
     name: operation.value || operation.componentType,
     x: operation.position.x,
@@ -485,7 +486,7 @@ async function addComponentToCanvas(
     id: operation.componentId, // Pass the component ID for wire connections
   });
 
-  console.log("✅ Component created and added to canvas");
+  logger.api("Component created and added to canvas");
 
   // The function adds to canvas internally, so we just need to render
   canvas.renderAll();
@@ -557,13 +558,13 @@ async function addWireToCanvas(
 
   // Find the actual component objects on canvas
   const objects = canvas.getObjects();
-  console.log("🔍 Looking for components on canvas:");
-  console.log("  - Total objects on canvas:", objects.length);
-  console.log(
+  logger.api("Looking for components on canvas:");
+  logger.api("  - Total objects on canvas:", objects.length);
+  logger.api(
     "  - Looking for fromComponent:",
     operation.fromConnection!.componentId
   );
-  console.log(
+  logger.api(
     "  - Looking for toComponent:",
     operation.toConnection!.componentId
   );
@@ -573,7 +574,7 @@ async function addWireToCanvas(
     const objId = obj.get("id") || obj.get("objectId");
     const componentType = obj.get("componentType");
     if (objId || componentType) {
-      console.log(`  - Object ${index}: id=${objId}, type=${componentType}`);
+      logger.api(`  - Object ${index}: id=${objId}, type=${componentType}`);
     }
   });
 
@@ -589,9 +590,9 @@ async function addWireToCanvas(
       obj.get("objectId") === operation.toConnection!.componentId
   );
 
-  console.log("🔍 Search results:");
-  console.log("  - fromComponent found:", !!fromComponent);
-  console.log("  - toComponent found:", !!toComponent);
+  logger.api("Search results:");
+  logger.api("  - fromComponent found:", !!fromComponent);
+  logger.api("  - toComponent found:", !!toComponent);
 
   if (fromComponent && toComponent) {
     // Create a simple wire between component centers for now

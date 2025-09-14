@@ -10,6 +10,7 @@ import { useCanvasViewport } from "./hooks/useCanvasViewport";
 import { useCanvasAutoSave } from "./hooks/useCanvasAutoSave";
 import { useHistoryStack } from "./hooks/useHistoryStack";
 import { memoryMonitor } from "@/lib/memory-monitor";
+import { logger } from "@/lib/logger";
 import { canvasCommandManager } from "./canvas-command-manager";
 import { setupComponentHandler } from "./componentHandlerSetup";
 import { createSimpleComponent } from "./SimpleComponentFactory";
@@ -129,8 +130,8 @@ export function IDEFabricCanvas({
       currentProject?.canvas_settings &&
       !restorationInProgress
     ) {
-      console.log("🔄 Canvas ready, attempting to restore canvas data...");
-      console.log("📊 Canvas data to restore:", {
+      logger.canvas("Canvas ready, attempting to restore canvas data");
+      logger.canvas("Canvas data to restore", {
         timestamp: new Date().toISOString(),
         hasObjects: currentProject.canvas_settings.objects?.length || 0,
         hasViewport: !!currentProject.canvas_settings.viewportTransform,
@@ -142,7 +143,7 @@ export function IDEFabricCanvas({
 
       // Always try to restore chat data first, regardless of canvas objects
       if (currentProject.canvas_settings.chatData && !chatRestored) {
-        console.log("💬 Chat data found, dispatching restoration event");
+        logger.canvas("Chat data found, dispatching restoration event");
         setTimeout(() => {
           window.dispatchEvent(
             new CustomEvent("chatDataRestored", {
@@ -156,8 +157,8 @@ export function IDEFabricCanvas({
       // Check if canvas already has objects (might have been restored already)
       const existingObjects = fabricCanvas.getObjects();
       if (existingObjects.length > 0) {
-        console.log(
-          "ℹ️ Canvas already has objects, skipping canvas restoration but chat was restored"
+        logger.canvas(
+          "Canvas already has objects, skipping canvas restoration but chat was restored"
         );
         return;
       }
@@ -167,7 +168,7 @@ export function IDEFabricCanvas({
 
       restoreCanvasData(fabricCanvas)
         .then(() => {
-          console.log("✅ Canvas restoration completed");
+          logger.canvas("Canvas restoration completed");
 
           // Reapply grid pattern after restoration
           const gridPattern = createGridPattern(
@@ -176,10 +177,10 @@ export function IDEFabricCanvas({
             currentZoom
           );
           if (gridPattern) {
-            console.log("Reapplying grid pattern after restoration");
+            logger.canvas("Reapplying grid pattern after restoration");
             fabricCanvas.backgroundColor = gridPattern;
           } else {
-            console.log("Failed to recreate grid pattern after restoration");
+            logger.canvas("Failed to recreate grid pattern after restoration");
           }
 
           fabricCanvas.renderAll();
@@ -195,7 +196,7 @@ export function IDEFabricCanvas({
             currentZoom
           );
           if (gridPattern) {
-            console.log("Applying grid pattern after restoration failure");
+            logger.canvas("Applying grid pattern after restoration failure");
             fabricCanvas.backgroundColor = gridPattern;
             fabricCanvas.renderAll();
           }
@@ -214,13 +215,13 @@ export function IDEFabricCanvas({
   useEffect(() => {
     if (typeof window !== "undefined") {
       (window as any).testChatRestoration = () => {
-        console.log("🧪 Testing chat restoration...");
-        console.log(
+        logger.canvas("Testing chat restoration...");
+        logger.canvas(
           "Current project chat data:",
           currentProject?.canvas_settings?.chatData
         );
-        console.log("Chat restored state:", chatRestored);
-        console.log("Restoration in progress:", restorationInProgress);
+        logger.canvas("Chat restored state:", chatRestored);
+        logger.canvas("Restoration in progress:", restorationInProgress);
         return {
           hasChatData: !!currentProject?.canvas_settings?.chatData,
           chatRestored,
@@ -231,7 +232,7 @@ export function IDEFabricCanvas({
       };
 
       (window as any).manualChatRestore = () => {
-        console.log("🔧 Manual chat restoration triggered");
+        logger.canvas("Manual chat restoration triggered");
         if (currentProject?.canvas_settings?.chatData) {
           window.dispatchEvent(
             new CustomEvent("chatDataRestored", {
@@ -239,14 +240,14 @@ export function IDEFabricCanvas({
             })
           );
           setChatRestored(true);
-          console.log("✅ Manual chat restoration event dispatched");
+          logger.canvas("Manual chat restoration event dispatched");
         } else {
-          console.log("❌ No chat data available for manual restoration");
+          logger.canvas("No chat data available for manual restoration");
         }
       };
 
       (window as any).checkChatMessages = () => {
-        console.log("📝 Checking current chat messages...");
+        logger.canvas("Checking current chat messages...");
         // This will be handled by the AIChatContext
         window.dispatchEvent(new CustomEvent("checkChatMessages"));
       };
@@ -270,7 +271,7 @@ export function IDEFabricCanvas({
     if (typeof window !== "undefined") {
       const handleNetlistRestored = (event: CustomEvent) => {
         const { netlist } = event.detail;
-        console.log("🔗 Netlist restored from project data:", {
+        logger.wire("Netlist restored from project data:", {
           netCount: netlist?.nets?.length || 0,
           totalConnections:
             netlist?.nets?.reduce(
@@ -309,7 +310,7 @@ export function IDEFabricCanvas({
     gridSize: number,
     zoom: number = 1
   ) => {
-    console.log("Creating grid pattern with size:", gridSize, "zoom:", zoom);
+    logger.canvas("Creating grid pattern with size:", gridSize, "zoom:", zoom);
     // Create a temporary canvas for the pattern
     const patternCanvas = document.createElement("canvas");
     const patternCtx = patternCanvas.getContext("2d");
@@ -346,11 +347,11 @@ export function IDEFabricCanvas({
       patternCtx.lineTo(gridSize, gridSize);
 
       patternCtx.stroke();
-      console.log(
+      logger.canvas(
         `Grid pattern created with opacity: ${lineOpacity} (manual: ${gridVisible})`
       );
     } else {
-      console.log("Grid pattern created (invisible at current zoom)");
+      logger.canvas("Grid pattern created (invisible at current zoom)");
     }
 
     // Create Fabric.js pattern
@@ -364,8 +365,8 @@ export function IDEFabricCanvas({
 
   // Context menu paste handler - uses right-click position
   const handleContextPaste = () => {
-    console.log("🔍 DEBUG: handleContextPaste called");
-    console.log("🔍 DEBUG: menuState:", menuState);
+    logger.canvas("handleContextPaste called");
+    logger.canvas("menuState:", menuState);
     handlePaste({ x: menuState.canvasX, y: menuState.canvasY });
   };
 
@@ -376,7 +377,7 @@ export function IDEFabricCanvas({
     // Check if canvas element already has a Fabric.js instance
     const existingCanvas = (canvasRef.current as any).fabric;
     if (existingCanvas) {
-      console.log("Disposing existing canvas before creating new one");
+      logger.canvas("Disposing existing canvas before creating new one");
       existingCanvas.dispose();
     }
 
@@ -388,7 +389,7 @@ export function IDEFabricCanvas({
     const canvasWidth = rect.width - rulerSize;
     const canvasHeight = rect.height - rulerSize;
 
-    console.log(
+    logger.canvas(
       `Creating new canvas with dimensions: ${canvasWidth}x${canvasHeight}`
     );
 
@@ -401,12 +402,12 @@ export function IDEFabricCanvas({
     // Create and apply grid pattern immediately
     const gridPattern = createGridPattern(canvas, gridSize, 1); // Start with zoom = 1
     if (gridPattern) {
-      console.log("Applying initial grid pattern to canvas");
+      logger.canvas("Applying initial grid pattern to canvas");
       canvas.backgroundColor = gridPattern;
       canvas.renderAll();
-      console.log("Grid pattern applied and canvas rendered");
+      logger.canvas("Grid pattern applied and canvas rendered");
     } else {
-      console.log("Failed to create initial grid pattern");
+      logger.canvas("Failed to create initial grid pattern");
       // Fallback: ensure white background
       canvas.backgroundColor = "#FFFFFF";
       canvas.renderAll();
@@ -437,12 +438,12 @@ export function IDEFabricCanvas({
     // Final render to ensure everything is visible
     setTimeout(() => {
       canvas.renderAll();
-      console.log("Final canvas render completed");
+      logger.canvas("Final canvas render completed");
     }, 100);
 
     // Cleanup function to dispose canvas when component unmounts or useEffect re-runs
     return () => {
-      console.log("Disposing canvas in cleanup function");
+      logger.canvas("Disposing canvas in cleanup function");
 
       // Stop memory monitoring
       memoryMonitor.stopMonitoring();
@@ -502,13 +503,13 @@ export function IDEFabricCanvas({
             currentZoom
           );
           if (gridPattern) {
-            console.log("Reapplying grid pattern after ResizeObserver resize");
+            logger.canvas("Reapplying grid pattern after ResizeObserver resize");
             fabricCanvas.backgroundColor = gridPattern;
           }
 
           fabricCanvas.renderAll();
 
-          console.log(`Canvas resized to: ${canvasWidth}x${canvasHeight}`);
+          logger.canvas(`Canvas resized to: ${canvasWidth}x${canvasHeight}`);
         }
       }
     });
@@ -546,7 +547,7 @@ export function IDEFabricCanvas({
             currentZoom
           );
           if (gridPattern) {
-            console.log("Reapplying grid pattern after window resize");
+            logger.canvas("Reapplying grid pattern after window resize");
             fabricCanvas.backgroundColor = gridPattern;
           }
 
@@ -566,8 +567,8 @@ export function IDEFabricCanvas({
   useEffect(() => {
     if (!fabricCanvas) return;
 
-    console.log(
-      "🔗 Setting up component-wire follow logic, ruler visibility, snap-to-grid, and alignment guides"
+    logger.canvas(
+      "Setting up component-wire follow logic, ruler visibility, snap-to-grid, and alignment guides"
     );
 
     // Helper function to snap coordinate to grid
@@ -763,8 +764,8 @@ export function IDEFabricCanvas({
         movingObject.type === "group"
       ) {
         // This is a component being moved - update connected wires
-        console.log(
-          "🔄 Component moving - updating connected wires in real-time"
+        logger.canvas(
+          "Component moving - updating connected wires in real-time"
         );
         // Note: Simple wiring tool doesn't need wire updates on component move
       }
@@ -784,7 +785,7 @@ export function IDEFabricCanvas({
         ((movedObject as any).componentType || movedObject.type === "group") &&
         movedObject.type === "group"
       ) {
-        console.log("🎯 Component movement completed - final wire update");
+        logger.canvas("Component movement completed - final wire update");
         // Note: Simple wiring tool doesn't need wire updates on component move
       }
 
@@ -794,17 +795,17 @@ export function IDEFabricCanvas({
 
     // New ruler visibility handlers per design requirements
     const handleSelectionCreated = () => {
-      console.log("👆 Object selected - showing rulers");
+      logger.canvas("Object selected - showing rulers");
       setAreRulersVisible(true);
     };
 
     const handleSelectionUpdated = () => {
-      console.log("🔄 Selection updated - showing rulers");
+      logger.canvas("Selection updated - showing rulers");
       setAreRulersVisible(true);
     };
 
     const handleSelectionCleared = () => {
-      console.log("❌ Selection cleared - hiding rulers");
+      logger.canvas("Selection cleared - hiding rulers");
       setAreRulersVisible(false);
       // Also remove any lingering alignment guides
       removeAlignmentGuides();
@@ -844,7 +845,7 @@ export function IDEFabricCanvas({
   const optimizeCanvasMemory = useCallback(() => {
     if (!fabricCanvas) return;
 
-    console.log("🧹 Optimizing canvas memory...");
+    logger.canvas("Optimizing canvas memory...");
 
     const objects = fabricCanvas.getObjects();
     let removedCount = 0;
@@ -871,7 +872,7 @@ export function IDEFabricCanvas({
     });
 
     if (removedCount > 0) {
-      console.log(`🗑️ Removed ${removedCount} off-screen objects`);
+      logger.canvas(`Removed ${removedCount} off-screen objects`);
       fabricCanvas.renderAll();
     }
 
@@ -894,7 +895,7 @@ export function IDEFabricCanvas({
 
         if (memoryUsageRatio > 0.7) {
           // If using more than 70% of heap
-          console.log("⚠️ High memory usage detected, optimizing canvas...");
+          logger.canvas("High memory usage detected, optimizing canvas...");
           optimizeCanvasMemory();
         }
       }
@@ -903,9 +904,9 @@ export function IDEFabricCanvas({
     return () => clearInterval(memoryCheckInterval);
   }, [fabricCanvas, optimizeCanvasMemory]);
   const handleGroup = () => {
-    console.log("--- ACTION START: handleGroup ---");
+    logger.canvas("--- ACTION START: handleGroup ---");
     if (!fabricCanvas) {
-      console.log("--- ACTION FAILED: No canvas available ---");
+      logger.canvas("--- ACTION FAILED: No canvas available ---");
       return;
     }
 
@@ -913,12 +914,12 @@ export function IDEFabricCanvas({
 
     // Check if we have multiple objects selected (activeSelection)
     if (activeObject && activeObject.type === "activeSelection") {
-      console.log("--- Grouping existing activeSelection ---");
+      logger.canvas("--- Grouping existing activeSelection ---");
 
       // Get the objects from the ActiveSelection
       const objects = (activeObject as any)._objects || [];
       if (objects.length < 2) {
-        console.log(
+        logger.canvas(
           "--- ACTION FAILED: ActiveSelection has less than 2 objects ---"
         );
         return;
@@ -947,7 +948,7 @@ export function IDEFabricCanvas({
       fabricCanvas.add(group);
       fabricCanvas.setActiveObject(group);
       fabricCanvas.renderAll();
-      console.log("--- ACTION SUCCESS: handleGroup (from activeSelection) ---");
+      logger.canvas("--- ACTION SUCCESS: handleGroup (from activeSelection) ---");
       return;
     }
 
@@ -959,11 +960,11 @@ export function IDEFabricCanvas({
       );
 
     if (allObjects.length < 2) {
-      console.log("--- ACTION FAILED: Need at least 2 objects to group ---");
+      logger.canvas("--- ACTION FAILED: Need at least 2 objects to group ---");
       return;
     }
 
-    console.log(`--- Found ${allObjects.length} objects to group ---`);
+    logger.canvas(`--- Found ${allObjects.length} objects to group ---`);
 
     // Calculate the bounding box of all objects
     let minLeft = Infinity,
@@ -997,24 +998,24 @@ export function IDEFabricCanvas({
     fabricCanvas.setActiveObject(group);
     fabricCanvas.renderAll();
 
-    console.log("--- ACTION SUCCESS: handleGroup (created new group) ---");
+    logger.canvas("--- ACTION SUCCESS: handleGroup (created new group) ---");
     // saveState(); // We can add this back later
   };
 
   const handleUngroup = async () => {
-    console.log("--- ACTION START: handleUngroup ---");
+    logger.canvas("--- ACTION START: handleUngroup ---");
     if (!fabricCanvas) {
-      console.log("--- ACTION FAILED: No canvas available ---");
+      logger.canvas("--- ACTION FAILED: No canvas available ---");
       return;
     }
 
     const activeObject = fabricCanvas.getActiveObject();
     if (!activeObject || activeObject.type !== "group") {
-      console.log("--- ACTION FAILED: Selected object is not a group ---");
+      logger.canvas("--- ACTION FAILED: Selected object is not a group ---");
       return;
     }
 
-    console.log("--- Ungrouping selected group ---");
+    logger.canvas("--- Ungrouping selected group ---");
 
     const group = activeObject as fabric.Group;
 
@@ -1070,7 +1071,7 @@ export function IDEFabricCanvas({
     }
 
     fabricCanvas.renderAll();
-    console.log(
+    logger.canvas(
       `--- ACTION SUCCESS: handleUngroup (ungrouped ${addedObjects.length} objects) ---`
     );
 
@@ -1078,15 +1079,15 @@ export function IDEFabricCanvas({
   };
 
   const handleDelete = () => {
-    console.log("--- ACTION START: handleDelete ---");
+    logger.canvas("--- ACTION START: handleDelete ---");
     if (!fabricCanvas) {
-      console.log("--- ACTION FAILED: No canvas available ---");
+      logger.canvas("--- ACTION FAILED: No canvas available ---");
       return;
     }
 
     const activeObject = fabricCanvas.getActiveObject();
     if (!activeObject) {
-      console.log("--- ACTION FAILED: No object selected to delete ---");
+      logger.canvas("--- ACTION FAILED: No object selected to delete ---");
       return;
     }
 
@@ -1097,7 +1098,7 @@ export function IDEFabricCanvas({
       fabricCanvas.discardActiveObject();
       fabricCanvas.renderAll();
       saveState();
-      console.log(
+      logger.canvas(
         `--- ACTION SUCCESS: handleDelete (deleted ${objects.length} objects) ---`
       );
       return;
@@ -1107,37 +1108,37 @@ export function IDEFabricCanvas({
     fabricCanvas.remove(activeObject);
     fabricCanvas.renderAll();
     saveState();
-    console.log("--- ACTION SUCCESS: handleDelete (deleted 1 object) ---");
+    logger.canvas("--- ACTION SUCCESS: handleDelete (deleted 1 object) ---");
   };
 
   const handleCopy = () => {
-    console.log("🔍 DEBUG: handleCopy called");
-    console.log("--- ACTION START: handleCopy ---");
+    logger.canvas("DEBUG: handleCopy called");
+    logger.canvas("--- ACTION START: handleCopy ---");
     if (!fabricCanvas) {
-      console.log("--- ACTION FAILED: No canvas available ---");
+      logger.canvas("--- ACTION FAILED: No canvas available ---");
       return;
     }
 
     const activeObject = fabricCanvas.getActiveObject();
     if (!activeObject) {
-      console.log("--- ACTION FAILED: No object selected to copy ---");
+      logger.canvas("--- ACTION FAILED: No object selected to copy ---");
       return;
     }
 
     // Simple copy implementation
     setClipboard(activeObject);
-    console.log("--- ACTION SUCCESS: handleCopy ---");
+    logger.canvas("--- ACTION SUCCESS: handleCopy ---");
   };
 
   const handlePaste = (position?: { x: number; y: number }) => {
-    console.log("--- ACTION START: handlePaste ---");
+    logger.canvas("--- ACTION START: handlePaste ---");
     if (!fabricCanvas) {
-      console.log("--- ACTION FAILED: No canvas available ---");
+      logger.canvas("--- ACTION FAILED: No canvas available ---");
       return;
     }
 
     if (!clipboard) {
-      console.log("--- ACTION FAILED: Nothing to paste (clipboard empty) ---");
+      logger.canvas("--- ACTION FAILED: Nothing to paste (clipboard empty) ---");
       return;
     }
 
@@ -1160,8 +1161,8 @@ export function IDEFabricCanvas({
         componentData.type === "component" &&
         componentType
       ) {
-        console.log(
-          `🔄 Pasted component detected: ${
+        logger.canvas(
+          `Pasted component detected: ${
             componentData.componentName || componentType
           }`
         );
@@ -1202,18 +1203,18 @@ export function IDEFabricCanvas({
             fabricCanvas.renderAll();
             saveState();
 
-            console.log(
+            logger.canvas(
               `--- ACTION SUCCESS: handlePaste with pin recreation at position (${pastePos.x}, ${pastePos.y}) ---`
             );
           } catch (error) {
-            console.error("❌ Failed to recreate component pins:", error);
+            logger.canvas("Failed to recreate component pins:", error);
             // Fallback: add the cloned component as-is
             fabricCanvas.add(cloned);
             fabricCanvas.setActiveObject(cloned);
             fabricCanvas.renderAll();
             saveState();
 
-            console.log(
+            logger.canvas(
               `--- ACTION SUCCESS: handlePaste (fallback) at position (${pastePos.x}, ${pastePos.y}) ---`
             );
           }
@@ -1226,7 +1227,7 @@ export function IDEFabricCanvas({
         fabricCanvas.setActiveObject(cloned);
         fabricCanvas.renderAll();
         saveState();
-        console.log(
+        logger.canvas(
           `--- ACTION SUCCESS: handlePaste at position (${pastePos.x}, ${pastePos.y}) ---`
         );
       }
@@ -1235,21 +1236,21 @@ export function IDEFabricCanvas({
   };
 
   const handleRotate = () => {
-    console.log("--- ACTION START: handleRotate ---");
+    logger.canvas("--- ACTION START: handleRotate ---");
     if (!fabricCanvas) {
-      console.log("--- ACTION FAILED: No canvas available ---");
+      logger.canvas("--- ACTION FAILED: No canvas available ---");
       return;
     }
 
     const activeObject = fabricCanvas.getActiveObject();
     if (!activeObject) {
-      console.log("--- ACTION FAILED: No component selected to rotate ---");
+      logger.canvas("--- ACTION FAILED: No component selected to rotate ---");
       return;
     }
 
     // Only rotate components (not wires or other objects)
     if (!(activeObject as any).componentType) {
-      console.log("--- ACTION FAILED: Selected object is not a component ---");
+      logger.canvas("--- ACTION FAILED: Selected object is not a component ---");
       return;
     }
 
@@ -1261,21 +1262,21 @@ export function IDEFabricCanvas({
     fabricCanvas.renderAll();
     saveState();
 
-    console.log(
+    logger.canvas(
       `--- ACTION SUCCESS: handleRotate (${currentAngle}° → ${newAngle}°) ---`
     );
   };
 
   const handleUndo = () => {
-    console.log("--- ACTION START: handleUndo ---");
+    logger.canvas("--- ACTION START: handleUndo ---");
     historyUndo();
-    console.log("--- ACTION END: handleUndo ---");
+    logger.canvas("--- ACTION END: handleUndo ---");
   };
 
   const handleRedo = () => {
-    console.log("--- ACTION START: handleRedo ---");
+    logger.canvas("--- ACTION START: handleRedo ---");
     historyRedo();
-    console.log("--- ACTION END: handleRedo ---");
+    logger.canvas("--- ACTION END: handleRedo ---");
   };
 
   // PART 3: The Connection (The Central Hub)
@@ -1357,19 +1358,19 @@ export function IDEFabricCanvas({
     const containerDiv = containerRef.current;
 
     const handleContextMenu = (e: MouseEvent) => {
-      console.log("🔍 IDEFabricCanvas handleContextMenu triggered!");
-      console.log("- Event:", e);
-      console.log("- clientX:", e.clientX, "clientY:", e.clientY);
+      logger.canvas("IDEFabricCanvas handleContextMenu triggered!");
+      logger.canvas("- Event:", e);
+      logger.canvas("- clientX:", e.clientX, "clientY:", e.clientY);
 
       e.preventDefault(); // Stop the default browser menu
 
       // Use canvas.findTarget() to determine if user right-clicked on an object
       const target = fabricCanvas.findTarget(e);
-      console.log("- Fabric target found:", target);
-      console.log("- Target name:", target ? (target as any).name : "none");
+      logger.canvas("- Fabric target found:", target);
+      logger.canvas("- Target name:", target ? (target as any).name : "none");
 
       if (target && (target as any).name !== "workspace") {
-        console.log("✅ Showing OBJECT context menu");
+        logger.canvas("Showing OBJECT context menu");
         // Case A: Right-Click on an Object
         // Make that object the active selection on the canvas
         fabricCanvas.setActiveObject(target);
@@ -1385,10 +1386,10 @@ export function IDEFabricCanvas({
           type: "object" as const,
           target: target,
         };
-        console.log("🔧 Setting OBJECT menu state:", objectMenuState);
+        logger.canvas("Setting OBJECT menu state:", objectMenuState);
         setMenuState(objectMenuState);
       } else {
-        console.log("✅ Showing CANVAS context menu");
+        logger.canvas("Showing CANVAS context menu");
         // Case B: Right-Click on Empty Canvas
         // Show context menu with only "Paste" option
         const canvasMenuState = {

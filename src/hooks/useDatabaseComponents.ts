@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import { logger } from "@/lib/logger";
 
 export interface DatabaseComponent {
   id: string;
@@ -42,7 +43,7 @@ export function useDatabaseComponents() {
   const fetchComponents = useCallback(
     async (loadMore = false) => {
       try {
-        console.log("🔍 Fetching components from database...", {
+        logger.api("Fetching components from database...", {
           loadMore,
           offset,
           PAGE_SIZE,
@@ -55,7 +56,7 @@ export function useDatabaseComponents() {
         setError(null);
 
         const currentOffset = loadMore ? offset : 0;
-        console.log("📡 Making Supabase query:", {
+        logger.api("Making Supabase query:", {
           table: "components",
           range: [currentOffset, currentOffset + PAGE_SIZE - 1],
           orderBy: "name",
@@ -67,7 +68,7 @@ export function useDatabaseComponents() {
           .order("name")
           .range(currentOffset, currentOffset + PAGE_SIZE - 1);
 
-        console.log("📊 Supabase response:", {
+        logger.api("Supabase response:", {
           dataLength: data?.length || 0,
           error: fetchError,
           hasMore: data ? data.length === PAGE_SIZE : false,
@@ -79,7 +80,7 @@ export function useDatabaseComponents() {
         }
 
         if (data) {
-          console.log("✅ Processing", data.length, "components from database");
+          logger.api("Processing", data.length, "components from database");
 
           // Check if we have more data
           setHasMore(data.length === PAGE_SIZE);
@@ -87,7 +88,7 @@ export function useDatabaseComponents() {
           // Transform database components to display format
           const displayComponents: ComponentDisplayData[] = data.map(
             (comp: DatabaseComponent) => {
-              console.log("🔄 Processing component:", {
+              logger.api("Processing component:", {
                 id: comp.id,
                 name: comp.name,
                 category: comp.category,
@@ -113,8 +114,8 @@ export function useDatabaseComponents() {
             }
           );
 
-          console.log(
-            "🎯 Setting",
+          logger.api(
+            "Setting",
             displayComponents.length,
             "display components"
           );
@@ -122,8 +123,8 @@ export function useDatabaseComponents() {
           if (loadMore) {
             setComponents((prev) => {
               const newComponents = [...prev, ...displayComponents];
-              console.log(
-                "📦 Total components after load more:",
+              logger.api(
+                "Total components after load more:",
                 newComponents.length
               );
               return newComponents;
@@ -132,19 +133,19 @@ export function useDatabaseComponents() {
           } else {
             setComponents(displayComponents);
             setOffset(PAGE_SIZE);
-            console.log("📦 Set initial components:", displayComponents.length);
+            logger.api("Set initial components:", displayComponents.length);
           }
         } else {
-          console.warn("⚠️ No data returned from Supabase");
+          logger.api("No data returned from Supabase");
         }
       } catch (err) {
-        console.error("❌ Error fetching components:", err);
+        logger.api("Error fetching components:", err);
         setError(
           err instanceof Error ? err.message : "Failed to fetch components"
         );
       } finally {
         setLoading(false);
-        console.log("🏁 Component fetch completed");
+        logger.api("Component fetch completed");
       }
     },
     [offset]
@@ -156,9 +157,9 @@ export function useDatabaseComponents() {
     }
   }, [hasMore, loading, fetchComponents]);
 
-  // Memory cleanup function
+    // Memory cleanup function
   const cleanupMemory = useCallback(() => {
-    console.log("🧹 Cleaning up component memory...");
+    logger.api("Cleaning up component memory...");
     setComponents([]);
     setOffset(0);
     setHasMore(true);
@@ -168,7 +169,7 @@ export function useDatabaseComponents() {
   // Auto-cleanup when component unmounts or when memory usage gets high
   useEffect(() => {
     const handleMemoryPressure = () => {
-      console.log("⚠️ Memory pressure detected, cleaning up components...");
+      logger.api("Memory pressure detected, cleaning up components...");
       cleanupMemory();
     };
 
@@ -176,20 +177,19 @@ export function useDatabaseComponents() {
     if ("memory" in performance) {
       const memoryInfo = (performance as any).memory;
       if (memoryInfo.usedJSHeapSize > memoryInfo.totalJSHeapSize * 0.8) {
-        console.log("⚠️ High memory usage detected, triggering cleanup...");
+        logger.api("High memory usage detected, triggering cleanup...");
         cleanupMemory();
       }
     }
 
     return () => {
-      // Cleanup on unmount
-      cleanupMemory();
+      // Cleanup function for useEffect
     };
   }, [cleanupMemory]);
 
   // Initial component fetch
   useEffect(() => {
-    console.log("🚀 Initial component fetch triggered");
+    logger.api("Initial component fetch triggered");
     fetchComponents(false);
   }, []); // Empty dependency array to run only once on mount
 

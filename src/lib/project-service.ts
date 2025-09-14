@@ -2,6 +2,7 @@
 
 import { DatabaseService, Project } from "@/lib/database";
 import { Circuit } from "@/lib/schemas/circuit";
+import { logger } from "./logger";
 
 export interface ProjectLoadResult {
   project: Project;
@@ -26,7 +27,7 @@ export class ProjectService {
 
       // Scenario 1: Brand new user (no projects)
       if (projects.length === 0) {
-        console.log("🆕 Brand new user - creating first project");
+        logger.api("Brand new user - creating first project");
         const newProject = await this.createUntitledProject();
         return {
           project: newProject,
@@ -40,8 +41,8 @@ export class ProjectService {
 
       // Scenario 2: User has projects and the most recent one has a custom name
       if (mostRecentProject.name !== "Untitled") {
-        console.log(
-          "👋 Returning user - loading most recent project:",
+        logger.api(
+          "Returning user - loading most recent project:",
           mostRecentProject.name
         );
         await DatabaseService.updateLastOpened(mostRecentProject.id);
@@ -54,7 +55,7 @@ export class ProjectService {
 
       // Scenario 3: User's most recent project is still "Untitled"
       // (they haven't renamed their first project)
-      console.log('🔄 Returning user - continuing with "Untitled" project');
+      logger.api('Returning user - continuing with "Untitled" project');
       await DatabaseService.updateLastOpened(mostRecentProject.id);
       return {
         project: mostRecentProject,
@@ -71,7 +72,7 @@ export class ProjectService {
       });
 
       // Fallback: Create a new "Untitled" project if there's any error
-      console.log('🔧 Fallback - creating new "Untitled" project due to error');
+      logger.api('Fallback - creating new "Untitled" project due to error');
       const fallbackProject = await this.createUntitledProject();
       return {
         project: fallbackProject,
@@ -85,7 +86,7 @@ export class ProjectService {
    * Create a new "Untitled" project with empty circuit data
    */
   private static async createUntitledProject(): Promise<Project> {
-    console.log('🆕 Creating new "Untitled" project...');
+    logger.api('Creating new "Untitled" project...');
 
     try {
       const emptyCircuit: Circuit = {
@@ -112,11 +113,11 @@ export class ProjectService {
         },
       });
 
-      console.log('✅ "Untitled" project created successfully:', newProject.id);
+      logger.api('"Untitled" project created successfully:', newProject.id);
       return newProject;
     } catch (error) {
-      console.error("❌ Error creating Untitled project:", error);
-      console.error("❌ Create project error details:", {
+      logger.api("Error creating Untitled project:", error);
+      logger.api("Create project error details:", {
         message: error instanceof Error ? error.message : "Unknown error",
         stack: error instanceof Error ? error.stack : undefined,
         errorType: typeof error,
@@ -142,7 +143,7 @@ export class ProjectService {
         chatData: chatData || null,
       };
 
-      console.log("💾 Saving project with data:", {
+      logger.api("Saving project with data:", {
         projectId,
         hasCircuitData: !!circuitData,
         hasCanvasData: !!canvasData,
@@ -169,9 +170,9 @@ export class ProjectService {
         "Auto-save"
       );
 
-      console.log("💾 Project saved successfully");
+      logger.api("Project saved successfully");
     } catch (error) {
-      console.error("❌ Error saving project:", error);
+      logger.api("Error saving project:", error);
       throw error;
     }
   }
