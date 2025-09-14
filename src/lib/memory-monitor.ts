@@ -4,6 +4,7 @@
  */
 
 import React from "react";
+import { logger } from "./logger";
 
 export interface MemoryInfo {
   usedJSHeapSize: number;
@@ -49,7 +50,7 @@ export class MemoryMonitor {
     if (this.monitoring) return;
 
     this.monitoring = true;
-    console.log("🧠 Memory monitoring started");
+    logger.canvas("Memory monitoring started");
 
     this.intervalId = window.setInterval(() => {
       const info = this.getMemoryInfo();
@@ -73,7 +74,7 @@ export class MemoryMonitor {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
-    console.log("🧠 Memory monitoring stopped");
+    logger.canvas("Memory monitoring stopped");
   }
 
   forceGarbageCollection(): void {

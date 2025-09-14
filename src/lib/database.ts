@@ -4,7 +4,7 @@ import { logger } from "./logger";
 
 export interface Project {
   id: string;
-  name: string;
+  name?: string;
   description?: string;
   owner_id: string;
   is_public: boolean;
@@ -70,7 +70,7 @@ export class DatabaseService {
    * Get all projects for the current user
    */
   static async getUserProjects(): Promise<Project[]> {
-    console.log("🔍 Getting user projects...");
+    logger.api("Getting user projects...");
 
     // Check if user is authenticated
     const {
@@ -78,16 +78,16 @@ export class DatabaseService {
       error: userError,
     } = await supabase.auth.getUser();
     if (userError) {
-      console.error("❌ Auth error getting user:", userError);
+      logger.api("Auth error getting user:", userError);
       throw new Error(`Authentication error: ${userError.message}`);
     }
 
     if (!user) {
-      console.error("❌ No authenticated user found");
+      logger.api("No authenticated user found");
       throw new Error("User not authenticated");
     }
 
-    console.log("✅ User authenticated:", user.email);
+    logger.api("User authenticated:", user.email);
 
     const { data, error } = await supabase
       .from("projects")
@@ -95,11 +95,11 @@ export class DatabaseService {
       .order("updated_at", { ascending: false });
 
     if (error) {
-      console.error("❌ Database error getting projects:", error);
+      logger.api("Database error getting projects:", error);
       throw new Error(`Database error: ${error.message}`);
     }
 
-    console.log("✅ Projects retrieved:", data?.length || 0, "projects");
+    logger.api("Projects retrieved:", data?.length || 0, "projects");
     return data || [];
   }
 
@@ -107,7 +107,7 @@ export class DatabaseService {
    * Get a specific project by ID
    */
   static async getProject(projectId: string): Promise<Project | null> {
-    console.log("🔍 Getting project by ID:", projectId);
+    logger.api("Getting project by ID:", projectId);
 
     const {
       data: { user },
@@ -126,14 +126,14 @@ export class DatabaseService {
     if (error) {
       if (error.code === "PGRST116") {
         // No rows returned
-        console.log("❌ Project not found:", projectId);
+        logger.api("Project not found:", projectId);
         return null;
       }
-      console.error("❌ Database error getting project:", error);
+      logger.api("Database error getting project:", error);
       throw new Error(`Database error: ${error.message}`);
     }
 
-    console.log("✅ Project retrieved:", {
+    logger.api("Project retrieved:", {
       name: data.name,
       hasCanvasSettings: !!data.canvas_settings,
       canvasSettingsKeys: data.canvas_settings
@@ -168,7 +168,9 @@ export class DatabaseService {
    * Create a new project
    */
   static async createProject(projectData: Partial<Project>): Promise<Project> {
-    console.log("🆕 Creating new project...", { name: projectData.name });
+    logger.api("Creating new project...", {
+      name: projectData.name || "unnamed",
+    });
 
     const {
       data: { user },
@@ -179,7 +181,7 @@ export class DatabaseService {
       throw new Error("User not authenticated");
     }
 
-    console.log("✅ User authenticated for project creation:", user.email);
+    logger.api("User authenticated for project creation:", user.email);
 
     const { data, error } = await supabase
       .from("projects")
@@ -197,7 +199,7 @@ export class DatabaseService {
       throw new Error(`Failed to create project: ${error.message}`);
     }
 
-    console.log("✅ Project created successfully:", data.name, "ID:", data.id);
+    logger.api("Project created successfully:", data.name, "ID:", data.id);
 
     // Log activity
     try {
@@ -291,7 +293,7 @@ export class DatabaseService {
   static async getLatestVersion(
     projectId: string
   ): Promise<ProjectVersion | null> {
-    console.log("🔍 Getting latest version for project:", projectId);
+    logger.api("Getting latest version for project:", projectId);
 
     const { data, error } = await supabase
       .from("project_versions")
@@ -303,7 +305,7 @@ export class DatabaseService {
 
     if (error && error.code !== "PGRST116") throw error; // PGRST116 = no rows
 
-    console.log("📊 Latest version data:", {
+    logger.api("Latest version data:", {
       hasData: !!data,
       versionNumber: data?.version_number,
       hasCanvasData: !!data?.canvas_data,
@@ -348,8 +350,8 @@ export class DatabaseService {
 
         const nextVersionNumber = (latestVersion?.version_number || 0) + 1;
 
-        console.log(
-          "💾 Creating version",
+        logger.api(
+          "Creating version",
           nextVersionNumber,
           "for project",
           projectId

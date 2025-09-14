@@ -114,11 +114,7 @@ export function useDatabaseComponents() {
             }
           );
 
-          logger.api(
-            "Setting",
-            displayComponents.length,
-            "display components"
-          );
+          logger.api("Setting", displayComponents.length, "display components");
 
           if (loadMore) {
             setComponents((prev) => {
@@ -157,7 +153,7 @@ export function useDatabaseComponents() {
     }
   }, [hasMore, loading, fetchComponents]);
 
-    // Memory cleanup function
+  // Memory cleanup function
   const cleanupMemory = useCallback(() => {
     logger.api("Cleaning up component memory...");
     setComponents([]);

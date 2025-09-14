@@ -1,8 +1,8 @@
 /**
  * Simple Wiring Tool - Works with Database Pin Data
  * A clean, straightforward           if (data && data.type === "pin") {
-            console.log(
-              `🔍 Found pin: ${pinData.pinNumber} of component ${pinData.componentId}`
+            logger.wire(
+              `Found pin: ${pinData.pinNumber} of component ${pinData.componentId}`
             );
             // Get the pin's center point, transforming if it's inside a group
             let pinCenter = obj.getCenterPoint();
@@ -10,9 +10,9 @@
               pinCenter = fabric.util.transformPoint(pinCenter, groupTransform);
             }
 
-            console.log(`🔍 Pin local center: (${obj.getCenterPoint().x.toFixed(1)}, ${obj.getCenterPoint().y.toFixed(1)})`);
-            console.log(`🔍 Pin transformed center: (${pinCenter.x.toFixed(1)}, ${pinCenter.y.toFixed(1)})`);
-            console.log(`🔍 Mouse point: (${point.x.toFixed(1)}, ${point.y.toFixed(1)})`);
+            logger.wire(`Pin local center: (${obj.getCenterPoint().x.toFixed(1)}, ${obj.getCenterPoint().y.toFixed(1)})`);
+            logger.wire(`Pin transformed center: (${pinCenter.x.toFixed(1)}, ${pinCenter.y.toFixed(1)})`);
+            logger.wire(`Mouse point: (${point.x.toFixed(1)}, ${point.y.toFixed(1)})`);
 
             // Check if mouse is within pin bounds (simple circle collision)
             const distance = Math.sqrt(
@@ -20,13 +20,14 @@
                 Math.pow(point.y - pinCenter.y, 2)
             );
 
-            console.log(`🔍 Distance: ${distance.toFixed(2)}px (threshold: 6px)`);for connecting component pins
+            logger.wire(`Distance: ${distance.toFixed(2)}px (threshold: 6px)`);for connecting component pins
  * Integrated with netlist management for electrical connectivity tracking
  */
 
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import * as fabric from "fabric";
 import { useNetlist, NetConnection } from "./useNetlist";
+import { logger } from "@/lib/logger";
 
 interface PinData {
   name: string;
@@ -89,10 +90,8 @@ export function useSimpleWiringTool({
     (point: fabric.Point): fabric.Object | null => {
       if (!canvas) return null;
 
-      console.log(
-        `🔍 Finding pin at point: (${point.x.toFixed(1)}, ${point.y.toFixed(
-          1
-        )})`
+      logger.wire(
+        `Finding pin at point: (${point.x.toFixed(1)}, ${point.y.toFixed(1)})`
       );
 
       // Helper function to search for pins recursively
@@ -104,8 +103,8 @@ export function useSimpleWiringTool({
           // Check if this object itself is a pin
           const pinData = (obj as any).data;
           if (pinData && pinData.type === "pin") {
-            console.log(
-              `🔍 Found pin: ${pinData.pinNumber} of component ${pinData.componentId}`
+            logger.wire(
+              `Found pin: ${pinData.pinNumber} of component ${pinData.componentId}`
             );
             // Get the pin's center point, transforming if it's inside a group
             let pinCenter = obj.getCenterPoint();
@@ -119,8 +118,8 @@ export function useSimpleWiringTool({
                 Math.pow(point.y - pinCenter.y, 2)
             );
 
-            console.log(
-              `🔍 Pin distance: ${distance.toFixed(
+            logger.wire(
+              `Pin distance: ${distance.toFixed(
                 2
               )}px, center: (${pinCenter.x.toFixed(1)}, ${pinCenter.y.toFixed(
                 1
@@ -129,18 +128,18 @@ export function useSimpleWiringTool({
 
             // Pin radius is approximately 4-6 pixels
             if (distance <= 6) {
-              console.log(`✅ Pin clicked: ${pinData.pinNumber}`);
+              logger.wire(`Pin clicked: ${pinData.pinNumber}`);
               return obj;
             }
           }
 
           // If this is a group, search inside it
           if (obj.type === "group") {
-            console.log(`🔍 Searching inside group: ${obj.type}`);
+            logger.wire(`Searching inside group: ${obj.type}`);
             const group = obj as fabric.Group;
             const groupTransformMatrix = group.calcTransformMatrix();
             const groupObjects = group.getObjects();
-            console.log(`🔍 Group has ${groupObjects.length} objects`);
+            logger.wire(`Group has ${groupObjects.length} objects`);
             const found = findPinRecursive(groupObjects, groupTransformMatrix);
             if (found) return found;
           }
@@ -215,7 +214,7 @@ export function useSimpleWiringTool({
   // Handle mouse down for starting wire
   const handleMouseDown = useCallback(
     (e: any) => {
-      console.log("🔗 handleMouseDown called", {
+      logger.wire("handleMouseDown called", {
         isWireMode,
         canvas: !!canvas,
       });
@@ -229,15 +228,15 @@ export function useSimpleWiringTool({
       const point = new fabric.Point(pointer.x, pointer.y);
 
       const clickedPin = findPinAtPoint(point);
-      console.log(
-        "🔗 Clicked pin:",
+      logger.wire(
+        "Clicked pin:",
         clickedPin
           ? `pin ${(clickedPin as any).data?.pinNumber} of component ${
               (clickedPin as any).data?.componentId
             }`
           : "none"
       );
-      console.log("🔗 Total objects on canvas:", canvas.getObjects().length);
+      logger.wire("Total objects on canvas:", canvas.getObjects().length);
 
       if (clickedPin) {
         const pinData = (clickedPin as any).data;
@@ -318,23 +317,21 @@ export function useSimpleWiringTool({
               // Both pins are already in nets
               if (fromNet.netId === toNet.netId) {
                 // Already in the same net - this is redundant but allowed
-                console.log(
-                  `🔗 Connecting pins already in same net: ${fromNet.netId}`
+                logger.wire(
+                  `Connecting pins already in same net: ${fromNet.netId}`
                 );
               } else {
                 // Different nets - merge them
-                console.log(
-                  `🔗 Merging nets: ${fromNet.netId} + ${toNet.netId}`
-                );
+                logger.wire(`Merging nets: ${fromNet.netId} + ${toNet.netId}`);
                 netlist.mergeNets(fromNet.netId, toNet.netId);
               }
             } else if (fromNet) {
               // Only from pin is in a net - add to pin to it
-              console.log(`🔗 Adding pin to existing net: ${fromNet.netId}`);
+              logger.wire(`Adding pin to existing net: ${fromNet.netId}`);
               netlist.addConnectionToNet(fromNet.netId, toConnection);
             } else if (toNet) {
               // Only to pin is in a net - add from pin to it
-              console.log(`🔗 Adding pin to existing net: ${toNet.netId}`);
+              logger.wire(`Adding pin to existing net: ${toNet.netId}`);
               netlist.addConnectionToNet(toNet.netId, fromConnection);
             } else {
               // Neither pin is in a net - create a new net
@@ -342,7 +339,7 @@ export function useSimpleWiringTool({
                 fromConnection,
                 toConnection,
               ]);
-              console.log(`🔗 Created new net: ${newNetId}`);
+              logger.wire(`Created new net: ${newNetId}`);
             }
 
             setConnections((prev) => [...prev, connection]);
@@ -352,7 +349,7 @@ export function useSimpleWiringTool({
               onNetlistChange(netlist.nets);
             }
 
-            console.log(`📊 Current netlist:`, netlist.nets);
+            logger.wire(`Current netlist:`, netlist.nets);
           }
 
           // Reset drawing state
@@ -419,32 +416,32 @@ export function useSimpleWiringTool({
 
   // Show component pins when entering wire mode
   const showComponentPins = useCallback((canvas: fabric.Canvas) => {
-    console.log("👁️ Showing component pins");
+    logger.wire("Showing component pins");
     const objects = canvas.getObjects();
     let pinCount = 0;
 
     const showPinsRecursive = (objects: fabric.Object[], depth = 0) => {
       const indent = "  ".repeat(depth);
-      console.log(
-        `${indent}🔍 Searching ${objects.length} objects at depth ${depth}`
+      logger.wire(
+        `${indent}Searching ${objects.length} objects at depth ${depth}`
       );
 
       for (const obj of objects) {
-        console.log(
-          `${indent}📦 Object type: ${obj.type}, visible: ${obj.visible}, opacity: ${obj.opacity}`
+        logger.wire(
+          `${indent}Object type: ${obj.type}, visible: ${obj.visible}, opacity: ${obj.opacity}`
         );
 
         if (obj.type === "group") {
           const groupObjects = (obj as fabric.Group).getObjects();
-          console.log(
-            `${indent}📂 Group has ${groupObjects.length} child objects`
+          logger.wire(
+            `${indent}Group has ${groupObjects.length} child objects`
           );
 
           // Check if this is a component sandwich
           const groupData = (obj as any).data;
           if (groupData && groupData.type === "component") {
-            console.log(
-              `${indent}🏗️ Found component: ${groupData.componentName} with ${groupObjects.length} parts`
+            logger.wire(
+              `${indent}Found component: ${groupData.componentName} with ${groupObjects.length} parts`
             );
           }
 
@@ -452,47 +449,47 @@ export function useSimpleWiringTool({
         } else {
           // Check if this is a pin
           const data = (obj as any).data;
-          console.log(`${indent}🔍 Checking object data:`, data);
+          logger.wire(`${indent}Checking object data:`, data);
 
           if (data && data.type === "pin") {
-            console.log(`${indent}✅ Found pin! Setting visible...`);
-            console.log(
-              `${indent}📍 Pin position: left=${obj.left}, top=${obj.top}`
+            logger.wire(`${indent}Found pin! Setting visible...`);
+            logger.wire(
+              `${indent}Pin position: left=${obj.left}, top=${obj.top}`
             );
-            console.log(`${indent}📍 Pin center:`, obj.getCenterPoint());
+            logger.wire(`${indent}Pin center:`, obj.getCenterPoint());
             if (obj.group) {
-              console.log(
-                `${indent}📍 Pin is in group, group position: left=${obj.group.left}, top=${obj.group.top}`
+              logger.wire(
+                `${indent}Pin is in group, group position: left=${obj.group.left}, top=${obj.group.top}`
               );
               const transformedCenter = fabric.util.transformPoint(
                 obj.getCenterPoint(),
                 obj.group.calcTransformMatrix()
               );
-              console.log(`${indent}📍 Transformed center:`, transformedCenter);
+              logger.wire(`${indent}Transformed center:`, transformedCenter);
             }
             obj.set({
               visible: true,
               opacity: 1,
             });
             pinCount++;
-            console.log(
-              `${indent}👁️ Showed pin: ${data.pinId} (${data.pinNumber})`
+            logger.wire(
+              `${indent}Showed pin: ${data.pinId} (${data.pinNumber})`
             );
           } else {
-            console.log(`${indent}❌ Not a pin (data.type: ${data?.type})`);
+            logger.wire(`${indent}Not a pin (data.type: ${data?.type})`);
           }
         }
       }
     };
 
     showPinsRecursive(objects);
-    console.log(`👁️ Total pins shown: ${pinCount}`);
+    logger.wire(`Total pins shown: ${pinCount}`);
     canvas.renderAll();
   }, []);
 
   // Hide component pins when exiting wire mode
   const hideComponentPins = useCallback((canvas: fabric.Canvas) => {
-    console.log("🙈 Hiding component pins");
+    logger.wire("Hiding component pins");
     const objects = canvas.getObjects();
     let pinCount = 0;
 
@@ -516,30 +513,30 @@ export function useSimpleWiringTool({
     };
 
     hidePinsRecursive(objects);
-    console.log(`🙈 Total pins hidden: ${pinCount}`);
+    logger.wire(`Total pins hidden: ${pinCount}`);
     canvas.renderAll();
   }, []);
 
   // Toggle wire mode
   const toggleWireMode = useCallback(() => {
     if (!canvas) {
-      console.log("⚠️ toggleWireMode: No canvas available");
+      logger.wire("toggleWireMode: No canvas available");
       return;
     }
 
     const newWireMode = !isWireMode;
-    console.log(`🔌 toggleWireMode: ${isWireMode} -> ${newWireMode}`);
+    logger.wire(`toggleWireMode: ${isWireMode} -> ${newWireMode}`);
     setIsWireMode(newWireMode);
 
     if (!newWireMode) {
-      console.log("🔌 Exiting wire mode");
+      logger.wire("Exiting wire mode");
       exitWireMode();
       // Re-enable selection
       canvas.selection = true;
       // Hide pins
       hideComponentPins(canvas);
     } else {
-      console.log("🔌 Entering wire mode - setting cursor to crosshair");
+      logger.wire("Entering wire mode - setting cursor to crosshair");
       // Enter wire mode - change cursor
       canvas.defaultCursor = "crosshair";
       canvas.hoverCursor = "crosshair";
@@ -547,7 +544,7 @@ export function useSimpleWiringTool({
       canvas.selection = false;
       // Show pins
       showComponentPins(canvas);
-      console.log("🔌 Cursor set to:", canvas.defaultCursor);
+      logger.wire("Cursor set to:", canvas.defaultCursor);
     }
 
     canvas.renderAll();
@@ -608,13 +605,13 @@ export function useSimpleWiringTool({
   useEffect(() => {
     if (!canvas || !enabled) return;
 
-    console.log("🔗 Setting up wire mode event listeners");
+    logger.wire("Setting up wire mode event listeners");
 
     canvas.on("mouse:down", handleMouseDown);
     canvas.on("mouse:move", handleMouseMove);
 
     return () => {
-      console.log("🔗 Cleaning up wire mode event listeners");
+      logger.wire("Cleaning up wire mode event listeners");
       canvas.off("mouse:down", handleMouseDown);
       canvas.off("mouse:move", handleMouseMove);
     };

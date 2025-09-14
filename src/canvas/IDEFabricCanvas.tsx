@@ -503,7 +503,9 @@ export function IDEFabricCanvas({
             currentZoom
           );
           if (gridPattern) {
-            logger.canvas("Reapplying grid pattern after ResizeObserver resize");
+            logger.canvas(
+              "Reapplying grid pattern after ResizeObserver resize"
+            );
             fabricCanvas.backgroundColor = gridPattern;
           }
 
@@ -948,7 +950,9 @@ export function IDEFabricCanvas({
       fabricCanvas.add(group);
       fabricCanvas.setActiveObject(group);
       fabricCanvas.renderAll();
-      logger.canvas("--- ACTION SUCCESS: handleGroup (from activeSelection) ---");
+      logger.canvas(
+        "--- ACTION SUCCESS: handleGroup (from activeSelection) ---"
+      );
       return;
     }
 
@@ -1138,7 +1142,9 @@ export function IDEFabricCanvas({
     }
 
     if (!clipboard) {
-      logger.canvas("--- ACTION FAILED: Nothing to paste (clipboard empty) ---");
+      logger.canvas(
+        "--- ACTION FAILED: Nothing to paste (clipboard empty) ---"
+      );
       return;
     }
 
@@ -1250,7 +1256,9 @@ export function IDEFabricCanvas({
 
     // Only rotate components (not wires or other objects)
     if (!(activeObject as any).componentType) {
-      logger.canvas("--- ACTION FAILED: Selected object is not a component ---");
+      logger.canvas(
+        "--- ACTION FAILED: Selected object is not a component ---"
+      );
       return;
     }
 
@@ -1401,7 +1409,7 @@ export function IDEFabricCanvas({
           type: "canvas" as const,
           target: null,
         };
-        console.log("🔧 Setting CANVAS menu state:", canvasMenuState);
+        logger.canvas("Setting CANVAS menu state:", canvasMenuState);
         setMenuState(canvasMenuState);
       }
     };

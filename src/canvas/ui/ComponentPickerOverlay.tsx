@@ -200,9 +200,7 @@ function ComponentPreview({ component, onClose }: ComponentPreviewProps) {
           logger.component("Image length:", component.image.length);
 
           const timestamp = new Date().toISOString();
-          logger.component(
-            `Adding ${component.name} to canvas from overlay`
-          );
+          logger.component(`Adding ${component.name} to canvas from overlay`);
 
           try {
             logger.component(

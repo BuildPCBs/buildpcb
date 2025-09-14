@@ -1,11 +1,17 @@
 "use client";
 
-import { useState, createContext, useContext, ReactNode, useEffect } from "react";
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
-import { authStorage } from '@/lib/auth-storage';
-import { logger } from '@/lib/logger';
-import { AuthContextType, AuthUser } from '@/types/auth';
+import {
+  useState,
+  createContext,
+  useContext,
+  ReactNode,
+  useEffect,
+} from "react";
+import { User, Session } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
+import { authStorage } from "@/lib/auth-storage";
+import { logger } from "@/lib/logger";
+import { AuthContextType, AuthUser } from "@/types/auth";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -21,41 +27,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         // Set a timeout to prevent infinite loading
         const authTimeout = setTimeout(() => {
-          console.warn('Auth loading timeout - proceeding without auth check');
+          console.warn("Auth loading timeout - proceeding without auth check");
           setIsLoading(false);
         }, 3000); // 3 second timeout
 
         // First check if we have a session in localStorage
         const hasStoredSession = authStorage.hasStoredSession();
         if (hasStoredSession) {
-          logger.auth('Found stored session data');
+          logger.auth("Found stored session data");
           const userData = authStorage.getUser();
-          logger.auth('Last login:', authStorage.getLastLogin());
+          logger.auth("Last login:", authStorage.getLastLogin());
         }
 
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession();
+
         clearTimeout(authTimeout); // Clear timeout if we get a response
-        
+
         if (error) {
-          console.error('Error getting session:', error);
+          console.error("Error getting session:", error);
           // Clear any invalid session data
           authStorage.removeUser();
         } else {
           setSession(session);
           setUser(session?.user || null);
-          
+
           // Save additional user data to localStorage for quick access
           if (session?.user) {
             authStorage.setUser({
               id: session.user.id,
               email: session.user.email!,
-              lastLogin: new Date().toISOString()
+              lastLogin: new Date().toISOString(),
             });
           }
         }
       } catch (error) {
-        console.error('Error getting session:', error);
+        console.error("Error getting session:", error);
       } finally {
         setIsLoading(false);
       }
@@ -64,37 +73,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     getSession();
 
     // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        logger.auth('Auth state changed:', event, session?.user?.email);
-        
-        setSession(session);
-        setUser(session?.user || null);
-        setIsLoading(false);
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      logger.auth("Auth state changed:", event, session?.user?.email);
 
-        // Handle different auth events
-        if (event === 'SIGNED_IN' && session) {
-          // Save user data to localStorage
-          authStorage.setUser({
-            id: session.user.id,
-            email: session.user.email!,
-            lastLogin: new Date().toISOString()
-          });
-          
-          // Close auth overlay on successful auth
-          setIsAuthOverlayOpen(false);
-          logger.auth('User signed in:', session.user.email);
-          
-        } else if (event === 'SIGNED_OUT') {
-          // Clear user data from localStorage
-          authStorage.removeUser();
-          logger.auth('User signed out');
-          
-        } else if (event === 'TOKEN_REFRESHED') {
-          logger.auth('Token refreshed for user:', session?.user?.email);
-        }
+      setSession(session);
+      setUser(session?.user || null);
+      setIsLoading(false);
+
+      // Handle different auth events
+      if (event === "SIGNED_IN" && session) {
+        // Save user data to localStorage
+        authStorage.setUser({
+          id: session.user.id,
+          email: session.user.email!,
+          lastLogin: new Date().toISOString(),
+        });
+
+        // Close auth overlay on successful auth
+        setIsAuthOverlayOpen(false);
+        logger.auth("User signed in:", session.user.email);
+      } else if (event === "SIGNED_OUT") {
+        // Clear user data from localStorage
+        authStorage.removeUser();
+        logger.auth("User signed out");
+      } else if (event === "TOKEN_REFRESHED") {
+        logger.auth("Token refreshed for user:", session?.user?.email);
       }
-    );
+    });
 
     return () => subscription.unsubscribe();
   }, []);
@@ -121,7 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase.auth.verifyOtp({
       email,
       token,
-      type: 'email',
+      type: "email",
     });
     return { error };
   };
@@ -130,19 +137,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       // Clear user data from localStorage first
       authStorage.removeUser();
-      
+
       const { error } = await supabase.auth.signOut();
-      
+
       if (!error) {
         // Ensure local state is cleared
         setUser(null);
         setSession(null);
         setIsAuthOverlayOpen(false);
       }
-      
+
       return { error };
     } catch (error: any) {
-      console.error('Error signing out:', error);
+      console.error("Error signing out:", error);
       return { error };
     }
   };
@@ -163,14 +170,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Get access token for API calls
   const getToken = async (): Promise<string | null> => {
     try {
-      const { data: { session }, error } = await supabase.auth.getSession();
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.getSession();
       if (error || !session) {
-        console.error('Error getting session for token:', error);
+        console.error("Error getting session for token:", error);
         return null;
       }
       return session.access_token;
     } catch (error) {
-      console.error('Error getting access token:', error);
+      console.error("Error getting access token:", error);
       return null;
     }
   };

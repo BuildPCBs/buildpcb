@@ -3,6 +3,7 @@
 import * as fabric from "fabric";
 import { supabase } from "@/lib/supabase";
 import { canvasCommandManager } from "./canvas-command-manager";
+import { logger } from "@/lib/logger";
 
 // SIMPLE COMPONENT HANDLER - Add this at the end
 let isComponentHandlerSetup = false;
@@ -20,20 +21,20 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
 
   // Clean up previous event listener if it exists
   if (componentEventUnsubscribe) {
-    console.log("🧹 Cleaning up previous component event listener");
+    logger.canvas("Cleaning up previous component event listener");
     componentEventUnsubscribe();
     componentEventUnsubscribe = null;
   }
 
   // Check if this canvas already has component handlers set up
   if ((canvas as any)._componentHandlersSetup) {
-    console.log(
+    logger.canvas(
       "Component handlers already set up for this canvas, skipping..."
     );
     return;
   }
 
-  console.log("🔄 Setting up SVG component handler with fresh canvas...");
+  logger.canvas("Setting up SVG component handler with fresh canvas...");
 
   // Mark this canvas as having handlers set up
   (canvas as any)._componentHandlersSetup = true;
@@ -55,30 +56,24 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
       x?: number;
       y?: number;
     }) => {
-      console.log(
-        "🎯 IDEFabricCanvas: Component command received for",
-        payload.name
-      );
-      console.log("🎯 IDEFabricCanvas: Full payload:", payload);
-      console.log(
-        "🎯 IDEFabricCanvas: SVG path length:",
-        payload.svgPath?.length
-      );
-      console.log(
-        "🎯 IDEFabricCanvas: SVG path preview:",
+      logger.canvas("Component command received for", payload.name);
+      logger.canvas("Full payload:", payload);
+      logger.canvas("SVG path length:", payload.svgPath?.length);
+      logger.canvas(
+        "SVG path preview:",
         payload.svgPath?.substring(0, 200) + "..."
       );
 
       // New intelligent component creation logic with database metadata
       const createComponent = async (componentInfo: typeof payload) => {
-        console.log(
-          `🎯 DEBUG: ===== STARTING COMPONENT CREATION FOR ${componentInfo.name} =====`
+        logger.canvas(
+          `===== STARTING COMPONENT CREATION FOR ${componentInfo.name} =====`
         );
 
         // Prevent duplicate processing
         if (isProcessingComponent) {
-          console.log(
-            `⚠️ Component creation already in progress, skipping ${componentInfo.name}`
+          logger.canvas(
+            `Component creation already in progress, skipping ${componentInfo.name}`
           );
           return;
         }
@@ -104,13 +99,10 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
             .single();
 
           if (dbError) {
-            console.warn(
-              `⚠️ Could not fetch database component data:`,
-              dbError
-            );
-            console.log(`🔄 Proceeding with provided component info only`);
+            logger.canvas(`Could not fetch database component data:`, dbError);
+            logger.canvas(`Proceeding with provided component info only`);
           } else if (dbComponent) {
-            console.log(`✅ Retrieved full database component data:`, {
+            logger.canvas(`Retrieved full database component data:`, {
               name: dbComponent.name,
               manufacturer: dbComponent.manufacturer,
               partNumber: dbComponent.part_number,
@@ -168,25 +160,21 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
             );
 
           if (existingComponents.length > 0) {
-            console.log(
-              `⚠️ Very similar component detected for ${componentInfo.name} at same position, skipping creation`
+            logger.canvas(
+              `Very similar component detected for ${componentInfo.name} at same position, skipping creation`
             );
             isProcessingComponent = false; // Reset flag since we're not processing
             return;
           }
 
-          console.log(`🎯 DEBUG: Using current canvas from command manager`);
-          console.log(`🎯 DEBUG: Canvas exists: ${!!currentCanvas}`);
-          console.log(`🎯 DEBUG: Canvas width: ${currentCanvas.width}`);
-          console.log(`🎯 DEBUG: Canvas height: ${currentCanvas.height}`);
-          console.log(
-            `🎯 DEBUG: Canvas objects count: ${
-              currentCanvas.getObjects().length
-            }`
+          logger.canvas(`Using current canvas from command manager`);
+          logger.canvas(`Canvas exists: ${!!currentCanvas}`);
+          logger.canvas(`Canvas width: ${currentCanvas.width}`);
+          logger.canvas(`Canvas height: ${currentCanvas.height}`);
+          logger.canvas(
+            `Canvas objects count: ${currentCanvas.getObjects().length}`
           );
-          console.log(
-            `🎯 DEBUG: Canvas disposed: ${currentCanvas.disposed || false}`
-          );
+          logger.canvas(`Canvas disposed: ${currentCanvas.disposed || false}`);
 
           // Additional canvas validation
           if (currentCanvas.disposed) {
@@ -212,21 +200,21 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
             const svgString = atob(base64Data);
             svgPromise = Promise.resolve(svgString);
             console.log(
-              `📄 SVG extracted from data URL (${svgString.length} chars)`
+              `SVG extracted from data URL (${svgString.length} chars)`
             );
-            console.log(`📄 SVG preview:`, svgString.substring(0, 200) + "...");
+            logger.canvas(`SVG preview:`, svgString.substring(0, 200) + "...");
           } else if (componentInfo.svgPath.startsWith("data:image/svg+xml")) {
             // Handle URL-encoded data URL
             const urlData = componentInfo.svgPath.split(",")[1];
             const svgString = decodeURIComponent(urlData);
             svgPromise = Promise.resolve(svgString);
-            console.log(
-              `📄 SVG extracted from URL-encoded data URL (${svgString.length} chars)`
+            logger.canvas(
+              `SVG extracted from URL-encoded data URL (${svgString.length} chars)`
             );
-            console.log(`📄 SVG preview:`, svgString.substring(0, 200) + "...");
+            logger.canvas(`SVG preview:`, svgString.substring(0, 200) + "...");
           } else {
             // Handle regular URL - fetch from server
-            console.log(`📄 Fetching SVG from URL: ${componentInfo.svgPath}`);
+            logger.canvas(`Fetching SVG from URL: ${componentInfo.svgPath}`);
             svgPromise = fetch(componentInfo.svgPath).then((response) => {
               console.log(
                 `📄 Fetch response: ${response.status} ${response.statusText}`
