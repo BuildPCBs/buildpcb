@@ -174,16 +174,15 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
 
                 if (componentBbox) {
                   bboxCenterX_mm =
-                    (componentBbox.minX + componentBbox.maxX) / 2;
+                    (componentBbox.minX - componentBbox.maxX) / 2;
                   bboxCenterY_mm =
                     (componentBbox.minY + componentBbox.maxY) / 2;
                 }
 
-                const adjustedX_mm = dbPin.x - bboxCenterX_mm;
-                const adjustedY_mm = dbPin.y - bboxCenterY_mm;
+                const adjustedX_mm = dbPin.x + bboxCenterX_mm;
+                const adjustedY_mm = dbPin.y + bboxCenterY_mm;
 
                 const pinX = adjustedX_mm * MM_TO_PX;
-                // <<< FINAL FIX IS HERE: Removed the negative sign to prevent vertical flip
                 const pinY = adjustedY_mm * MM_TO_PX;
 
                 return {
@@ -203,7 +202,7 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
                 originY: "center",
               });
 
-              // Nudge the symbol so its visual center is at the group's (0,0) origin
+              // ** THE FIX **: Nudge the symbol so its visual center is at the group's (0,0) origin
               const svgBounds = svgSymbol.getBoundingRect();
               const svgCenterX = svgBounds.left + svgBounds.width / 2;
               const svgCenterY = svgBounds.top + svgBounds.height / 2;
