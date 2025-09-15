@@ -1,5 +1,5 @@
-import dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
+import dotenv from "dotenv";
+dotenv.config({ path: ".env.local" });
 import { createClient } from "@supabase/supabase-js";
 import { promises as fs } from "fs";
 import * as path from "path";
@@ -35,9 +35,16 @@ interface SymbolIndexEntry {
   id: string;
   name: string;
   category: string;
-  relativePath: string;
+  path: string;
   pins: Pin[];
   kicad_sym_raw: string;
+  bbox?: {
+    minX: number;
+    maxX: number;
+    minY: number;
+    maxY: number;
+  };
+  extends?: string;
 }
 
 interface ComponentInsert {
@@ -55,6 +62,13 @@ interface ComponentInsert {
   footprint_filters?: string[];
   default_footprint?: string | null;
   reference_designator?: string | null;
+  bbox?: {
+    minX: number;
+    maxX: number;
+    minY: number;
+    maxY: number;
+  };
+  extends?: string;
 }
 
 async function migrateSymbolsToSupabase() {
@@ -63,20 +77,40 @@ async function migrateSymbolsToSupabase() {
   try {
     // Check current database state
     const { count: existingCount, error: countError } = await supabase
-      .from('components')
-      .select('*', { count: 'exact', head: true });
+      .from("components")
+      .select("*", { count: "exact", head: true });
 
     if (countError) {
-      console.log('⚠️  Could not check existing components:', countError.message);
+      console.log(
+        "⚠️  Could not check existing components:",
+        countError.message
+      );
     } else {
-      console.log(`📊 Current database: ${existingCount || 0} existing components`);
+      console.log(
+        `📊 Current database: ${existingCount || 0} existing components`
+      );
+    }
+
+    // Clear all existing components to start fresh
+    console.log("🧹 Clearing existing components from database...");
+    const { error: deleteError } = await supabase
+      .from("components")
+      .delete()
+      .neq("id", "00000000-0000-0000-0000-000000000000"); // Delete all rows
+
+    if (deleteError) {
+      console.error("❌ Failed to clear components:", deleteError.message);
+      throw new Error(`Failed to clear components: ${deleteError.message}`);
+    } else {
+      console.log("✅ Successfully cleared all existing components");
     }
 
     // Read the enriched symbols data
     console.log("📖 Reading symbols_index_with_pins.json...");
     const jsonPath = path.join(process.cwd(), "symbols_index_with_pins.json");
     const jsonContent = await fs.readFile(jsonPath, "utf-8");
-    const symbolsData: Record<string, SymbolIndexEntry[]> = JSON.parse(jsonContent);
+    const symbolsData: Record<string, SymbolIndexEntry[]> =
+      JSON.parse(jsonContent);
 
     // Flatten all symbols from all categories
     const allSymbols = Object.values(symbolsData).flat();
@@ -90,18 +124,25 @@ async function migrateSymbolsToSupabase() {
 
     // Also include unit variants (e.g., "40106_unit2") that don't have pins but are valid components
     const unitVariants = allSymbols.filter(
-      (symbol) => (!symbol.pins || symbol.pins.length === 0) && /_unit\d+$/.test(symbol.name)
+      (symbol) =>
+        (!symbol.pins || symbol.pins.length === 0) &&
+        /_unit\d+$/.test(symbol.name)
     );
 
     // Also include extends variants (symbols that extend base symbols)
     const extendsVariants = allSymbols.filter(
-      (symbol) => (!symbol.pins || symbol.pins.length === 0) &&
-                  !/_unit\d+$/.test(symbol.name) &&
-                  symbol.kicad_sym_raw &&
-                  symbol.kicad_sym_raw.includes("(extends ")
+      (symbol) =>
+        (!symbol.pins || symbol.pins.length === 0) &&
+        !/_unit\d+$/.test(symbol.name) &&
+        symbol.kicad_sym_raw &&
+        symbol.kicad_sym_raw.includes("(extends ")
     );
 
-    const allValidSymbols = [...symbolsWithPins, ...unitVariants, ...extendsVariants];
+    const allValidSymbols = [
+      ...symbolsWithPins,
+      ...unitVariants,
+      ...extendsVariants,
+    ];
 
     console.log(`✅ Found ${symbolsWithPins.length} symbols with pin data`);
     console.log(`✅ Found ${unitVariants.length} unit variants`);
@@ -124,7 +165,9 @@ async function migrateSymbolsToSupabase() {
         const unitNumber = parseInt(unitMatch[2]);
 
         // Find the base symbol
-        const baseSymbol = allSymbols.find(s => s.name === baseName && s.pins && s.pins.length > 0);
+        const baseSymbol = allSymbols.find(
+          (s) => s.name === baseName && s.pins && s.pins.length > 0
+        );
         if (baseSymbol && baseSymbol.pins) {
           return {
             pins: baseSymbol.pins,
@@ -138,11 +181,15 @@ async function migrateSymbolsToSupabase() {
 
       // For symbols using extends pattern, find the base symbol
       if (symbol.kicad_sym_raw && symbol.kicad_sym_raw.includes("(extends ")) {
-        const extendsMatch = symbol.kicad_sym_raw.match(/\(extends "([^"]+)"\)/);
+        const extendsMatch = symbol.kicad_sym_raw.match(
+          /\(extends "([^"]+)"\)/
+        );
         if (extendsMatch) {
           const baseName = extendsMatch[1];
           // Find the base symbol
-          const baseSymbol = allSymbols.find(s => s.name === baseName && s.pins && s.pins.length > 0);
+          const baseSymbol = allSymbols.find(
+            (s) => s.name === baseName && s.pins && s.pins.length > 0
+          );
           if (baseSymbol && baseSymbol.pins) {
             return {
               pins: baseSymbol.pins,
@@ -174,28 +221,34 @@ async function migrateSymbolsToSupabase() {
       if (!kicadSymRaw) return metadata;
 
       // Extract properties using regex
-      const propertyMatches = kicadSymRaw.matchAll(/\(property "([^"]+)" "([^"]*)"/g);
+      const propertyMatches = kicadSymRaw.matchAll(
+        /\(property "([^"]+)" "([^"]*)"/g
+      );
       for (const match of propertyMatches) {
         const propName = match[1];
         const propValue = match[2];
 
         switch (propName) {
-          case 'Datasheet':
+          case "Datasheet":
             metadata.datasheet_url = propValue;
             break;
-          case 'Description':
+          case "Description":
             metadata.description = propValue;
             break;
-          case 'ki_keywords':
-            metadata.keywords = propValue.split(/\s+/).filter(k => k.length > 0);
+          case "ki_keywords":
+            metadata.keywords = propValue
+              .split(/\s+/)
+              .filter((k) => k.length > 0);
             break;
-          case 'ki_fp_filters':
-            metadata.footprint_filters = propValue.split(/\s+/).filter(f => f.length > 0);
+          case "ki_fp_filters":
+            metadata.footprint_filters = propValue
+              .split(/\s+/)
+              .filter((f) => f.length > 0);
             break;
-          case 'Footprint':
+          case "Footprint":
             metadata.default_footprint = propValue || null;
             break;
-          case 'Reference':
+          case "Reference":
             metadata.reference_designator = propValue;
             break;
         }
@@ -228,6 +281,9 @@ async function migrateSymbolsToSupabase() {
           footprint_filters: metadata.footprint_filters,
           default_footprint: metadata.default_footprint,
           reference_designator: metadata.reference_designator,
+          // Bounding box and extends information
+          bbox: symbol.bbox,
+          extends: symbol.extends,
         };
       }
     );
@@ -251,12 +307,12 @@ async function migrateSymbolsToSupabase() {
       );
 
       try {
-        // Check which components already exist
-        const componentNames = batch.map(comp => comp.name);
+        // Check which components already exist by symbol_id
+        const symbolIds = batch.map((comp) => comp.kicad_sym_raw.symbol_id);
         const { data: existingComponents, error: checkError } = await supabase
-          .from('components')
-          .select('name')
-          .in('name', componentNames);
+          .from("components")
+          .select("kicad_sym_raw")
+          .in("kicad_sym_raw->>symbol_id", symbolIds);
 
         if (checkError) {
           console.error(`❌ Batch ${batchNumber} check failed:`, checkError);
@@ -264,11 +320,19 @@ async function migrateSymbolsToSupabase() {
           continue;
         }
 
-        const existingNames = new Set(existingComponents?.map(c => c.name) || []);
+        const existingSymbolIds = new Set(
+          existingComponents
+            ?.map((c) => c.kicad_sym_raw?.symbol_id)
+            .filter((id) => id) || []
+        );
 
         // Separate into new components (to insert) and existing (to update)
-        const newComponents = batch.filter(comp => !existingNames.has(comp.name));
-        const existingComponentsData = batch.filter(comp => existingNames.has(comp.name));
+        const newComponents = batch.filter(
+          (comp) => !existingSymbolIds.has(comp.kicad_sym_raw.symbol_id)
+        );
+        const existingComponentsData = batch.filter((comp) =>
+          existingSymbolIds.has(comp.kicad_sym_raw.symbol_id)
+        );
 
         let batchSuccessCount = 0;
 
@@ -280,7 +344,10 @@ async function migrateSymbolsToSupabase() {
             .select("id, name");
 
           if (insertError) {
-            console.error(`❌ Batch ${batchNumber} insert failed:`, insertError);
+            console.error(
+              `❌ Batch ${batchNumber} insert failed:`,
+              insertError
+            );
           } else {
             batchSuccessCount += insertData?.length || 0;
           }
@@ -290,8 +357,11 @@ async function migrateSymbolsToSupabase() {
         if (existingComponentsData.length > 0) {
           for (const component of existingComponentsData) {
             const { error: updateError } = await supabase
-              .from('components')
+              .from("components")
               .update({
+                name: component.name,
+                type: component.type,
+                category: component.category,
                 description: component.description,
                 pin_configuration: component.pin_configuration,
                 kicad_sym_raw: component.kicad_sym_raw,
@@ -301,12 +371,20 @@ async function migrateSymbolsToSupabase() {
                 footprint_filters: component.footprint_filters,
                 default_footprint: component.default_footprint,
                 reference_designator: component.reference_designator,
-                updated_at: new Date().toISOString()
+                bbox: component.bbox,
+                extends: component.extends,
+                updated_at: new Date().toISOString(),
               })
-              .eq('name', component.name);
+              .eq(
+                "kicad_sym_raw->>symbol_id",
+                component.kicad_sym_raw.symbol_id
+              );
 
             if (updateError) {
-              console.error(`❌ Batch ${batchNumber} update failed for ${component.name}:`, updateError);
+              console.error(
+                `❌ Batch ${batchNumber} update failed for ${component.name}:`,
+                updateError
+              );
             } else {
               batchSuccessCount += 1;
             }
@@ -319,7 +397,9 @@ async function migrateSymbolsToSupabase() {
           );
           successCount += batchSuccessCount;
         } else {
-          console.error(`❌ Batch ${batchNumber} failed: no components processed`);
+          console.error(
+            `❌ Batch ${batchNumber} failed: no components processed`
+          );
           errorCount += batch.length;
         }
       } catch (batchError) {

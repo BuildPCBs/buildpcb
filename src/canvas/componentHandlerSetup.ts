@@ -57,12 +57,6 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
       y?: number;
     }) => {
       logger.canvas("Component command received for", payload.name);
-      logger.canvas("Full payload:", payload);
-      logger.canvas("SVG path length:", payload.svgPath?.length);
-      logger.canvas(
-        "SVG path preview:",
-        payload.svgPath?.substring(0, 200) + "..."
-      );
 
       // New intelligent component creation logic with database metadata
       const createComponent = async (componentInfo: typeof payload) => {
@@ -84,6 +78,7 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
           console.error(
             `❌ ERROR: No canvas available from command manager for component ${componentInfo.name}`
           );
+          isProcessingComponent = false;
           return;
         }
 
@@ -100,34 +95,8 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
 
           if (dbError) {
             logger.canvas(`Could not fetch database component data:`, dbError);
-            logger.canvas(`Proceeding with provided component info only`);
           } else if (dbComponent) {
-            logger.canvas(`Retrieved full database component data:`, {
-              name: dbComponent.name,
-              manufacturer: dbComponent.manufacturer,
-              partNumber: dbComponent.part_number,
-              category: dbComponent.category,
-              hasPins: dbComponent.pin_configuration ? "checking..." : false,
-              pinConfigKeys:
-                typeof dbComponent.pin_configuration === "string"
-                  ? "JSON string"
-                  : Object.keys(dbComponent.pin_configuration || {}),
-              pinConfigType: typeof dbComponent.pin_configuration,
-              pinConfigSample:
-                typeof dbComponent.pin_configuration === "string"
-                  ? (() => {
-                      try {
-                        return (
-                          JSON.parse(dbComponent.pin_configuration).pins?.[0] ||
-                          "parse error"
-                        );
-                      } catch (e) {
-                        return "invalid json";
-                      }
-                    })()
-                  : dbComponent.pin_configuration?.pins?.[0] || "no pins",
-            });
-
+            logger.canvas(`Retrieved full database component data.`);
             // Merge database data with provided info
             componentInfo = {
               ...componentInfo,
@@ -139,403 +108,147 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
               pinCount:
                 dbComponent.pin_configuration?.pins?.length ||
                 componentInfo.pinCount,
-              // Use database SVG if available, otherwise keep the provided svgPath
               svgPath: dbComponent.symbol_svg
                 ? `data:image/svg+xml;base64,${btoa(dbComponent.symbol_svg)}`
                 : componentInfo.svgPath,
-              // Store full database component for later use
               databaseComponent: dbComponent,
             };
           }
 
-          // Check for duplicate components at the same position (more lenient)
-          const existingComponents = currentCanvas
-            .getObjects()
-            .filter(
-              (obj: any) =>
-                obj.data?.componentName === componentInfo.name &&
-                obj.data?.componentType === componentInfo.type &&
-                Math.abs((obj.left || 0) - (componentInfo.x || 0)) < 5 &&
-                Math.abs((obj.top || 0) - (componentInfo.y || 0)) < 5
-            );
-
-          if (existingComponents.length > 0) {
-            logger.canvas(
-              `Very similar component detected for ${componentInfo.name} at same position, skipping creation`
-            );
-            isProcessingComponent = false; // Reset flag since we're not processing
-            return;
-          }
-
-          logger.canvas(`Using current canvas from command manager`);
-          logger.canvas(`Canvas exists: ${!!currentCanvas}`);
-          logger.canvas(`Canvas width: ${currentCanvas.width}`);
-          logger.canvas(`Canvas height: ${currentCanvas.height}`);
-          logger.canvas(
-            `Canvas objects count: ${currentCanvas.getObjects().length}`
-          );
-          logger.canvas(`Canvas disposed: ${currentCanvas.disposed || false}`);
-
-          // Additional canvas validation
-          if (currentCanvas.disposed) {
-            console.error(
-              `❌ ERROR: Current canvas is disposed when creating component ${componentInfo.name}`
-            );
-            return;
-          }
-
-          if (!currentCanvas.getElement()) {
-            console.error(
-              `❌ ERROR: Current canvas element is not available when creating component ${componentInfo.name}`
-            );
-            return;
-          }
-
-          // Handle SVG loading - support both URLs and data URLs
+          // Handle SVG loading
           let svgPromise: Promise<string>;
-
           if (componentInfo.svgPath.startsWith("data:image/svg+xml;base64,")) {
-            // Handle data URL - extract SVG content directly
             const base64Data = componentInfo.svgPath.split(",")[1];
             const svgString = atob(base64Data);
             svgPromise = Promise.resolve(svgString);
-            logger.canvas(
-              `SVG extracted from data URL (${svgString.length} chars)`
-            );
-            logger.canvas(`SVG preview:`, svgString.substring(0, 200) + "...");
           } else if (componentInfo.svgPath.startsWith("data:image/svg+xml")) {
-            // Handle URL-encoded data URL
             const urlData = componentInfo.svgPath.split(",")[1];
             const svgString = decodeURIComponent(urlData);
             svgPromise = Promise.resolve(svgString);
-            logger.canvas(
-              `SVG extracted from URL-encoded data URL (${svgString.length} chars)`
-            );
-            logger.canvas(`SVG preview:`, svgString.substring(0, 200) + "...");
           } else {
-            // Handle regular URL - fetch from server
-            logger.canvas(`Fetching SVG from URL: ${componentInfo.svgPath}`);
             svgPromise = fetch(componentInfo.svgPath).then((response) => {
-              logger.canvas(
-                `Fetch response: ${response.status} ${response.statusText}`
-              );
-              if (!response.ok) {
+              if (!response.ok)
                 throw new Error(
                   `HTTP ${response.status}: ${response.statusText}`
                 );
-              }
               return response.text();
             });
-            logger.canvas(`SVG fetched from URL: ${componentInfo.svgPath}`);
           }
 
           svgPromise
             .then((svgString) => {
               logger.canvas(`SVG loaded (${svgString.length} chars)`);
-              logger.canvas(
-                `SVG content preview:`,
-                svgString.substring(0, 300) + "..."
-              );
               return fabric.loadSVGFromString(svgString);
             })
             .then((result) => {
-              logger.canvas(`Fabric loadSVGFromString result:`, result);
               const objects = result.objects.filter((obj) => !!obj);
-              logger.canvas(`Parsed ${objects.length} SVG objects`);
-              logger.canvas(
-                `Objects details:`,
-                objects.map((obj, i) => ({
-                  index: i,
-                  type: obj.type,
-                  visible: obj.visible,
-                  width: obj.width,
-                  height: obj.height,
-                }))
-              );
-              const pinsFromSVG: fabric.FabricObject[] = [];
-              const symbolParts: fabric.FabricObject[] = [];
+              const symbolParts: fabric.FabricObject[] = objects;
 
-              // 1. Separate the loaded parts into PINS and SYMBOL pieces
-              objects.forEach((obj: any, index: number) => {
-                logger.canvas(`DEBUG: Processing object ${index}:`, {
-                  type: obj?.type,
-                  id: obj?.id,
-                  left: obj?.left,
-                  top: obj?.top,
-                  visible: obj?.visible,
-                  opacity: obj?.opacity,
-                  hasEl: !!obj?.el,
-                  // Log the actual element attributes if available
-                  elementId: obj?.el?.id,
-                  elementClass: obj?.el?.className,
-                  elementTag: obj?.el?.tagName,
-                });
-
-                if (obj && obj.id === "pin") {
-                  // This is a connection point. Save it.
-                  logger.canvas(`Found PIN at x=${obj.left}, y=${obj.top}`);
-                  pinsFromSVG.push(obj);
-                } else if (obj) {
-                  // This is part of the visual symbol.
-                  symbolParts.push(obj);
-                }
-              });
-
-              // BOTTOM BREAD: Original, invisible pin data (stores true location and database pin info)
-              let dbPins = [];
+              // Extract pin and bbox data from the database component
+              let dbPins: any[] = [];
+              let componentBbox: any = null;
               try {
                 const pinConfig =
                   componentInfo.databaseComponent?.pin_configuration;
                 if (typeof pinConfig === "string") {
                   const parsedConfig = JSON.parse(pinConfig);
                   dbPins = parsedConfig.pins || [];
+                  componentBbox = parsedConfig.bbox || null;
                 } else if (pinConfig && typeof pinConfig === "object") {
-                  dbPins = pinConfig.pins || [];
+                  dbPins = (pinConfig as any).pins || [];
+                  componentBbox = (pinConfig as any).bbox || null;
                 }
                 logger.canvas(`Parsed pin configuration:`, {
-                  pinConfigType: typeof pinConfig,
                   parsedPins: dbPins.length,
+                  hasBbox: !!componentBbox,
                 });
               } catch (error) {
                 logger.canvas(`Error parsing pin configuration:`, error);
-                dbPins = [];
               }
 
-              // PIN COORDINATE TRANSFORMATION: Convert KiCad mm coordinates to canvas px
-              // KiCad uses mm with Y flipped compared to canvas coordinates
-              const MM_TO_PX = 3.78; // 96 DPI / 25.4 mm per inch ≈ 3.78 px per mm
+              // PIN COORDINATE TRANSFORMATION
+              const MM_TO_PX = 3.78;
+              const invisiblePinData = dbPins.map((dbPin: any) => {
+                let bboxCenterX_mm = 0;
+                let bboxCenterY_mm = 0;
 
-              const invisiblePinData = dbPins.map(
-                (dbPin: any, index: number) => {
-                  // Transform coordinates: scale mm→px, flip Y, store as relative to component center
-                  const pinX = dbPin.x * MM_TO_PX;
-                  const pinY = -dbPin.y * MM_TO_PX; // Flip Y coordinate
-
-                  return {
-                    originalX: pinX, // Store transformed coordinates
-                    originalY: pinY,
-                    pinId: `pin${dbPin.number}`,
-                    pinNumber: dbPin.number,
-                    pinName: dbPin.name || `Pin ${dbPin.number}`,
-                    electricalType: dbPin.electrical_type || "unknown",
-                    orientation: dbPin.orientation || 0,
-                  };
+                if (componentBbox) {
+                  bboxCenterX_mm =
+                    (componentBbox.minX + componentBbox.maxX) / 2;
+                  bboxCenterY_mm =
+                    (componentBbox.minY + componentBbox.maxY) / 2;
                 }
-              );
-              logger.canvas(
-                `Found ${pinsFromSVG.length} pins in SVG and ${invisiblePinData.length} pins in database`
-              );
 
-              // DEBUG: Log details about pins found
-              if (invisiblePinData.length === 0) {
-                logger.canvas(
-                  "WARNING: No pins found in database! This component won't be wireable."
-                );
-                logger.canvas(
-                  "Check database component data for pin_configuration.pins"
-                );
-              } else {
-                logger.canvas(
-                  "Found pins in database:",
-                  invisiblePinData.map((pin: any, i: number) => ({
-                    index: i,
-                    number: pin.pinNumber,
-                    name: pin.pinName,
-                    rawPosition: `(${dbPins[i].x}, ${dbPins[i].y})mm`, // Show original mm coordinates
-                    canvasPosition: `(${pin.originalX}, ${pin.originalY})px`, // Show transformed px coordinates
-                  }))
-                );
-              }
+                const adjustedX_mm = dbPin.x - bboxCenterX_mm;
+                const adjustedY_mm = dbPin.y - bboxCenterY_mm;
 
-              // THE FILLING: Main component symbol (the SVG shape)
-              logger.canvas(
-                `DEBUG: Creating SVG symbol with ${symbolParts.length} parts`
-              );
-              logger.canvas(
-                `DEBUG: Symbol parts:`,
-                symbolParts.map((part, i) => ({
-                  index: i,
-                  type: part?.type,
-                  id: (part as any)?.id,
-                  hasEl: !!(part as any)?.el,
-                }))
-              );
+                const pinX = adjustedX_mm * MM_TO_PX;
+                // <<< FINAL FIX IS HERE: Removed the negative sign to prevent vertical flip
+                const pinY = adjustedY_mm * MM_TO_PX;
 
+                return {
+                  originalX: pinX,
+                  originalY: pinY,
+                  pinId: `pin${dbPin.number}`,
+                  pinNumber: dbPin.number,
+                  pinName: dbPin.name || `Pin ${dbPin.number}`,
+                  electricalType: dbPin.electrical_type || "unknown",
+                  orientation: dbPin.orientation || -90,
+                };
+              });
+
+              // Create the main component symbol
               const svgSymbol = new fabric.Group(symbolParts, {
                 originX: "center",
                 originY: "center",
               });
 
-              logger.canvas(
-                `DEBUG: SVG Symbol created with ${symbolParts.length} parts`
-              );
+              // Nudge the symbol so its visual center is at the group's (0,0) origin
               const svgBounds = svgSymbol.getBoundingRect();
-              logger.canvas(`DEBUG: SVG Symbol bounds:`, {
-                left: svgBounds.left,
-                top: svgBounds.top,
-                width: svgBounds.width,
-                height: svgBounds.height,
-                centerX: svgBounds.left + svgBounds.width / 2,
-                centerY: svgBounds.top + svgBounds.height / 2,
-              });
-
-              // Calculate SVG center offset - pins should be relative to SVG center, not group center
               const svgCenterX = svgBounds.left + svgBounds.width / 2;
               const svgCenterY = svgBounds.top + svgBounds.height / 2;
-              logger.canvas(
-                `DEBUG: SVG center offset: (${svgCenterX}, ${svgCenterY})`
-              );
+              svgSymbol.left = -svgCenterX;
+              svgSymbol.top = -svgCenterY;
 
-              // DEBUG: Ensure all symbol parts are visible
-              symbolParts.forEach((part, index) => {
-                if (part.opacity === 0 || part.opacity === undefined) {
-                  part.set("opacity", 1);
-                  logger.canvas(
-                    `DEBUG: Set opacity to 1 for symbol part ${index}`
-                  );
-                }
-                if (part.visible === false) {
-                  part.set("visible", true);
-                  logger.canvas(
-                    `DEBUG: Set visible to true for symbol part ${index}`
-                  );
-                }
-              });
-              svgSymbol.set("opacity", 1);
-              svgSymbol.set("visible", true);
-
-              logger.canvas(
-                `DEBUG: SVG Symbol created with ${symbolParts.length} parts`
-              );
-              logger.canvas(
-                `DEBUG: SVG Symbol bounds:`,
-                svgSymbol.getBoundingRect()
-              );
-              logger.canvas(
-                `DEBUG: Symbol parts:`,
-                symbolParts.map((part) => ({
-                  type: part.type,
-                  visible: part.visible,
-                  opacity: part.opacity,
-                }))
-              );
-
-              // TOP BREAD: Visible, interactive pin circles (transparent green)
-              logger.canvas(
-                `DEBUG: Creating ${invisiblePinData.length} interactive pins from database`
-              );
-
-              // Generate a single component ID for all pins in this component
+              // Create interactive pin objects
               const componentId = `component_${Date.now()}_${Math.random()
                 .toString(36)
                 .substr(2, 9)}`;
+              const interactivePins = invisiblePinData.map((pinInfo: any) => {
+                const interactivePin = new fabric.Circle({
+                  radius: 4,
+                  fill: "rgba(0, 255, 0, 0.8)",
+                  stroke: "#059669",
+                  strokeWidth: 1,
+                  left: pinInfo.originalX,
+                  top: pinInfo.originalY,
+                  originX: "center",
+                  originY: "center",
+                  opacity: 0,
+                  visible: false,
+                });
 
-              const interactivePins = invisiblePinData.map(
-                (pinInfo: any, index: number) => {
-                  // Position pins relative to SVG center, not component center
-                  const pinLeft = pinInfo.originalX - svgCenterX;
-                  const pinTop = pinInfo.originalY - svgCenterY;
+                interactivePin.set("data", {
+                  type: "pin",
+                  componentId: componentId,
+                  pinId: pinInfo.pinId,
+                  pinNumber: pinInfo.pinNumber,
+                  pinName: pinInfo.pinName,
+                  isConnectable: true,
+                });
+                return interactivePin;
+              });
 
-                  logger.canvas(
-                    `DEBUG: Creating pin ${index + 1} (${
-                      pinInfo.pinNumber
-                    }) at (${pinInfo.originalX}, ${
-                      pinInfo.originalY
-                    }) -> relative (${pinLeft}, ${pinTop}) [SVG center: ${svgCenterX}, ${svgCenterY}]`
-                  );
-
-                  const interactivePin = new fabric.Circle({
-                    radius: 4,
-                    fill: "rgba(0, 255, 0, 0.8)", // Bright green for visibility
-                    stroke: "#059669",
-                    strokeWidth: 1,
-                    left: pinLeft,
-                    top: pinTop,
-                    originX: "center",
-                    originY: "center",
-                    // PART 3: PIN VISIBILITY RULE - Start hidden
-                    opacity: 0,
-                    visible: false,
-                  });
-
-                  logger.canvas(
-                    `DEBUG: Pin ${index + 1} created at relative position (${
-                      pinInfo.originalX
-                    }, ${pinInfo.originalY})`
-                  );
-                  logger.canvas(
-                    `DEBUG: Pin center point:`,
-                    interactivePin.getCenterPoint()
-                  );
-
-                  // Add the pin metadata that the wiring tool expects
-                  const pinData = {
-                    ...pinInfo,
-                    originalX: pinLeft, // Update to use SVG-relative coordinates
-                    originalY: pinTop,
-                  };
-                  interactivePin.set("pin", true);
-                  interactivePin.set("pinData", pinData);
-                  interactivePin.set("componentId", componentId);
-                  interactivePin.set("data", {
-                    type: "pin",
-                    componentId: componentId,
-                    pinId: pinData.pinId,
-                    pinNumber: pinData.pinNumber,
-                    pinName: pinData.pinName,
-                    electricalType: pinData.electricalType,
-                    isConnectable: true,
-                  });
-
-                  return interactivePin;
-                }
-              );
-
-              // THE GOLDEN RULE: Lock all three layers together into ONE inseparable group
-              // This is the COMPONENT SANDWICH - it moves as one unit forever
-
-              // Calculate position - try to use screen center if no specific coordinates provided
+              // Position the component on the canvas
               let componentX = componentInfo.x;
               let componentY = componentInfo.y;
-
-              if (!componentX || !componentY) {
-                // Get the center of the visible canvas area in screen coordinates
-                try {
-                  const canvasElement = currentCanvas.getElement();
-                  if (canvasElement) {
-                    const canvasRect = canvasElement.getBoundingClientRect();
-                    const centerX = canvasRect.width / 2;
-                    const centerY = canvasRect.height / 2;
-
-                    // Convert screen coordinates to canvas coordinates using viewport transform
-                    const vpt = currentCanvas.viewportTransform;
-                    const zoom = currentCanvas.getZoom();
-                    componentX = (centerX - vpt[4]) / zoom;
-                    componentY = (centerY - vpt[5]) / zoom;
-
-                    logger.canvas(
-                      `Component positioned at center: (${componentX.toFixed(
-                        0
-                      )}, ${componentY.toFixed(0)})`
-                    );
-                  } else {
-                    // Fallback: use canvas viewport center
-                    logger.canvas(
-                      `Using viewport center (canvas element unavailable)`
-                    );
-                    const vpCenter = currentCanvas.getVpCenter();
-                    componentX = vpCenter.x;
-                    componentY = vpCenter.y;
-                  }
-                } catch (error) {
-                  logger.canvas(`ERROR: Failed to get canvas position:`, error);
-                  // Ultimate fallback: use canvas viewport center
-                  const vpCenter = currentCanvas.getVpCenter();
-                  componentX = vpCenter.x;
-                  componentY = vpCenter.y;
-                }
+              if (componentX === undefined || componentY === undefined) {
+                const vpCenter = currentCanvas.getVpCenter();
+                componentX = vpCenter.x;
+                componentY = vpCenter.y;
               }
 
+              // Create the final "Component Sandwich" group
               const componentSandwich = new fabric.Group(
                 [svgSymbol, ...interactivePins],
                 {
@@ -543,189 +256,32 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
                   top: componentY,
                   originX: "center",
                   originY: "center",
-                  selectable: true,
-                  evented: true,
-                  lockScalingX: true,
-                  lockScalingY: true,
                   hasControls: true,
                   hasBorders: true,
-                  centeredRotation: true,
                 }
               );
 
-              // DEBUG: Log component positioning
-              const vpCenter = canvas.getVpCenter();
-              logger.canvas(
-                `Canvas center: (${vpCenter.x.toFixed(0)}, ${vpCenter.y.toFixed(
-                  0
-                )})`
-              );
-              logger.canvas(
-                `Component position: (${componentSandwich.left?.toFixed(
-                  0
-                )}, ${componentSandwich.top?.toFixed(0)})`
-              );
-
-              // Check if component is within visible bounds
-              const bounds = componentSandwich.getBoundingRect();
-              const canvasWidth = canvas.getWidth();
-              const canvasHeight = canvas.getHeight();
-              logger.canvas(
-                `Component bounds: (${bounds.left.toFixed(
-                  0
-                )}, ${bounds.top.toFixed(0)}) ${bounds.width.toFixed(
-                  0
-                )}x${bounds.height.toFixed(0)}`
-              );
-
-              // Store the invisible pin data and component metadata
-              componentSandwich.set("componentType", componentInfo.type);
-              componentSandwich.set("invisiblePinData", invisiblePinData);
+              // Attach metadata to the final group
               componentSandwich.set("data", {
                 type: "component",
                 componentId: componentId,
-                componentType: componentInfo.type,
                 componentName: componentInfo.name,
-                pins: interactivePins.map(
-                  (_: any, index: number) => `pin${index + 1}`
-                ),
-                isComponentSandwich: true, // Mark this as a proper sandwich
-              });
-
-              logger.canvas("Component sandwich created with metadata:", {
-                componentId,
-                componentName: componentInfo.name,
-                pinCount: interactivePins.length,
                 isComponentSandwich: true,
-                hasInvisiblePinData: !!invisiblePinData,
-                pins: interactivePins.map((pin: any, i: number) => ({
-                  index: i,
-                  hasPinProperty: !!(pin as any).pin,
-                  visible: pin.visible,
-                  opacity: pin.opacity,
-                })),
               });
 
-              // Attach full database component metadata for proper serialization
               if (componentInfo.databaseComponent) {
                 componentSandwich.set(
                   "databaseComponent",
                   componentInfo.databaseComponent
                 );
-                componentSandwich.set("componentMetadata", {
-                  id: componentInfo.databaseComponent.id,
-                  name: componentInfo.databaseComponent.name,
-                  type: componentInfo.databaseComponent.type,
-                  category: componentInfo.databaseComponent.category,
-                  description: componentInfo.databaseComponent.description,
-                  manufacturer: componentInfo.databaseComponent.manufacturer,
-                  partNumber: componentInfo.databaseComponent.part_number,
-                  specifications:
-                    componentInfo.databaseComponent.specifications,
-                  pinConfiguration:
-                    componentInfo.databaseComponent.pin_configuration,
-                  kicadSymRaw: componentInfo.databaseComponent.kicad_sym_raw,
-                  kicadLibrarySource:
-                    componentInfo.databaseComponent.kicad_library_source,
-                  datasheetUrl: componentInfo.databaseComponent.datasheet_url,
-                  keywords: componentInfo.databaseComponent.keywords,
-                });
-                logger.canvas(
-                  `Attached database metadata to component: ${componentInfo.name}`
-                );
               }
-
-              // 5. Add the COMPONENT SANDWICH to the canvas - physically impossible to separate
-              logger.canvas(
-                `Adding ${componentInfo.name} to canvas (${
-                  currentCanvas.getObjects().length
-                } objects currently)`
-              );
 
               currentCanvas.add(componentSandwich);
               currentCanvas.renderAll();
 
               logger.canvas(
-                `${componentInfo.name} added to canvas (${
-                  currentCanvas.getObjects().length
-                } total objects)`
-              );
-
-              // Check component properties
-              logger.canvas(
-                `Component bounds: (${bounds.left.toFixed(
-                  0
-                )}, ${bounds.top.toFixed(0)}) ${bounds.width.toFixed(
-                  0
-                )}x${bounds.height.toFixed(0)}`
-              );
-
-              // Check if component is within canvas viewport
-              const viewportBounds = {
-                left:
-                  -currentCanvas.viewportTransform[4] / currentCanvas.getZoom(),
-                top:
-                  -currentCanvas.viewportTransform[5] / currentCanvas.getZoom(),
-                right:
-                  (-currentCanvas.viewportTransform[4] +
-                    currentCanvas.getWidth()) /
-                  currentCanvas.getZoom(),
-                bottom:
-                  (-currentCanvas.viewportTransform[5] +
-                    currentCanvas.getHeight()) /
-                  currentCanvas.getZoom(),
-              };
-              const componentBounds = componentSandwich.getBoundingRect();
-              const isVisible =
-                componentBounds.left < viewportBounds.right &&
-                componentBounds.left + componentBounds.width >
-                  viewportBounds.left &&
-                componentBounds.top < viewportBounds.bottom &&
-                componentBounds.top + componentBounds.height >
-                  viewportBounds.top;
-              logger.canvas(`DEBUG: Viewport bounds:`, viewportBounds);
-              logger.canvas(
-                `DEBUG: Is component within viewport: ${isVisible}`
-              );
-
-              // Check if component is still there after a short delay
-              setTimeout(() => {
-                logger.canvas(
-                  `DEBUG: Component still in canvas after delay: ${currentCanvas
-                    .getObjects()
-                    .includes(componentSandwich)}`
-                );
-                logger.canvas(
-                  `DEBUG: Total objects after delay: ${
-                    currentCanvas.getObjects().length
-                  }`
-                );
-                if (currentCanvas.getObjects().includes(componentSandwich)) {
-                  logger.canvas(
-                    `DEBUG: Component bounds after delay:`,
-                    componentSandwich.getBoundingRect()
-                  );
-                  logger.canvas(
-                    `DEBUG: Component position after delay: left=${componentSandwich.left}, top=${componentSandwich.top}`
-                  );
-                  logger.canvas(
-                    `DEBUG: Component visible after delay: ${componentSandwich.visible}`
-                  );
-                  logger.canvas(
-                    `DEBUG: Component opacity after delay: ${componentSandwich.opacity}`
-                  );
-                }
-              }, 100);
-
-              logger.canvas(
                 `COMPONENT SANDWICH: Added ${componentInfo.name} with ${interactivePins.length} permanently attached pins!`
               );
-
-              logger.canvas(
-                `DEBUG: ===== COMPONENT CREATION COMPLETED FOR ${componentInfo.name} =====`
-              );
-
-              // Reset processing flag
               isProcessingComponent = false;
             })
             .catch((error) => {
@@ -733,47 +289,7 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
                 `❌ INTELLIGENT: Failed to load ${componentInfo.svgPath}:`,
                 error
               );
-
-              // Reset processing flag on error
               isProcessingComponent = false;
-
-              // Fallback: Try to create a simple component instead
-              logger.canvas(
-                `FALLBACK: Attempting to create simple component for ${componentInfo.name}`
-              );
-              try {
-                const simpleComponent = new fabric.Rect({
-                  left: 200,
-                  top: 200,
-                  width: 60,
-                  height: 30,
-                  fill: "#E8E8E8",
-                  stroke: "#333333",
-                  strokeWidth: 2,
-                });
-
-                simpleComponent.set("componentType", componentInfo.type);
-                simpleComponent.set("data", {
-                  type: "component",
-                  componentType: componentInfo.type,
-                  componentName: componentInfo.name,
-                });
-
-                currentCanvas.add(simpleComponent);
-                currentCanvas.renderAll();
-
-                logger.canvas(
-                  `FALLBACK: Simple component created for ${componentInfo.name}`
-                );
-              } catch (fallbackError) {
-                logger.canvas(
-                  `FALLBACK: Failed to create simple component:`,
-                  fallbackError
-                );
-
-                // Reset processing flag on fallback error
-                isProcessingComponent = false;
-              }
             });
         } catch (error) {
           console.error(
@@ -784,14 +300,12 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
         }
       };
 
-      // Use the new createComponent function
       createComponent(payload);
     }
   );
 
   isComponentHandlerSetup = true;
 
-  // Return cleanup function
   return () => {
     logger.canvas(
       "Cleaning up component event listener from setupComponentHandler"
@@ -801,6 +315,5 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
       componentEventUnsubscribe = null;
     }
     isComponentHandlerSetup = false;
-    isProcessingComponent = false;
   };
 }

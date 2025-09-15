@@ -200,6 +200,38 @@ async function parseKicadSymFile(
       }
     }
 
+    // NEW: Look for unit-specific symbol declarations (like "-2V5_1_1")
+    if (pins.length === 0) {
+      const unitSymbolRegex =
+        /\(\s*symbol\s+"([^"]+_\d+_\d+)"\s*([\s\S]*?)\)\s*(?=\(\s*symbol|\s*$)/g;
+      let unitSymbolMatch;
+      while ((unitSymbolMatch = unitSymbolRegex.exec(symbolBody)) !== null) {
+        const unitSymbolId = unitSymbolMatch[1];
+        const unitSymbolBody = unitSymbolMatch[2];
+
+        const unitPinRegex =
+          /\(pin\s+([^\s]+)\s+([^\s]+)\s*[\s\S]*?\(at\s+([-\d.]+)\s+([-\d.]+)(?:\s+([-\d.]+))?\s*\)[\s\S]*?\(name\s+"([^"]+)"[\s\S]*?\)\s*[\s\S]*?\(number\s+"([^"]+)"/g;
+        let unitPinMatch;
+        while ((unitPinMatch = unitPinRegex.exec(unitSymbolBody)) !== null) {
+          const electricalType = unitPinMatch[1];
+          const pinName = unitPinMatch[6];
+          const pinNumber = unitPinMatch[7];
+          const x = parseFloat(unitPinMatch[3]);
+          const y = parseFloat(unitPinMatch[4]);
+          const orientation = unitPinMatch[5] ? parseFloat(unitPinMatch[5]) : 0;
+
+          pins.push({
+            name: pinName,
+            number: pinNumber,
+            electrical_type: electricalType,
+            x: x,
+            y: y * -1,
+            orientation: orientation,
+          });
+        }
+      }
+    }
+
     // Extract rectangle (bounding box)
     const rectRegex =
       /\(rectangle\s+\(start\s+([-\d.]+)\s+([-\d.]+)\)\s+\(end\s+([-\d.]+)\s+([-\d.]+)\)/;
@@ -269,6 +301,18 @@ async function parseKicadSymFile(
       bbox: bbox,
       extends: extendsSymbol,
     });
+
+    // Also extract base symbol name variants that might not have suffixes
+    const baseSymbolName = stripSymbolSuffixes(symbolId);
+    if (baseSymbolName !== symbolId && !symbolsMap.has(baseSymbolName)) {
+      // Create an entry for the base symbol using the same data
+      symbolsMap.set(baseSymbolName, {
+        kicad_sym_raw: fullSymbolDefinition,
+        pins: pins,
+        bbox: bbox,
+        extends: extendsSymbol,
+      });
+    }
   }
   return symbolsMap;
 }
@@ -327,11 +371,22 @@ async function main() {
 
     symbolsInFile.forEach((data, id) => {
       const cleanId = id.includes(":") ? id.split(":")[1] : id;
+      const baseId = stripSymbolSuffixes(cleanId);
+
+      // Check for exact match first
       if (requiredSymbolIds.has(cleanId)) {
         foundSymbolsData.set(cleanId, data);
         requiredSymbolIds.delete(cleanId);
         console.log(
-          `-> Found: ${cleanId} (${requiredSymbolIds.size} remaining)`
+          `-> Found exact: ${cleanId} (${requiredSymbolIds.size} remaining)`
+        );
+      }
+      // Check for base symbol match
+      else if (requiredSymbolIds.has(baseId)) {
+        foundSymbolsData.set(baseId, data);
+        requiredSymbolIds.delete(baseId);
+        console.log(
+          `-> Found base: ${baseId} from ${cleanId} (${requiredSymbolIds.size} remaining)`
         );
       }
     });
@@ -340,7 +395,7 @@ async function main() {
   if (requiredSymbolIds.size > 0) {
     console.warn(
       `\n⚠️ Could not find pin data for ${requiredSymbolIds.size} symbols:`,
-      [...requiredSymbolIds]
+      [...requiredSymbolIds].slice(0, 10)
     );
   }
 
