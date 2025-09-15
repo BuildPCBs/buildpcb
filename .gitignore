@@ -1,3 +1,4 @@
+
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 schema.txt
 blueprint.md
@@ -77,3 +78,5 @@ src/components/auth/AuthTest.tsx
 src/lib/auth-debug.ts
 src/components/debug/CanvasDebug.tsx
 src/components/debug/ComponentVisibilityTest.tsx
+./scripts/symbols_index_with_pins.json
+symbols_index_with_pins.json
