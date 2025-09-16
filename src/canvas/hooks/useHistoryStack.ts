@@ -21,13 +21,14 @@ export function useHistoryStack({
   const [historyIndex, setHistoryIndex] = useState(-1);
   const isUndoRedoInProgress = useRef(false);
   const isInitializing = useRef(false);
+  const isHistoryInitialized = useRef(false);
 
   // Save current canvas state to history
   const saveState = useCallback(() => {
     if (!canvas || isUndoRedoInProgress.current) return;
 
     // If history is not initialized, initialize it first
-    if (historyIndex < 0) {
+    if (!isHistoryInitialized.current) {
       if (isInitializing.current) {
         console.log(
           "⏳ History initialization already in progress, waiting..."
@@ -63,12 +64,14 @@ export function useHistoryStack({
         // Use functional updates to avoid race conditions
         setHistory([initialState]);
         setHistoryIndex(0);
+        isHistoryInitialized.current = true;
 
         console.log("✅ History auto-initialized successfully");
         isInitializing.current = false;
 
-        // Continue with saving the current state
-        // Don't return here, continue to save the current state
+        // Return after initialization to prevent infinite loop
+        // The initialization itself is enough for the first state
+        return;
       } catch (error) {
         console.error("❌ Failed to auto-initialize history:", error);
         isInitializing.current = false;
@@ -137,7 +140,7 @@ export function useHistoryStack({
     }
 
     // Don't reinitialize if already initialized
-    if (historyIndex >= 0) {
+    if (isHistoryInitialized.current) {
       console.log("ℹ️ History already initialized, skipping");
       return;
     }
@@ -176,6 +179,7 @@ export function useHistoryStack({
 
       setHistory([initialState]);
       setHistoryIndex(0);
+      isHistoryInitialized.current = true;
       isInitializing.current = false;
     } catch (error) {
       console.error("❌ Failed to initialize history:", error);
