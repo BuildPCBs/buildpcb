@@ -1,21 +1,19 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { logger } from "@/lib/logger";
 
 export interface DatabaseComponent {
-  id: string;
+  idx?: number; // Keep for backward compatibility
+  uid: string; // New primary identifier
   name: string;
-  type: string;
-  category: string;
-  description?: string;
-  pin_configuration: any;
-  kicad_sym_raw: any;
-  kicad_library_source?: string;
-  symbol_svg?: string;
-  manufacturer?: string;
-  part_number?: string;
-  keywords?: string[];
-  datasheet_url?: string;
+  package_id: string;
+  unit_id: string;
+  symbol_svg: string;
+  symbol_data: string; // JSON string containing pin data
+  kicad_sym_raw: string;
+  created_at: string;
+  updated_at: string;
+  is_graphical_symbol: boolean;
 }
 
 export interface ComponentDisplayData {
@@ -40,6 +38,9 @@ export function useDatabaseComponents() {
 
   const PAGE_SIZE = 100; // Reduced from 1000 to 100 for better memory management
 
+  // Counter for generating unique temporary IDs
+  const tempIdCounter = useRef(0);
+
   const fetchComponents = useCallback(
     async (loadMore = false) => {
       try {
@@ -57,13 +58,13 @@ export function useDatabaseComponents() {
 
         const currentOffset = loadMore ? offset : 0;
         logger.api("Making Supabase query:", {
-          table: "components",
+          table: "components_v2",
           range: [currentOffset, currentOffset + PAGE_SIZE - 1],
           orderBy: "name",
         });
 
         const { data, error: fetchError } = await supabase
-          .from("components")
+          .from("components_v2")
           .select("*")
           .order("name")
           .range(currentOffset, currentOffset + PAGE_SIZE - 1);
@@ -89,26 +90,49 @@ export function useDatabaseComponents() {
           const displayComponents: ComponentDisplayData[] = data.map(
             (comp: DatabaseComponent) => {
               logger.api("Processing component:", {
-                id: comp.id,
+                idx: comp.idx,
                 name: comp.name,
-                category: comp.category,
+                package_id: comp.package_id,
                 hasSvg: !!comp.symbol_svg,
                 svgLength: comp.symbol_svg?.length || 0,
               });
 
+              // Parse symbol_data to get pin information
+              let pinCount = 0;
+              let pins: any[] = [];
+              try {
+                if (comp.symbol_data) {
+                  let symbolData;
+                  if (typeof comp.symbol_data === "string") {
+                    symbolData = JSON.parse(comp.symbol_data);
+                  } else {
+                    // symbol_data is already an object
+                    symbolData = comp.symbol_data;
+                  }
+                  pins = symbolData.pins || [];
+                  pinCount = pins.length;
+                }
+              } catch (error) {
+                logger.api(
+                  "Failed to parse symbol_data for component:",
+                  comp.name,
+                  error
+                );
+              }
+
               return {
-                id: comp.id,
+                id:
+                  comp.uid ||
+                  comp.idx?.toString() ||
+                  `temp_${Date.now()}_${tempIdCounter.current++}`, // Use uid as primary, fallback to idx, then temp
                 name: comp.name,
-                category: comp.category,
+                category: comp.package_id || "unknown", // Use package_id as category
                 image: getComponentImage(comp),
-                type: comp.type,
-                description: comp.description,
-                manufacturer: comp.manufacturer,
-                partNumber: comp.part_number,
-                pinCount:
-                  comp.pin_configuration?.total_pins ||
-                  comp.pin_configuration?.pins?.length ||
-                  0,
+                type: comp.package_id || "component", // Use package_id as type
+                description: `Package: ${comp.package_id}`, // Generate description from package_id
+                manufacturer: "Unknown", // Default value
+                partNumber: comp.name, // Use name as part number
+                pinCount: pinCount,
                 symbol_svg: comp.symbol_svg, // Include raw SVG for fallback
               };
             }
@@ -225,12 +249,12 @@ export function useDatabaseComponents() {
           error
         );
         // Fallback to category icon
-        return getCategoryIcon(component.category);
+        return getCategoryIcon(component.package_id || "unknown");
       }
     }
 
     // Fallback to category icon
-    return getCategoryIcon(component.category);
+    return getCategoryIcon(component.package_id || "unknown");
   };
 
   // Memory-efficient category icon generator

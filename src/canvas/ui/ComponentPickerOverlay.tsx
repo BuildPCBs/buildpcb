@@ -252,8 +252,10 @@ export function ComponentPickerOverlay({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [selectedComponent, setSelectedComponent] =
     useState<ComponentDisplayData | null>(null);
+  const [isKeyboardNavigation, setIsKeyboardNavigation] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const {
     components: databaseComponents,
@@ -265,9 +267,14 @@ export function ComponentPickerOverlay({
   } = useDatabaseComponents();
 
   const filteredComponents = useMemo(() => {
-    return searchQuery.trim()
+    const baseComponents = searchQuery.trim()
       ? searchComponents(searchQuery)
       : databaseComponents;
+
+    // Filter out components with temporary IDs (components without proper database uid)
+    return baseComponents.filter(
+      (component) => !component.id.startsWith("temp_")
+    );
   }, [searchQuery, databaseComponents, searchComponents]);
 
   // Debug logging - only in development
@@ -291,16 +298,45 @@ export function ComponentPickerOverlay({
   ]);
 
   useEffect(() => {
-    setSelectedIndex(0);
-    setSelectedComponent(filteredComponents[0] || null);
-  }, [searchQuery, filteredComponents]);
+    // Only reset selection when search query changes or when filteredComponents is empty
+    if (searchQuery.trim()) {
+      // When searching, reset to first result
+      setSelectedIndex(0);
+      setSelectedComponent(filteredComponents[0] || null);
+    } else if (filteredComponents.length === 0) {
+      // When no components, clear selection
+      setSelectedIndex(0);
+      setSelectedComponent(null);
+    } else if (selectedIndex >= filteredComponents.length) {
+      // If current selection is out of bounds, adjust to last valid item
+      const newIndex = Math.max(0, filteredComponents.length - 1);
+      setSelectedIndex(newIndex);
+      setSelectedComponent(filteredComponents[newIndex] || null);
+    } else if (filteredComponents.length > 0 && !selectedComponent) {
+      // If we have components but no selection, select first one
+      setSelectedIndex(0);
+      setSelectedComponent(filteredComponents[0]);
+    }
+  }, [searchQuery, filteredComponents.length]);
 
+  // Ensure selectedComponent stays in sync with selectedIndex
+  useEffect(() => {
+    if (filteredComponents.length > 0 && selectedIndex >= 0 && selectedIndex < filteredComponents.length) {
+      const currentComponent = filteredComponents[selectedIndex];
+      if (currentComponent !== selectedComponent) {
+        setSelectedComponent(currentComponent);
+      }
+    }
+  }, [selectedIndex, filteredComponents, selectedComponent]);
+
+  // Focus input when overlay becomes visible
   useEffect(() => {
     if (isVisible && inputRef.current) {
       inputRef.current.focus();
     }
   }, [isVisible]);
 
+  // Load more components if needed
   useEffect(() => {
     if (
       searchQuery.trim() &&
@@ -339,18 +375,40 @@ export function ComponentPickerOverlay({
           onClose();
           break;
         case "ArrowDown":
+          setIsKeyboardNavigation(true);
           setSelectedIndex((prev) => {
             const next = Math.min(prev + 1, filteredComponents.length - 1);
-            setSelectedComponent(filteredComponents[next] || null);
-            return next;
+            // Only update if we're not already at the boundary
+            if (next !== prev) {
+              setSelectedComponent(filteredComponents[next] || null);
+              // Clear any pending scroll timeout
+              if (scrollTimeoutRef.current) {
+                clearTimeout(scrollTimeoutRef.current);
+              }
+              return next;
+            }
+            return prev;
           });
+          // Reset keyboard navigation flag after a longer delay
+          setTimeout(() => setIsKeyboardNavigation(false), 500);
           break;
         case "ArrowUp":
+          setIsKeyboardNavigation(true);
           setSelectedIndex((prev) => {
             const next = Math.max(prev - 1, 0);
-            setSelectedComponent(filteredComponents[next] || null);
-            return next;
+            // Only update if we're not already at the boundary
+            if (next !== prev) {
+              setSelectedComponent(filteredComponents[next] || null);
+              // Clear any pending scroll timeout
+              if (scrollTimeoutRef.current) {
+                clearTimeout(scrollTimeoutRef.current);
+              }
+              return next;
+            }
+            return prev;
           });
+          // Reset keyboard navigation flag after a longer delay
+          setTimeout(() => setIsKeyboardNavigation(false), 500);
           break;
         case "Enter":
           if (selectedComponent) {
@@ -428,53 +486,68 @@ export function ComponentPickerOverlay({
   // Add scroll event listener to keep selection in sync with scroll position
   useEffect(() => {
     const handleScroll = () => {
-      if (!listRef.current || filteredComponents.length === 0) return;
+      // Skip scroll sync during keyboard navigation
+      if (isKeyboardNavigation) return;
 
-      const container = listRef.current;
-      const containerScrollTop = container.scrollTop;
-      const containerHeight = container.clientHeight;
+      // Debounce scroll events
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
 
-      // Find the item that's most visible in the current scroll position
-      let bestIndex = 0;
-      let bestVisibility = 0;
+      scrollTimeoutRef.current = setTimeout(() => {
+        if (!listRef.current || filteredComponents.length === 0) return;
 
-      for (let i = 0; i < filteredComponents.length; i++) {
-        const element = container.children[i] as HTMLElement;
-        if (!element) continue;
+        const container = listRef.current;
+        const containerScrollTop = container.scrollTop;
+        const containerHeight = container.clientHeight;
 
-        const elementTop = element.offsetTop;
-        const elementHeight = element.offsetHeight;
-        const elementBottom = elementTop + elementHeight;
+        // Find the item that's most visible in the current scroll position
+        let bestIndex = 0;
+        let bestVisibility = 0;
 
-        // Calculate how much of the element is visible
-        const visibleTop = Math.max(containerScrollTop, elementTop);
-        const visibleBottom = Math.min(
-          containerScrollTop + containerHeight,
-          elementBottom
-        );
-        const visibleHeight = Math.max(0, visibleBottom - visibleTop);
-        const visibility = visibleHeight / elementHeight;
+        for (let i = 0; i < filteredComponents.length; i++) {
+          const element = container.children[i] as HTMLElement;
+          if (!element) continue;
 
-        // If this element is more visible than the current best, update
-        if (visibility > bestVisibility) {
-          bestVisibility = visibility;
-          bestIndex = i;
+          const elementTop = element.offsetTop;
+          const elementHeight = element.offsetHeight;
+          const elementBottom = elementTop + elementHeight;
+
+          // Calculate how much of the element is visible
+          const visibleTop = Math.max(containerScrollTop, elementTop);
+          const visibleBottom = Math.min(
+            containerScrollTop + containerHeight,
+            elementBottom
+          );
+          const visibleHeight = Math.max(0, visibleBottom - visibleTop);
+          const visibility = visibleHeight / elementHeight;
+
+          // If this element is more visible than the current best, update
+          if (visibility > bestVisibility) {
+            bestVisibility = visibility;
+            bestIndex = i;
+          }
         }
-      }
 
-      // Only update if we found a significantly more visible item
-      if (bestVisibility > 0.5 && bestIndex !== selectedIndex) {
-        setSelectedIndex(bestIndex);
-        setSelectedComponent(filteredComponents[bestIndex] || null);
-      }
+        // Only update if we found a significantly more visible item
+        if (bestVisibility > 0.5 && bestIndex !== selectedIndex) {
+          setSelectedIndex(bestIndex);
+          setSelectedComponent(filteredComponents[bestIndex] || null);
+        }
+      }, 100); // 100ms debounce
     };
 
     const container = listRef.current;
     if (container) {
       container.addEventListener("scroll", handleScroll, { passive: true });
-      return () => container.removeEventListener("scroll", handleScroll);
+      return () => {
+        container.removeEventListener("scroll", handleScroll);
+        if (scrollTimeoutRef.current) {
+          clearTimeout(scrollTimeoutRef.current);
+        }
+      };
     }
-  }, [filteredComponents, selectedIndex]);
+  }, [filteredComponents, selectedIndex, isKeyboardNavigation]);
 
   if (!isVisible) return null;
 
@@ -565,8 +638,12 @@ export function ComponentPickerOverlay({
                     <div
                       key={component.id}
                       onClick={() => {
+                        // Disable scroll sync temporarily when clicking
+                        setIsKeyboardNavigation(true);
                         setSelectedIndex(index);
                         setSelectedComponent(component);
+                        // Re-enable scroll sync after a delay
+                        setTimeout(() => setIsKeyboardNavigation(false), 300);
                       }}
                       className={`p-3 cursor-pointer transition-colors ${
                         index === selectedIndex

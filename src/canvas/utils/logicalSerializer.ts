@@ -148,11 +148,11 @@ export async function loadCanvasFromLogicalCircuit(
     try {
       console.log(`🔍 Loading component: ${component.databaseId}`);
 
-      // Fetch component from database
+      // Fetch component from database using components_v2 table
       const { data: dbComponent, error } = await supabase
-        .from("components")
+        .from("components_v2")
         .select("*")
-        .eq("id", component.databaseId)
+        .eq("uid", component.databaseId || component.id)
         .single();
 
       if (error || !dbComponent) {
@@ -165,15 +165,15 @@ export async function loadCanvasFromLogicalCircuit(
 
       // Add component to canvas using the command system
       canvasCommandManager.executeCommand("component:add", {
-        id: dbComponent.id,
+        id: dbComponent.uid, // Use uid as the primary identifier
         type: dbComponent.type,
-        svgPath: dbComponent.image || "",
+        svgPath: dbComponent.symbol_svg || "", // Use symbol_svg field
         name: dbComponent.name,
         category: dbComponent.category,
         description: dbComponent.description,
         manufacturer: dbComponent.manufacturer,
         partNumber: dbComponent.part_number,
-        pinCount: dbComponent.pin_configuration?.pins?.length || 0,
+        pinCount: dbComponent.symbol_data?.pins?.length || 0, // Get pin count from symbol_data
         databaseComponent: dbComponent,
         x: component.position.x,
         y: component.position.y,

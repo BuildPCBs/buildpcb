@@ -36,8 +36,19 @@ export function serializeCanvasToCircuit(
     const dbMetadata =
       (group as any).componentMetadata || (group as any).databaseComponent;
 
+    // Get the original database ID for proper restoration
+    let componentId = `comp_${index}`; // fallback
+    if (dbMetadata?.uid) {
+      componentId = dbMetadata.uid; // Use database uid
+    } else if (dbMetadata?.id) {
+      componentId = dbMetadata.id; // Fallback to database id
+    } else if (componentData.originalDatabaseId) {
+      componentId = componentData.originalDatabaseId; // If stored in data
+    }
+
     return {
-      id: dbMetadata?.id || componentData.id || `comp_${index}`,
+      id: componentId,
+      databaseId: componentId, // Store for restoration
       type:
         dbMetadata?.type ||
         componentData.componentType ||

@@ -5,17 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="372b2826-5811-4556-b3b2-af8fbe461aed" name="Changes" comment="update README.md with enhanced feature descriptions and improve workspace.xml configuration">
-      <change beforePath="$PROJECT_DIR$/src/app/dashboard/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/dashboard/page.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/canvas/FabricCanvas.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/canvas/FabricCanvas.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/canvas/IDEFabricCanvas.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/canvas/IDEFabricCanvas.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/canvas/canvas-command-manager.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/canvas/canvas-command-manager.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/canvas/hooks/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/canvas/hooks/index.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/canvas/hooks/useCanvasHotkeys.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/canvas/hooks/useCanvasHotkeys.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/canvas/ui/ContextMenu.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/canvas/ui/ContextMenu.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/auth/AuthOverlay.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/auth/AuthOverlay.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/layout/ActivityAnalyticsPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/layout/ActivityAnalyticsPanel.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/layout/SchemaPanel.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/layout/SchemaPanel.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/components/layout/TopToolbar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/components/layout/TopToolbar.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/canvas/componentHandlerSetup.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/canvas/componentHandlerSetup.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/canvas/hooks/useSimpleWiringTool.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/canvas/hooks/useSimpleWiringTool.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -48,28 +40,29 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager": "true",
-    "RunOnceActivity.cidr.known.project.marker": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "RunOnceActivity.readMode.enableVisualFormatting": "true",
-    "cidr.known.project.marker": "true",
-    "git-widget-placeholder": "main",
-    "js.debugger.nextJs.config.created.client": "true",
-    "js.debugger.nextJs.config.created.server": "true",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "npm.Next.js: server-side.executor": "Run",
-    "ts.external.directory.path": "/Users/MAC/Projects/buildpcb/node_modules/typescript/lib",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.cidr.known.project.marker&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.readMode.enableVisualFormatting&quot;: &quot;true&quot;,
+    &quot;cidr.known.project.marker&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;js.debugger.nextJs.config.created.client&quot;: &quot;true&quot;,
+    &quot;js.debugger.nextJs.config.created.server&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/Users/MAC/Projects/buildpcb&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;npm.Next.js: server-side.executor&quot;: &quot;Run&quot;,
+    &quot;ts.external.directory.path&quot;: &quot;/Users/MAC/Projects/buildpcb/node_modules/typescript/lib&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RunManager" selected="npm.Next.js: server-side">
     <configuration name="Next.js: debug client-side" type="JavascriptDebugType" uri="http://localhost:3000/">
       <method v="2" />
@@ -103,6 +96,7 @@
       <workItem from="1753529379981" duration="25325000" />
       <workItem from="1754038002834" duration="143000" />
       <workItem from="1754038147368" duration="4048000" />
+      <workItem from="1758035419219" duration="37000" />
     </task>
     <task id="LOCAL-00001" summary="initialize project with Next.js, Tailwind CSS, and essential configuration files">
       <option name="closed" value="true" />
