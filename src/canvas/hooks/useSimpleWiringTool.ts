@@ -835,7 +835,7 @@ export function useSimpleWiringTool({
         }
 
         // Create new orthogonal preview wires
-        let previewWires: (fabric.Line | fabric.Path)[] = [];
+        const previewWires: (fabric.Line | fabric.Path)[] = [];
         const values = [2, 3];
 
         // If we have bend points, create multi-segment preview path

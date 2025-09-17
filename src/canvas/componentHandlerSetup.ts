@@ -116,54 +116,19 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
             const pinDataFromDb =
               dbPins.find((p) => p.number === pinNumber) || {};
 
-            // Debug: Log the pin object properties to understand its structure
-            logger.canvas(`📍 DEBUG Pin ${pinNumber}:`, {
-              type: obj.type,
-              left: obj.left,
-              top: obj.top,
-              width: obj.width,
-              height: obj.height,
-              x1: (obj as any).x1,
-              y1: (obj as any).y1,
-              x2: (obj as any).x2,
-              y2: (obj as any).y2,
-              path: (obj as any).path,
-            });
-
-            // Calculate the proper pin connection point
-            let connectionPoint: fabric.Point;
-
-            if (obj.type === "line") {
-              // For line objects, we want the endpoint that's furthest from component center
-              const line = obj as fabric.Line;
-              const point1 = new fabric.Point(line.x1 || 0, line.y1 || 0);
-              const point2 = new fabric.Point(line.x2 || 0, line.y2 || 0);
-
-              // For now, use x2,y2 as the connection point (typically the outer end)
-              // TODO: We might need to determine which end is the "outer" end based on component bounds
-              connectionPoint = point2;
-              logger.canvas(
-                `📍 Pin ${pinNumber} connection point: (${connectionPoint.x}, ${connectionPoint.y})`
-              );
-            } else {
-              // Fallback to center point for non-line objects
-              connectionPoint = obj.getCenterPoint();
-              logger.canvas(
-                `📍 Pin ${pinNumber} using center point: (${connectionPoint.x}, ${connectionPoint.y})`
-              );
-            }
+            const center = obj.getCenterPoint();
 
             const interactivePin = new fabric.Circle({
               radius: 3, // Visual size of the connectable point
               fill: "rgba(0, 255, 0, 0.7)",
               stroke: "#059669",
               strokeWidth: 0.4,
-              left: connectionPoint.x,
-              top: connectionPoint.y,
+              left: center.x,
+              top: center.y,
               originX: "center",
               originY: "center",
-              opacity: 1, // Make visible for debugging
-              visible: true, // Make visible for debugging
+              opacity: 0, // Hidden until mouse hover
+              visible: false, // Initially not visible
             });
 
             interactivePin.set("data", {

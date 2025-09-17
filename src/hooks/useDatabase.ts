@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   DatabaseService,
   Project,
@@ -269,18 +269,27 @@ export function useAutoSave(
   projectId: string | null,
   circuitData: Circuit | null,
   canvasData: Record<string, any>,
-  interval = 30000 // 30 seconds
+  interval = 60000 // Increased to 60 seconds for better performance
 ) {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const lastDataRef = useRef<string>('');
 
   const saveNow = useCallback(async () => {
     if (!projectId || !circuitData) return;
 
+    // Skip save if data hasn't actually changed
+    const currentDataHash = JSON.stringify({ circuitData, canvasData });
+    if (currentDataHash === lastDataRef.current) {
+      console.log("💾 Skipping auto-save - no changes detected");
+      return;
+    }
+
     try {
       setSaving(true);
       setError(null);
+      console.log("💾 Auto-saving project changes...");
 
       await DatabaseService.createVersion(
         projectId,
@@ -290,8 +299,11 @@ export function useAutoSave(
         "Automatic save"
       );
 
+      lastDataRef.current = currentDataHash;
       setLastSaved(new Date());
+      console.log("✅ Auto-save completed successfully");
     } catch (err) {
+      console.error("❌ Auto-save failed:", err);
       setError(err instanceof Error ? err.message : "Auto-save failed");
     } finally {
       setSaving(false);

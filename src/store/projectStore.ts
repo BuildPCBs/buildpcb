@@ -45,7 +45,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   lastSaved: null,
   isDirty: false,
   autoSaveEnabled: true,
-  autoSaveInterval: 30000, // 30 seconds default
+  autoSaveInterval: 120000, // Increased to 2 minutes for better performance
 
   // Actions
   setProject: (projectId: string, versionId: string, projectName: string) => {

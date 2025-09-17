@@ -157,7 +157,7 @@ export function ElasticWireCanvas({
       <div className="instructions">
         <h3>Elastic Wire Instructions:</h3>
         <ul>
-          <li>Click "Enter Elastic Mode" to start</li>
+          <li>Click &quot;Enter Elastic Mode&quot; to start</li>
           <li>Click on a component pin to start drawing</li>
           <li>Move mouse to see elastic wire preview</li>
           <li>Click on another pin to finish the wire</li>
