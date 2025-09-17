@@ -20,9 +20,7 @@ export default function ProjectLayout({
   return (
     <RouteGuard requireAuth={true}>
       <ProjectProvider>
-        <AIChatProvider>
-          {children}
-        </AIChatProvider>
+        <AIChatProvider>{children}</AIChatProvider>
       </ProjectProvider>
     </RouteGuard>
   );

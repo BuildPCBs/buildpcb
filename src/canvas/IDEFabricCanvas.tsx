@@ -1334,7 +1334,7 @@ export function IDEFabricCanvas({
       logger.canvas("Cannot save: no project loaded");
       return;
     }
-    
+
     try {
       // Use the shared save function if provided, otherwise fallback to auto-save
       if (onSave) {

@@ -31,7 +31,7 @@ export function IDECanvas() {
 
   // Get canvas instance for auto-save
   const fabricCanvas = canvasCommandManager.getCanvas();
-  
+
   // Use the auto-save mechanism
   const autoSave = useCanvasAutoSave({
     canvas: fabricCanvas,
@@ -52,12 +52,12 @@ export function IDECanvas() {
     console.log("💾 Shared save function called", {
       hasProject: !!currentProject,
       projectId: currentProject?.id,
-      canvasObjects: fabricCanvas.getObjects().length
+      canvasObjects: fabricCanvas.getObjects().length,
     });
-    
+
     // Call the auto-save mechanism
     await autoSave.saveNow();
-    
+
     console.log("✅ Shared save function completed");
   }, [currentProject, fabricCanvas, autoSave]);
 
@@ -99,10 +99,7 @@ export function IDECanvas() {
             <SchemaPanel />
 
             {/* Top Toolbar positioned absolutely on top of canvas */}
-            <TopToolbar 
-              getNetlist={getNetlist} 
-              onSave={sharedSaveFunction}
-            />
+            <TopToolbar getNetlist={getNetlist} onSave={sharedSaveFunction} />
 
             {/* AI Chat Interface - positioned above PromptEntry */}
             <div

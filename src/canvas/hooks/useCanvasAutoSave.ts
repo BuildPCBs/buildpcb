@@ -126,19 +126,19 @@ export function useCanvasAutoSave({
   //   currentData.canvasData,
   //   autoSaveEnabled ? Math.max(autoSaveInterval, 60000) : undefined // Minimum 60 seconds
   // );
-  
+
   // Create a dummy autoSave object for compatibility
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const autoSave = {
     lastSaved,
     saving,
     error,
     saveNow: async () => {
       console.log("💾 Auto-save disabled - using manual save mechanism only");
-    }
+    },
   };
 
   // Track canvas changes and mark project as dirty
@@ -329,7 +329,8 @@ export function useCanvasAutoSave({
       setLastSaved(new Date());
       console.log("✅ Manual save completed successfully with fresh data");
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Manual save failed";
+      const errorMessage =
+        error instanceof Error ? error.message : "Manual save failed";
       setError(errorMessage);
       console.error("❌ Manual save failed:", error);
     } finally {
@@ -356,7 +357,7 @@ export function useCanvasAutoSave({
 
     const interval = Math.max(autoSaveInterval, 60000); // Minimum 60 seconds
     console.log(`🕐 Setting up auto-save interval: ${interval / 1000}s`);
-    
+
     const intervalId = setInterval(async () => {
       if (isDirty && projectId && canvas) {
         console.log("⏰ Auto-save interval triggered");

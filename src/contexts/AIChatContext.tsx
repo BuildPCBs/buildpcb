@@ -367,7 +367,8 @@ export function AIChatProvider({
                               ...msg,
                               content:
                                 // For text-only mode, prioritize the actual text response over explanation
-                                (finalResponse.mode === "text-only" && finalResponse.textResponse) ||
+                                (finalResponse.mode === "text-only" &&
+                                  finalResponse.textResponse) ||
                                 accumulatedContent ||
                                 finalResponse.metadata?.explanation ||
                                 "Response received",

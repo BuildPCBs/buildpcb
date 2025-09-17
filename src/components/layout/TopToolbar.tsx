@@ -22,7 +22,11 @@ interface TopToolbarProps {
   onSave?: () => Promise<void>;
 }
 
-export function TopToolbar({ className = "", getNetlist, onSave }: TopToolbarProps) {
+export function TopToolbar({
+  className = "",
+  getNetlist,
+  onSave,
+}: TopToolbarProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [showAnalyticsPanel, setShowAnalyticsPanel] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -35,7 +39,7 @@ export function TopToolbar({ className = "", getNetlist, onSave }: TopToolbarPro
 
   // Get canvas instance for auto-save
   const canvas = canvasCommandManager.getCanvas();
-  
+
   // Use the same auto-save mechanism as Ctrl+S
   const autoSave = useCanvasAutoSave({
     canvas,
@@ -93,9 +97,9 @@ export function TopToolbar({ className = "", getNetlist, onSave }: TopToolbarPro
       console.log("💾 Export button triggered - using shared save function", {
         hasProject: !!currentProject,
         projectId: currentProject?.id,
-        canvasObjects: canvas.getObjects().length
+        canvasObjects: canvas.getObjects().length,
       });
-      
+
       // Use the shared save function
       if (onSave) {
         await onSave();
@@ -107,7 +111,9 @@ export function TopToolbar({ className = "", getNetlist, onSave }: TopToolbarPro
       // Update last save time
       setLastSaveTime(new Date());
 
-      console.log("✅ Project exported/saved successfully via unified mechanism");
+      console.log(
+        "✅ Project exported/saved successfully via unified mechanism"
+      );
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Failed to save project";
