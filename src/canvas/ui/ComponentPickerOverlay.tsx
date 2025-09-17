@@ -102,7 +102,7 @@ function ComponentPreview({ component, onClose }: ComponentPreviewProps) {
           {component.image ? (
             <img
               src={component.image}
-              alt={component.name}
+              alt={component.package_id}
               className="max-w-full max-h-full object-contain"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
@@ -113,7 +113,7 @@ function ComponentPreview({ component, onClose }: ComponentPreviewProps) {
           ) : null}
           <div className="w-full h-full bg-gray-100 rounded flex flex-col items-center justify-center text-gray-500 hidden">
             <div className="text-2xl font-semibold mb-1">
-              {component.name.charAt(0)}
+              {component.package_id.charAt(0)}
             </div>
             <p className="text-xs">No image available</p>
           </div>
@@ -121,7 +121,7 @@ function ComponentPreview({ component, onClose }: ComponentPreviewProps) {
 
         <div className="text-center">
           <h3 className="font-semibold text-gray-900 text-lg mb-1">
-            {component.name}
+            {component.package_id}
           </h3>
           <p className="text-sm text-gray-500">{component.category}</p>
         </div>
@@ -181,12 +181,13 @@ function ComponentPreview({ component, onClose }: ComponentPreviewProps) {
 
       <button
         onClick={() => {
-          logger.component("Add to Canvas clicked for:", component.name);
+          logger.component("Add to Canvas clicked for:", component.package_id);
           logger.component("Component data:", {
             id: component.id,
             type: component.type,
             image: component.image,
             name: component.name,
+            package_id: component.package_id,
             category: component.category,
             description: component.description,
             manufacturer: component.manufacturer,
@@ -200,7 +201,7 @@ function ComponentPreview({ component, onClose }: ComponentPreviewProps) {
           logger.component("Image length:", component.image.length);
 
           const timestamp = new Date().toISOString();
-          logger.component(`Adding ${component.name} to canvas from overlay`);
+          logger.component(`Adding ${component.package_id} to canvas from overlay`);
 
           try {
             logger.component(
@@ -213,7 +214,7 @@ function ComponentPreview({ component, onClose }: ComponentPreviewProps) {
                 id: component.id,
                 type: component.type,
                 svgPath: component.image,
-                name: component.name,
+                name: component.package_id,
                 category: component.category,
                 description: component.description,
                 manufacturer: component.manufacturer,
@@ -418,11 +419,12 @@ export function ComponentPickerOverlay({
           if (selectedComponent) {
             const timestamp = new Date().toISOString();
             logger.component(
-              `Adding ${selectedComponent.name} to canvas from overlay`
+              `Adding ${selectedComponent.package_id} to canvas from overlay`
             );
             logger.component(`Selected component data:`, {
               id: selectedComponent.id,
               name: selectedComponent.name,
+              package_id: selectedComponent.package_id,
               type: selectedComponent.type,
               hasImage: !!selectedComponent.image,
               imageLength: selectedComponent.image?.length,
@@ -434,7 +436,7 @@ export function ComponentPickerOverlay({
               id: selectedComponent.id,
               type: selectedComponent.type,
               svgPath: selectedComponent.image,
-              name: selectedComponent.name,
+              name: selectedComponent.package_id,
               category: selectedComponent.category,
               description: selectedComponent.description,
               manufacturer: selectedComponent.manufacturer,
@@ -659,18 +661,18 @@ export function ComponentPickerOverlay({
                         <div className="w-12 h-12 bg-gray-50 rounded-lg flex items-center justify-center flex-shrink-0">
                           <LazyImage
                             src={component.image}
-                            alt={component.name}
+                            alt={component.package_id}
                             className="w-10 h-10 object-contain"
                             placeholder={
                               <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center text-sm font-medium text-gray-600">
-                                {component.name.charAt(0)}
+                                {component.package_id.charAt(0)}
                               </div>
                             }
                           />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-gray-900 truncate">
-                            {component.name}
+                            {component.package_id}
                           </div>
                           <div className="text-xs text-gray-500 flex gap-2 mt-1">
                             <span className="bg-gray-100 px-2 py-0.5 rounded">

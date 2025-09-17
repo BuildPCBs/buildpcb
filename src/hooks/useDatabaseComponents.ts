@@ -19,6 +19,7 @@ export interface DatabaseComponent {
 export interface ComponentDisplayData {
   id: string;
   name: string;
+  package_id: string;
   category: string;
   image: string;
   type: string;
@@ -126,6 +127,7 @@ export function useDatabaseComponents() {
                   comp.idx?.toString() ||
                   `temp_${Date.now()}_${tempIdCounter.current++}`, // Use uid as primary, fallback to idx, then temp
                 name: comp.name,
+                package_id: comp.package_id,
                 category: comp.package_id || "unknown", // Use package_id as category
                 image: getComponentImage(comp),
                 type: comp.package_id || "component", // Use package_id as type
