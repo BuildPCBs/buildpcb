@@ -79,7 +79,7 @@ export function useHistoryStack({
       }
     }
 
-    console.log("💾 Saving canvas state to history");
+    // console.log("💾 Saving canvas state to history");
 
     try {
       // Check if canvas is in a valid state

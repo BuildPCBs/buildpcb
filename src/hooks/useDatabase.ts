@@ -274,7 +274,7 @@ export function useAutoSave(
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const lastDataRef = useRef<string>('');
+  const lastDataRef = useRef<string>("");
 
   const saveNow = useCallback(async () => {
     if (!projectId || !circuitData) return;

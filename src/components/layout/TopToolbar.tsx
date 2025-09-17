@@ -14,13 +14,15 @@ import { useProject } from "@/contexts/ProjectContext";
 import { Circuit } from "@/lib/schemas/circuit";
 import { canvasCommandManager } from "@/canvas/canvas-command-manager";
 import { useAIChat } from "@/contexts/AIChatContext";
+import { useCanvasAutoSave } from "@/canvas/hooks/useCanvasAutoSave";
 
 interface TopToolbarProps {
   className?: string;
   getNetlist?: (() => any) | null;
+  onSave?: () => Promise<void>;
 }
 
-export function TopToolbar({ className = "", getNetlist }: TopToolbarProps) {
+export function TopToolbar({ className = "", getNetlist, onSave }: TopToolbarProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [showAnalyticsPanel, setShowAnalyticsPanel] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -28,23 +30,24 @@ export function TopToolbar({ className = "", getNetlist }: TopToolbarProps) {
   const [isHovered, setIsHovered] = useState(false);
 
   // Get project and canvas contexts
-  const { currentProject, currentCircuit, saveProject } = useProject();
+  const { currentProject, currentCircuit } = useProject();
   const { messages } = useAIChat();
+
+  // Get canvas instance for auto-save
+  const canvas = canvasCommandManager.getCanvas();
+  
+  // Use the same auto-save mechanism as Ctrl+S
+  const autoSave = useCanvasAutoSave({
+    canvas,
+    netlist: getNetlist ? getNetlist() : [],
+    enabled: !!currentProject, // Only enable when project is loaded
+  });
 
   // Track last save time for better status display
   const [lastSaveTime, setLastSaveTime] = useState<Date | null>(null);
 
   // Add keyboard shortcut for saving (Ctrl+S / Cmd+S)
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key === "s") {
-        event.preventDefault();
-        if (currentProject && !isSaving) {
-          handleExport();
-        }
-      }
-    };
-
     const handleChatSave = (event: CustomEvent) => {
       console.log("🔥 Chat save event received, triggering manual save", {
         hasEventDetail: !!event.detail,
@@ -58,11 +61,9 @@ export function TopToolbar({ className = "", getNetlist }: TopToolbarProps) {
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("triggerChatSave", handleChatSave as EventListener);
 
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener(
         "triggerChatSave",
         handleChatSave as EventListener
@@ -72,11 +73,11 @@ export function TopToolbar({ className = "", getNetlist }: TopToolbarProps) {
 
   const handleExport = async (overrideMessages?: any[]) => {
     if (!currentProject) {
-      setSaveError("No project loaded");
+      setSaveError("No project loaded - please create or open a project first");
       return;
     }
 
-    // Get canvas from command manager instead of context
+    // Get canvas from command manager
     const canvas = canvasCommandManager.getCanvas();
     if (!canvas) {
       setSaveError(
@@ -89,72 +90,24 @@ export function TopToolbar({ className = "", getNetlist }: TopToolbarProps) {
       setIsSaving(true);
       setSaveError(null);
 
-      // Get canvas data using the same method as auto-save
-      const { serializeCanvasData } = await import(
-        "@/canvas/utils/canvasSerializer"
-      );
-      const netlistData = getNetlist ? getNetlist() : null;
-      const canvasData = serializeCanvasData(canvas, netlistData);
-
-      // Get circuit data - use current circuit or create empty one
-      const circuitData: Circuit = currentCircuit || {
-        mode: "full",
-        components: [],
-        connections: [],
-      };
-
-      // Use override messages if provided, otherwise use current messages
-      const messagesToSave = overrideMessages || messages;
-
-      // Prepare chat data for saving
-      console.log("🔍 Checking messages for save:", {
-        hasOverride: !!overrideMessages,
-        overrideLength: overrideMessages?.length || 0,
-        messagesLength: messages.length,
-        finalMessagesLength: messagesToSave.length,
-        hasMessages: messagesToSave && messagesToSave.length > 0,
+      console.log("💾 Export button triggered - using shared save function", {
+        hasProject: !!currentProject,
+        projectId: currentProject?.id,
+        canvasObjects: canvas.getObjects().length
       });
-
-      const chatData =
-        messagesToSave.length > 0
-          ? {
-              messages: messagesToSave.map((msg) => ({
-                ...msg,
-                timestamp:
-                  msg.timestamp instanceof Date
-                    ? msg.timestamp.toISOString()
-                    : msg.timestamp,
-              })),
-            }
-          : undefined;
-
-      if (chatData) {
-        console.log("💬 Saving chat data:", {
-          messageCount: messagesToSave.length,
-          totalCharacters: messagesToSave.reduce(
-            (sum: number, msg: any) => sum + msg.content.length,
-            0
-          ),
-          firstMessage: messagesToSave[0]?.content?.substring(0, 50) + "...",
-          lastMessage:
-            messagesToSave[messagesToSave.length - 1]?.content?.substring(
-              0,
-              50
-            ) + "...",
-        });
+      
+      // Use the shared save function
+      if (onSave) {
+        await onSave();
       } else {
-        console.log(
-          "⚠️ No chat data to save - messages array is empty or undefined"
-        );
+        // Fallback to auto-save if no shared function provided
+        await autoSave.saveNow();
       }
-
-      // Save the project with chat data
-      await saveProject(circuitData, canvasData, chatData);
 
       // Update last save time
       setLastSaveTime(new Date());
 
-      console.log("✅ Project saved successfully");
+      console.log("✅ Project exported/saved successfully via unified mechanism");
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Failed to save project";

@@ -4,12 +4,14 @@ import { useEffect, useCallback, useRef, useState } from "react";
 import * as fabric from "fabric";
 import { useProjectStore } from "@/store/projectStore";
 import { useAutoSave } from "@/hooks/useDatabase";
+import { DatabaseService } from "@/lib/database";
 import {
   serializeCanvasToLogicalCircuit,
   loadCanvasFromLogicalCircuit,
 } from "@/canvas/utils/logicalSerializer";
 import { serializeCanvasToCircuit } from "@/canvas/utils/canvasSerializer";
 import { useAIChat } from "@/contexts/AIChatContext";
+import { useProject } from "@/contexts/ProjectContext";
 
 interface UseCanvasAutoSaveOptions {
   canvas: fabric.Canvas | null;
@@ -37,6 +39,9 @@ export function useCanvasAutoSave({
     markDirty,
     markClean,
   } = useProjectStore();
+
+  // Also get project context as fallback
+  const { currentProject } = useProject();
 
   // Get chat messages for auto-save
   const { messages } = useAIChat();
@@ -77,7 +82,7 @@ export function useCanvasAutoSave({
       if (dataUpdateTimeoutRef.current) {
         clearTimeout(dataUpdateTimeoutRef.current);
       }
-      
+
       dataUpdateTimeoutRef.current = setTimeout(() => {
         getCurrentCanvasData().then((data) => {
           // Include chat data in the canvas data for auto-save
@@ -114,12 +119,27 @@ export function useCanvasAutoSave({
     };
   }, [canvas, getCurrentCanvasData, messages]);
 
-  const autoSave = useAutoSave(
-    projectId,
-    currentData.circuit,
-    currentData.canvasData,
-    autoSaveEnabled ? Math.max(autoSaveInterval, 60000) : undefined // Minimum 60 seconds
-  );
+  // Disabled useAutoSave hook to prevent race conditions with manual saves
+  // const autoSave = useAutoSave(
+  //   projectId,
+  //   currentData.circuit,
+  //   currentData.canvasData,
+  //   autoSaveEnabled ? Math.max(autoSaveInterval, 60000) : undefined // Minimum 60 seconds
+  // );
+  
+  // Create a dummy autoSave object for compatibility
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  const autoSave = {
+    lastSaved,
+    saving,
+    error,
+    saveNow: async () => {
+      console.log("💾 Auto-save disabled - using manual save mechanism only");
+    }
+  };
 
   // Track canvas changes and mark project as dirty
   const handleCanvasChange = useCallback(() => {
@@ -136,9 +156,9 @@ export function useCanvasAutoSave({
         const objects = canvas.getObjects();
         const fingerprint = JSON.stringify({
           objectCount: objects.length,
-          objectTypes: objects.map(obj => obj.type),
-          positions: objects.map(obj => ({ left: obj.left, top: obj.top })),
-          lastModified: Date.now()
+          objectTypes: objects.map((obj) => obj.type),
+          positions: objects.map((obj) => ({ left: obj.left, top: obj.top })),
+          lastModified: Date.now(),
         });
 
         if (fingerprint !== lastCanvasState.current) {
@@ -190,8 +210,8 @@ export function useCanvasAutoSave({
       const objects = canvas.getObjects();
       lastCanvasState.current = JSON.stringify({
         objectCount: objects.length,
-        objectTypes: objects.map(obj => obj.type),
-        positions: objects.map(obj => ({ left: obj.left, top: obj.top }))
+        objectTypes: objects.map((obj) => obj.type),
+        positions: objects.map((obj) => ({ left: obj.left, top: obj.top })),
       });
     } catch (error) {
       console.error("Failed to initialize canvas state:", error);
@@ -213,14 +233,49 @@ export function useCanvasAutoSave({
 
   // Manual save function
   const saveNow = useCallback(async () => {
-    if (!projectId || !canvas) {
-      console.warn("Cannot save: missing project or canvas");
-      return;
+    // Get the latest project store state to ensure we have current projectId
+    const currentStore = useProjectStore.getState();
+    const currentProjectId =
+      projectId || currentStore.projectId || currentProject?.id;
+
+    console.log("💾 Manual save triggered - checking conditions:", {
+      hasProjectId: !!currentProjectId,
+      projectId: currentProjectId,
+      hasCanvas: !!canvas,
+      canvasObjectCount: canvas?.getObjects().length,
+      autoSaveEnabled,
+      enabled,
+      storeProjectId: currentStore.projectId,
+      hookProjectId: projectId,
+      contextProjectId: currentProject?.id,
+    });
+
+    if (!currentProjectId) {
+      const errorMessage =
+        "Cannot save: missing projectId - check if project is properly loaded";
+      console.warn("❌", errorMessage);
+      console.warn(
+        "💡 Make sure you have opened/created a project before trying to save"
+      );
+      throw new Error(errorMessage);
+    }
+
+    if (!canvas) {
+      const errorMessage =
+        "Cannot save: missing canvas - check if canvas is properly initialized";
+      console.warn("❌", errorMessage);
+      throw new Error(errorMessage);
     }
 
     try {
-      console.log("💾 Manual save triggered");
-      // Get fresh canvas data with current chat data
+      setSaving(true);
+      setError(null);
+      console.log(
+        "💾 Manual save proceeding with projectId:",
+        currentProjectId
+      );
+
+      // Get fresh canvas data immediately for manual save
       const data = await getCurrentCanvasData();
       const chatData =
         messages.length > 0
@@ -239,34 +294,99 @@ export function useCanvasAutoSave({
         chatData: chatData,
       };
 
-      // Update the current data state for auto-save consistency
+      // Update the current data state for consistency
       setCurrentData({
         circuit: data.circuit,
         canvasData: extendedCanvasData,
         chatData: chatData,
       });
 
-      await autoSave.saveNow();
-      markClean();
-      console.log("✅ Manual save completed");
-    } catch (error) {
-      console.error("❌ Manual save failed:", error);
-    }
-  }, [projectId, canvas, autoSave, markClean, getCurrentCanvasData, messages]);
+      // Ensure we have valid circuit data with all required fields
+      const circuitData = {
+        mode: (data.circuit?.mode || "full") as "full" | "edit",
+        components: data.circuit?.components || [],
+        connections: data.circuit?.connections || [],
+        description: data.circuit?.description || "",
+      };
 
-  // Listen for auto-save completion to mark clean
-  useEffect(() => {
-    if (autoSave.lastSaved && isDirty) {
-      console.log("✅ Auto-save completed, marking clean");
+      // Call DatabaseService directly with fresh data instead of relying on auto-save hook
+      // This avoids timing issues with async state updates
+      console.log("💾 Calling DatabaseService directly with fresh data", {
+        projectId: currentProjectId,
+        componentCount: circuitData.components.length,
+        connectionCount: circuitData.connections.length,
+      });
+
+      await DatabaseService.createVersion(
+        currentProjectId,
+        circuitData,
+        extendedCanvasData,
+        `Manual save ${new Date().toLocaleTimeString()}`,
+        "Manual save via Ctrl+S or Export button"
+      );
+
       markClean();
+      setLastSaved(new Date());
+      console.log("✅ Manual save completed successfully with fresh data");
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Manual save failed";
+      setError(errorMessage);
+      console.error("❌ Manual save failed:", error);
+    } finally {
+      setSaving(false);
     }
-  }, [autoSave.lastSaved, isDirty, markClean]);
+  }, [
+    projectId,
+    canvas,
+    markClean,
+    getCurrentCanvasData,
+    messages,
+    setCurrentData,
+    currentProject,
+    setSaving,
+    setError,
+    setLastSaved,
+  ]);
+
+  // Implement auto-save interval using the same saveNow function
+  useEffect(() => {
+    if (!autoSaveEnabled || !projectId || !canvas || !isDirty) {
+      return;
+    }
+
+    const interval = Math.max(autoSaveInterval, 60000); // Minimum 60 seconds
+    console.log(`🕐 Setting up auto-save interval: ${interval / 1000}s`);
+    
+    const intervalId = setInterval(async () => {
+      if (isDirty && projectId && canvas) {
+        console.log("⏰ Auto-save interval triggered");
+        try {
+          await saveNow();
+        } catch (error) {
+          console.error("❌ Auto-save interval failed:", error);
+        }
+      }
+    }, interval);
+
+    return () => {
+      console.log("🕐 Clearing auto-save interval");
+      clearInterval(intervalId);
+    };
+  }, [autoSaveEnabled, projectId, canvas, isDirty, autoSaveInterval, saveNow]);
+
+  // Listen for auto-save completion to mark clean (simplified since we're not using useAutoSave)
+  // useEffect(() => {
+  //   if (autoSave.lastSaved && isDirty) {
+  //     console.log("✅ Auto-save completed, marking clean");
+  //     markClean();
+  //   }
+  // }, [autoSave.lastSaved, isDirty, markClean]);
 
   return {
     // Auto-save status
-    lastSaved: autoSave.lastSaved,
-    saving: autoSave.saving,
-    error: autoSave.error,
+    lastSaved,
+    saving,
+    error,
     isDirty,
 
     // Manual controls

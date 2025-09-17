@@ -13,6 +13,7 @@ import { Circuit } from "@/lib/schemas/circuit";
 import { ProjectService, ProjectLoadResult } from "@/lib/project-service";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
+import { loadCanvasFromCircuit } from "@/canvas/utils/canvasSerializer";
 
 interface ProjectContextType {
   // Current project state
@@ -401,11 +402,6 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
         const chatData = canvasDataWithoutNetlist.chatData;
         const canvasDataWithoutChat = { ...canvasDataWithoutNetlist };
         delete canvasDataWithoutChat.chatData;
-
-        // Import the canvas restoration function
-        const { loadCanvasFromCircuit } = await import(
-          "@/canvas/utils/canvasSerializer"
-        );
 
         // Load circuit data to recreate components
         if (currentCircuit) {

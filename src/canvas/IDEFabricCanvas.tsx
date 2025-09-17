@@ -26,12 +26,14 @@ interface IDEFabricCanvasProps {
   className?: string;
   onCanvasReady?: (canvas: any) => void;
   onNetlistReady?: (getNetlist: () => any) => void;
+  onSave?: () => Promise<void>;
 }
 
 export function IDEFabricCanvas({
   className = "",
   onCanvasReady,
   onNetlistReady,
+  onSave,
 }: IDEFabricCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -116,6 +118,26 @@ export function IDEFabricCanvas({
     canUndo,
     canRedo,
   } = useHistoryStack({ canvas: fabricCanvas });
+
+  // Debounced saveState to prevent excessive history saves
+  const saveStateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const debouncedSaveState = useCallback(() => {
+    if (saveStateTimeoutRef.current) {
+      clearTimeout(saveStateTimeoutRef.current);
+    }
+    saveStateTimeoutRef.current = setTimeout(() => {
+      saveState();
+    }, 500); // 500ms debounce
+  }, [saveState]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveStateTimeoutRef.current) {
+        clearTimeout(saveStateTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Initialize history when canvas becomes available
   useEffect(() => {
@@ -811,7 +833,7 @@ export function IDEFabricCanvas({
       }
 
       // Save state for undo/redo
-      saveState();
+      debouncedSaveState();
     };
 
     // New ruler visibility handlers per design requirements
@@ -837,11 +859,11 @@ export function IDEFabricCanvas({
     fabricCanvas.on("object:modified", handleObjectMoved);
     fabricCanvas.on("object:added", () => {
       // Debounce saveState to prevent multiple rapid calls
-      setTimeout(() => saveState(), 0);
+      debouncedSaveState();
     });
     fabricCanvas.on("object:removed", () => {
       // Debounce saveState to prevent multiple rapid calls
-      setTimeout(() => saveState(), 0);
+      debouncedSaveState();
     });
     fabricCanvas.on("selection:created", handleSelectionCreated);
     fabricCanvas.on("selection:updated", handleSelectionUpdated);
@@ -851,16 +873,16 @@ export function IDEFabricCanvas({
       fabricCanvas.off("object:moving", handleObjectMoving);
       fabricCanvas.off("object:modified", handleObjectMoved);
       fabricCanvas.off("object:added", () => {
-        setTimeout(() => saveState(), 0);
+        debouncedSaveState();
       });
       fabricCanvas.off("object:removed", () => {
-        setTimeout(() => saveState(), 0);
+        debouncedSaveState();
       });
       fabricCanvas.off("selection:created", handleSelectionCreated);
       fabricCanvas.off("selection:updated", handleSelectionUpdated);
       fabricCanvas.off("selection:cleared", handleSelectionCleared);
     };
-  }, [fabricCanvas, saveState]);
+  }, [fabricCanvas, debouncedSaveState]);
 
   // Canvas memory optimization
   const optimizeCanvasMemory = useCallback(() => {
@@ -1120,7 +1142,7 @@ export function IDEFabricCanvas({
       objects.forEach((obj: fabric.Object) => fabricCanvas.remove(obj));
       fabricCanvas.discardActiveObject();
       fabricCanvas.renderAll();
-      saveState();
+      debouncedSaveState();
       logger.canvas(
         `--- ACTION SUCCESS: handleDelete (deleted ${objects.length} objects) ---`
       );
@@ -1130,7 +1152,7 @@ export function IDEFabricCanvas({
     // Handle single object
     fabricCanvas.remove(activeObject);
     fabricCanvas.renderAll();
-    saveState();
+    debouncedSaveState();
     logger.canvas("--- ACTION SUCCESS: handleDelete (deleted 1 object) ---");
   };
 
@@ -1226,7 +1248,7 @@ export function IDEFabricCanvas({
             fabricCanvas.add(recreatedComponent);
             fabricCanvas.setActiveObject(recreatedComponent);
             fabricCanvas.renderAll();
-            saveState();
+            debouncedSaveState();
 
             logger.canvas(
               `--- ACTION SUCCESS: handlePaste with pin recreation at position (${pastePos.x}, ${pastePos.y}) ---`
@@ -1237,7 +1259,7 @@ export function IDEFabricCanvas({
             fabricCanvas.add(cloned);
             fabricCanvas.setActiveObject(cloned);
             fabricCanvas.renderAll();
-            saveState();
+            debouncedSaveState();
 
             logger.canvas(
               `--- ACTION SUCCESS: handlePaste (fallback) at position (${pastePos.x}, ${pastePos.y}) ---`
@@ -1251,7 +1273,7 @@ export function IDEFabricCanvas({
         fabricCanvas.add(cloned);
         fabricCanvas.setActiveObject(cloned);
         fabricCanvas.renderAll();
-        saveState();
+        debouncedSaveState();
         logger.canvas(
           `--- ACTION SUCCESS: handlePaste at position (${pastePos.x}, ${pastePos.y}) ---`
         );
@@ -1287,7 +1309,7 @@ export function IDEFabricCanvas({
 
     activeObject.set("angle", newAngle);
     fabricCanvas.renderAll();
-    saveState();
+    debouncedSaveState();
 
     logger.canvas(
       `--- ACTION SUCCESS: handleRotate (${currentAngle}° → ${newAngle}°) ---`
@@ -1304,6 +1326,26 @@ export function IDEFabricCanvas({
     logger.canvas("--- ACTION START: handleRedo ---");
     historyRedo();
     logger.canvas("--- ACTION END: handleRedo ---");
+  };
+
+  const handleSave = async () => {
+    logger.canvas("--- ACTION START: handleSave ---");
+    if (!currentProject) {
+      logger.canvas("Cannot save: no project loaded");
+      return;
+    }
+    
+    try {
+      // Use the shared save function if provided, otherwise fallback to auto-save
+      if (onSave) {
+        await onSave();
+      } else {
+        autoSave.saveNow();
+      }
+      logger.canvas("--- ACTION END: handleSave ---");
+    } catch (error) {
+      logger.canvas("--- ACTION FAILED: handleSave ---", error);
+    }
   };
 
   // PART 3: The Connection (The Central Hub)
@@ -1372,7 +1414,7 @@ export function IDEFabricCanvas({
     onUndo: handleUndo,
     onRedo: handleRedo,
     onRotate: handleRotate,
-    onSave: autoSave.saveNow,
+    onSave: handleSave,
     onToggleGrid: toggleGrid, // Add grid toggle
     onComponentPicker: () => setIsComponentPickerVisible(true), // Add component picker
     onToggleWireMode: toggleWireMode, // Add wire mode toggle

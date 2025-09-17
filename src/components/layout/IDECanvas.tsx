@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { SchemaPanel } from "./SchemaPanel";
 import { TopToolbar } from "./TopToolbar";
 import { AIPromptPanel } from "./AIPromptPanel";
@@ -13,6 +13,9 @@ import { CanvasProvider } from "../../contexts/CanvasContext";
 import { responsive } from "@/lib/responsive";
 import { logger } from "@/lib/logger";
 import * as fabric from "fabric";
+import { useProject } from "@/contexts/ProjectContext";
+import { useCanvasAutoSave } from "@/canvas/hooks/useCanvasAutoSave";
+import { canvasCommandManager } from "@/canvas/canvas-command-manager";
 
 export function IDECanvas() {
   // Override all browser mouse/keyboard controls
@@ -22,6 +25,41 @@ export function IDECanvas() {
   const [canvas, setCanvas] = useState<any>(null);
   const [isCanvasReady, setIsCanvasReady] = useState(false);
   const [getNetlist, setGetNetlist] = useState<(() => any) | null>(null);
+
+  // Get project context for save functionality
+  const { currentProject } = useProject();
+
+  // Get canvas instance for auto-save
+  const fabricCanvas = canvasCommandManager.getCanvas();
+  
+  // Use the auto-save mechanism
+  const autoSave = useCanvasAutoSave({
+    canvas: fabricCanvas,
+    netlist: getNetlist ? getNetlist() : [],
+    enabled: !!currentProject, // Only enable when we have a project
+  });
+
+  // Shared save function that both Ctrl+S and Export button will use
+  const sharedSaveFunction = useCallback(async () => {
+    if (!currentProject) {
+      throw new Error("Cannot save: no project loaded");
+    }
+
+    if (!fabricCanvas) {
+      throw new Error("Cannot save: canvas not initialized");
+    }
+
+    console.log("💾 Shared save function called", {
+      hasProject: !!currentProject,
+      projectId: currentProject?.id,
+      canvasObjects: fabricCanvas.getObjects().length
+    });
+    
+    // Call the auto-save mechanism
+    await autoSave.saveNow();
+    
+    console.log("✅ Shared save function completed");
+  }, [currentProject, fabricCanvas, autoSave]);
 
   const handleCanvasReady = (fabricCanvas: any) => {
     logger.canvas("Canvas is ready!", fabricCanvas);
@@ -53,6 +91,7 @@ export function IDECanvas() {
                 className="w-full h-full"
                 onCanvasReady={handleCanvasReady}
                 onNetlistReady={handleNetlistReady}
+                onSave={sharedSaveFunction}
               />
             </div>
 
@@ -60,7 +99,10 @@ export function IDECanvas() {
             <SchemaPanel />
 
             {/* Top Toolbar positioned absolutely on top of canvas */}
-            <TopToolbar getNetlist={getNetlist} />
+            <TopToolbar 
+              getNetlist={getNetlist} 
+              onSave={sharedSaveFunction}
+            />
 
             {/* AI Chat Interface - positioned above PromptEntry */}
             <div
