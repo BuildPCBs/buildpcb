@@ -4,11 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="372b2826-5811-4556-b3b2-af8fbe461aed" name="Changes" comment="update README.md with enhanced feature descriptions and improve workspace.xml configuration">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/canvas/componentHandlerSetup.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/canvas/componentHandlerSetup.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/canvas/hooks/useSimpleWiringTool.ts" beforeDir="false" afterPath="$PROJECT_DIR$/src/canvas/hooks/useSimpleWiringTool.ts" afterDir="false" />
-    </list>
+    <list default="true" id="372b2826-5811-4556-b3b2-af8fbe461aed" name="Changes" comment="update README.md with enhanced feature descriptions and improve workspace.xml configuration" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -97,6 +93,7 @@
       <workItem from="1754038002834" duration="143000" />
       <workItem from="1754038147368" duration="4048000" />
       <workItem from="1758035419219" duration="37000" />
+      <workItem from="1758035474650" duration="654000" />
     </task>
     <task id="LOCAL-00001" summary="initialize project with Next.js, Tailwind CSS, and essential configuration files">
       <option name="closed" value="true" />
