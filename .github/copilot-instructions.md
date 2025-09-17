@@ -4,12 +4,11 @@
 
 **Project Context: BuildPCBs**
 AI-powered PCB design IDE using Next.js 15 + React 19 + TypeScript + Tailwind CSS 4, Fabric.js 6.7+ for canvas, Zustand for state, Lucide React for icons. Targets professional engineers.
-
 **Development Environment**
 
 - Server: Runs via `pnpm dev --turbopack`. **DO NOT START IT**—always running; use new terminals for testing.
 - Hot reload: Automatic.
-- Logging: Structured with levels.
+- Logging: Structured with levels using custom logger.
 
 **Code Organization & Architecture**
 

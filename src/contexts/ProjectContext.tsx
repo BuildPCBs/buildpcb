@@ -393,9 +393,13 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
             : [],
         });
 
-        // Extract chat data before loading canvas
-        const chatData = currentProject.canvas_settings.chatData;
-        const canvasDataWithoutChat = { ...currentProject.canvas_settings };
+        // Extract netlist and chat data before loading canvas
+        const savedNetlist = currentProject.canvas_settings.netlist;
+        const canvasDataWithoutNetlist = { ...currentProject.canvas_settings };
+        delete canvasDataWithoutNetlist.netlist;
+
+        const chatData = canvasDataWithoutNetlist.chatData;
+        const canvasDataWithoutChat = { ...canvasDataWithoutNetlist };
         delete canvasDataWithoutChat.chatData;
 
         // Import the canvas restoration function
@@ -406,6 +410,35 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
         // Load circuit data to recreate components
         if (currentCircuit) {
           await loadCanvasFromCircuit(canvas, currentCircuit);
+        }
+
+        // Restore netlist if available
+        if (
+          savedNetlist &&
+          Array.isArray(savedNetlist) &&
+          savedNetlist.length > 0
+        ) {
+          console.log("🔗 Restoring netlist:", {
+            netCount: savedNetlist.length,
+            totalConnections: savedNetlist.reduce(
+              (sum, net) => sum + (net.connections?.length || 0),
+              0
+            ),
+          });
+
+          // Dispatch custom event to notify wiring tool of restored netlist
+          setTimeout(() => {
+            console.log(
+              "🚀 Dispatching netlistRestored event with",
+              savedNetlist.length,
+              "nets"
+            );
+            window.dispatchEvent(
+              new CustomEvent("netlistRestored", {
+                detail: { netlist: savedNetlist },
+              })
+            );
+          }, 200); // Small delay to ensure wiring tool is ready
         }
 
         // Then apply any additional canvas layout data from canvasDataWithoutChat

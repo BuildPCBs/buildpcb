@@ -8,10 +8,12 @@ import {
   serializeCanvasToLogicalCircuit,
   loadCanvasFromLogicalCircuit,
 } from "@/canvas/utils/logicalSerializer";
+import { serializeCanvasToCircuit } from "@/canvas/utils/canvasSerializer";
 import { useAIChat } from "@/contexts/AIChatContext";
 
 interface UseCanvasAutoSaveOptions {
   canvas: fabric.Canvas | null;
+  netlist?: any[];
   enabled?: boolean;
   interval?: number; // milliseconds
 }
@@ -22,6 +24,7 @@ interface UseCanvasAutoSaveOptions {
  */
 export function useCanvasAutoSave({
   canvas,
+  netlist = [],
   enabled = true,
   interval = 30000, // 30 seconds
 }: UseCanvasAutoSaveOptions) {
@@ -46,14 +49,14 @@ export function useCanvasAutoSave({
     if (!canvas) return { circuit: null, canvasData: {} };
 
     // Use the same canvas data extraction as manual save
-    const { serializeCanvasData } = await import(
+    const { serializeCanvasData, serializeCanvasToCircuit } = await import(
       "@/canvas/utils/canvasSerializer"
     );
-    const canvasData = serializeCanvasData(canvas);
-    const circuit = serializeCanvasToLogicalCircuit(canvas);
+    const canvasData = serializeCanvasData(canvas, netlist);
+    const circuit = serializeCanvasToCircuit(canvas);
 
     return { circuit, canvasData };
-  }, [canvas]);
+  }, [canvas, netlist]);
 
   // Use the database auto-save hook with longer interval
   const [currentData, setCurrentData] = useState<{

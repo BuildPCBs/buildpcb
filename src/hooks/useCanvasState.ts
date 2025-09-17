@@ -182,7 +182,8 @@ export function useCanvasState({
     canvas.on("object:added", handleCanvasChange);
     canvas.on("object:removed", handleCanvasChange);
     canvas.on("object:modified", handleCanvasChange);
-    canvas.on("object:moving", handleCanvasChange);
+    // Removed object:moving to prevent excessive history saves during dragging
+    // canvas.on("object:moving", handleCanvasChange);
     canvas.on("object:scaling", handleCanvasChange);
     canvas.on("object:rotating", handleCanvasChange);
     canvas.on("selection:created", handleCanvasChange);
@@ -193,7 +194,8 @@ export function useCanvasState({
       canvas.off("object:added", handleCanvasChange);
       canvas.off("object:removed", handleCanvasChange);
       canvas.off("object:modified", handleCanvasChange);
-      canvas.off("object:moving", handleCanvasChange);
+      // Removed object:moving cleanup to match removed listener
+      // canvas.off("object:moving", handleCanvasChange);
       canvas.off("object:scaling", handleCanvasChange);
       canvas.off("object:rotating", handleCanvasChange);
       canvas.off("selection:created", handleCanvasChange);

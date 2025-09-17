@@ -103,6 +103,7 @@ export function IDEFabricCanvas({
   // Auto-save functionality
   const autoSave = useCanvasAutoSave({
     canvas: fabricCanvas,
+    netlist: netlist,
     enabled: !!currentProject, // Only enable when we have a project
   });
 
@@ -769,7 +770,16 @@ export function IDEFabricCanvas({
         logger.canvas(
           "Component moving - updating connected wires in real-time"
         );
-        // Note: Simple wiring tool doesn't need wire updates on component move
+        // ENABLED: Simple wiring tool now supports wire updates on component move
+        const componentId =
+          (movingObject as any).data?.componentId ||
+          (movingObject as any).id ||
+          `component_${Date.now()}`;
+        logger.canvas(
+          "🎯 Component moving - calling updateWiresForComponent with ID:",
+          componentId
+        );
+        wiringTool.updateWiresForComponent(componentId);
       }
       // PART 3: No Follow Rule - If a wire is being moved, do nothing
       // Components should NOT follow wires
@@ -788,7 +798,16 @@ export function IDEFabricCanvas({
         movedObject.type === "group"
       ) {
         logger.canvas("Component movement completed - final wire update");
-        // Note: Simple wiring tool doesn't need wire updates on component move
+        // ENABLED: Simple wiring tool now supports wire updates on component move
+        const componentId =
+          (movedObject as any).data?.componentId ||
+          (movedObject as any).id ||
+          `component_${Date.now()}`;
+        logger.canvas(
+          "🎯 Component moved - calling updateWiresForComponent with ID:",
+          componentId
+        );
+        wiringTool.updateWiresForComponent(componentId);
       }
 
       // Save state for undo/redo
@@ -1564,7 +1583,7 @@ export function IDEFabricCanvas({
       </div>
 
       {/* Netlist debug indicator */}
-      {netlist.length > 0 && (
+      {/* {netlist.length > 0 && (
         <div className="absolute top-16 right-2 bg-purple-600 bg-opacity-90 text-white px-3 py-2 rounded text-sm font-medium max-w-xs">
           <div className="text-xs opacity-80 mb-1">Electrical Nets:</div>
           {netlist.slice(0, 3).map((net: any, index: number) => (
@@ -1578,7 +1597,7 @@ export function IDEFabricCanvas({
             </div>
           )}
         </div>
-      )}
+      )} */}
 
       {/* Auto-save status indicator */}
       {currentProject && (

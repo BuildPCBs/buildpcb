@@ -321,7 +321,11 @@ export function ComponentPickerOverlay({
 
   // Ensure selectedComponent stays in sync with selectedIndex
   useEffect(() => {
-    if (filteredComponents.length > 0 && selectedIndex >= 0 && selectedIndex < filteredComponents.length) {
+    if (
+      filteredComponents.length > 0 &&
+      selectedIndex >= 0 &&
+      selectedIndex < filteredComponents.length
+    ) {
       const currentComponent = filteredComponents[selectedIndex];
       if (currentComponent !== selectedComponent) {
         setSelectedComponent(currentComponent);

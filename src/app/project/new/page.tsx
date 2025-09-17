@@ -34,8 +34,8 @@ const NewProjectPage = () => {
         router.push(`/project/${newProject.id}`);
       } catch (err) {
         console.error("❌ Failed to create project:", err);
-        // On error, redirect to projects page
-        router.push("/projects");
+        // On error, redirect to dashboard page
+        router.push("/dashboard");
       }
     };
 
