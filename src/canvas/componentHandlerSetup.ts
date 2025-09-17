@@ -14,11 +14,13 @@ interface ComponentPayload {
   databaseComponent?: any;
   x?: number;
   y?: number;
+  preservedComponentId?: string; // For preserving component IDs during reload
 }
 
 let isComponentHandlerSetup = false;
 let componentEventUnsubscribe: (() => void) | null = null;
-let isProcessingComponent = false;
+// Remove the blocking flag - allow concurrent component processing
+// let isProcessingComponent = false;
 
 export function setupComponentHandler(canvas: fabric.Canvas) {
   if ((canvas as any)._componentHandlersSetup) {
@@ -39,20 +41,43 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
   componentEventUnsubscribe = canvasCommandManager.on(
     "component:add",
     async (payload: ComponentPayload) => {
-      if (isProcessingComponent) {
-        logger.canvas(`Processing is busy, skipping add for ${payload.name}`);
-        return;
-      }
-      isProcessingComponent = true;
-
+      // Remove blocking check - allow concurrent processing
       const currentCanvas = canvasCommandManager.getCanvas();
       if (!currentCanvas) {
         console.error("❌ ERROR: No active canvas available.");
-        isProcessingComponent = false;
         return;
       }
 
       logger.canvas(`===== STARTING COMPONENT CREATION: ${payload.name} =====`);
+
+      // Check for duplicate components on canvas
+      const existingComponents = currentCanvas.getObjects().filter((obj) => {
+        const objData = (obj as any).data;
+        return (
+          objData?.type === "component" &&
+          (objData?.originalDatabaseId === payload.id ||
+            objData?.componentId === payload.preservedComponentId)
+        );
+      });
+
+      if (existingComponents.length > 0) {
+        logger.canvas(
+          `🚫 Component already exists on canvas: ${payload.name} (${payload.id}), skipping duplicate`
+        );
+        logger.canvas(
+          `Found ${existingComponents.length} existing component(s) with same ID`
+        );
+        return;
+      }
+
+      // Log current canvas state for debugging
+      const totalObjects = currentCanvas.getObjects().length;
+      const componentObjects = currentCanvas
+        .getObjects()
+        .filter((obj) => (obj as any).data?.type === "component").length;
+      logger.canvas(
+        `📊 Canvas state: ${totalObjects} total objects, ${componentObjects} components before adding ${payload.name}`
+      );
 
       // Check if this is a temporary component ID (components without proper database uid)
       if (payload.id.startsWith("temp_")) {
@@ -62,27 +87,53 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
         console.error(
           `Cannot create component with temporary ID: ${payload.id}. This component is missing from the database.`
         );
-        isProcessingComponent = false;
         return;
       }
 
       try {
-        // 1. Fetch component's SVG and pin configuration from the database
-        const { data: dbComponent } = await supabase
+        // 1. Fetch component's SVG and pin configuration from the database with timeout
+        const fetchPromise = supabase
           .from("components_v2")
           .select("symbol_svg, symbol_data")
           .eq("uid", payload.id)
           .single();
+
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(
+            () =>
+              reject(
+                new Error(`Database fetch timeout for component ${payload.id}`)
+              ),
+            8000
+          )
+        );
+
+        const { data: dbComponent } = await Promise.race([
+          fetchPromise,
+          timeoutPromise,
+        ]);
 
         const svgString = dbComponent?.symbol_svg;
         if (!svgString) {
           throw new Error(`No SVG found for component ID: ${payload.id}`);
         }
 
-        // 2. Load the SVG string into Fabric.js objects
-        const { objects: allSvgObjects } = await fabric.loadSVGFromString(
-          svgString
+        // 2. Load the SVG string into Fabric.js objects with timeout
+        const svgLoadPromise = fabric.loadSVGFromString(svgString);
+        const svgTimeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(
+            () =>
+              reject(
+                new Error(`SVG loading timeout for component ${payload.name}`)
+              ),
+            5000
+          )
         );
+
+        const { objects: allSvgObjects } = await Promise.race([
+          svgLoadPromise,
+          svgTimeoutPromise,
+        ]);
 
         // 3. Get Pin Metadata (name, type) from the database JSON
         let dbPins: any[] = [];
@@ -102,7 +153,21 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
         }
 
         // 4. Create Interactive Pins from the tagged SVG elements
-        const componentId = `component_${Date.now()}`;
+        // Use preserved component ID if available, otherwise generate new one
+        const componentId =
+          payload.preservedComponentId ||
+          `component_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+        if (payload.preservedComponentId) {
+          logger.canvas(
+            `🔗 Using preserved component ID: ${componentId} for ${payload.name}`
+          );
+        } else {
+          logger.canvas(
+            `🆕 Generated new component ID: ${componentId} for ${payload.name}`
+          );
+        }
+
         const interactivePins: fabric.Circle[] = [];
 
         // We also separate the main symbol parts from the pin markers
@@ -200,14 +265,23 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
         currentCanvas.add(componentSandwich);
         currentCanvas.requestRenderAll();
 
-        logger.canvas(`✅ Successfully added ${payload.name} to canvas.`);
+        // Log final canvas state
+        const finalTotalObjects = currentCanvas.getObjects().length;
+        const finalComponentObjects = currentCanvas
+          .getObjects()
+          .filter((obj) => (obj as any).data?.type === "component").length;
+        logger.canvas(
+          `📊 Canvas state after adding: ${finalTotalObjects} total objects, ${finalComponentObjects} components`
+        );
+
+        logger.canvas(
+          `✅ Successfully added ${payload.name} to canvas with ID ${componentId}.`
+        );
       } catch (error) {
         console.error(
           `❌ COMPONENT CREATION FAILED for ${payload.name}:`,
           error
         );
-      } finally {
-        isProcessingComponent = false;
       }
     }
   );

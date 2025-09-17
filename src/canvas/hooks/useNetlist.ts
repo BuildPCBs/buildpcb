@@ -70,16 +70,32 @@ export function useNetlist(initialNets: Net[] = []): UseNetlistReturn {
   // Add a connection to an existing net
   const addConnectionToNet = useCallback(
     (netId: string, connection: NetConnection) => {
-      setNetsState((prevNets) =>
-        prevNets.map((net) =>
+      console.log("🔍 DEBUG - useNetlist.addConnectionToNet called:", {
+        netId,
+        connection,
+      });
+
+      setNetsState((prevNets) => {
+        const updated = prevNets.map((net) =>
           net.netId === netId
             ? {
                 ...net,
                 connections: [...net.connections, connection],
               }
             : net
-        )
-      );
+        );
+
+        console.log("🔍 DEBUG - useNetlist.addConnectionToNet state updated:", {
+          targetNetId: netId,
+          netCount: updated.length,
+          totalConnections: updated.reduce(
+            (sum, net) => sum + net.connections.length,
+            0
+          ),
+        });
+
+        return updated;
+      });
     },
     []
   );
@@ -93,7 +109,23 @@ export function useNetlist(initialNets: Net[] = []): UseNetlistReturn {
         connections: [...connections],
       };
 
-      setNetsState((prevNets) => [...prevNets, newNet]);
+      console.log("🔍 DEBUG - useNetlist.createNet called:", {
+        netId,
+        connectionsCount: connections.length,
+        connections,
+      });
+
+      setNetsState((prevNets) => {
+        const updated = [...prevNets, newNet];
+        console.log("🔍 DEBUG - useNetlist.createNet state updated:", {
+          newNetCount: updated.length,
+          totalConnections: updated.reduce(
+            (sum, net) => sum + net.connections.length,
+            0
+          ),
+        });
+        return updated;
+      });
       return netId;
     },
     [generateNetId]
@@ -102,10 +134,20 @@ export function useNetlist(initialNets: Net[] = []): UseNetlistReturn {
   // Merge two nets into one
   const mergeNets = useCallback(
     (netId1: string, netId2: string): boolean => {
+      console.log("🔍 DEBUG - useNetlist.mergeNets called:", {
+        netId1,
+        netId2,
+      });
+
       const net1 = getNetById(netId1);
       const net2 = getNetById(netId2);
 
       if (!net1 || !net2 || netId1 === netId2) {
+        console.log("🔍 DEBUG - useNetlist.mergeNets failed:", {
+          net1Found: !!net1,
+          net2Found: !!net2,
+          sameIds: netId1 === netId2,
+        });
         return false;
       }
 
@@ -113,15 +155,26 @@ export function useNetlist(initialNets: Net[] = []): UseNetlistReturn {
       const mergedConnections = [...net1.connections, ...net2.connections];
 
       // Update net1 with merged connections
-      setNetsState((prevNets) =>
-        prevNets
+      setNetsState((prevNets) => {
+        const updated = prevNets
           .filter((net) => net.netId !== netId2) // Remove net2
           .map((net) =>
             net.netId === netId1
               ? { ...net, connections: mergedConnections }
               : net
-          )
-      );
+          );
+
+        console.log("🔍 DEBUG - useNetlist.mergeNets state updated:", {
+          netCount: updated.length,
+          totalConnections: updated.reduce(
+            (sum, net) => sum + net.connections.length,
+            0
+          ),
+          mergedConnectionsCount: mergedConnections.length,
+        });
+
+        return updated;
+      });
 
       return true;
     },
@@ -162,15 +215,27 @@ export function useNetlist(initialNets: Net[] = []): UseNetlistReturn {
   }, [nets]);
 
   // Set nets (for restoration)
-  const setNets = useCallback((newNets: Net[]) => {
-    setNetsState(newNets);
-    // Update counter to avoid conflicts
-    const maxId = Math.max(
-      0,
-      ...newNets.map((net) => parseInt(net.netId.split("_")[1] || "0"))
-    );
-    netCounterRef.current = maxId;
-  }, []);
+  const setNets = useCallback(
+    (newNets: Net[]) => {
+      console.log("🔍 DEBUG - useNetlist.setNets called:", {
+        newNetsLength: newNets.length,
+        newNetsContent: newNets,
+        currentNetsLength: nets.length,
+      });
+      setNetsState(newNets);
+      // Update counter to avoid conflicts
+      const maxId = Math.max(
+        0,
+        ...newNets.map((net) => parseInt(net.netId.split("_")[1] || "0"))
+      );
+      netCounterRef.current = maxId;
+      console.log(
+        "🔍 DEBUG - useNetlist.setNets completed, counter:",
+        netCounterRef.current
+      );
+    },
+    [nets]
+  );
 
   return {
     nets,

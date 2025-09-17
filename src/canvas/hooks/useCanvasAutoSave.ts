@@ -15,7 +15,7 @@ import { useProject } from "@/contexts/ProjectContext";
 
 interface UseCanvasAutoSaveOptions {
   canvas: fabric.Canvas | null;
-  netlist?: any[];
+  netlist?: any[] | (() => any[]);
   enabled?: boolean;
   interval?: number; // milliseconds
 }
@@ -50,6 +50,20 @@ export function useCanvasAutoSave({
   const changeTimeout = useRef<NodeJS.Timeout | null>(null);
   const dataUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Helper function to get current netlist
+  const getCurrentNetlist = useCallback(() => {
+    const currentNetlist = typeof netlist === "function" ? netlist() : netlist;
+    console.log("📊 getCurrentNetlist called:", {
+      isFunction: typeof netlist === "function",
+      netCount: currentNetlist.length,
+      totalConnections: currentNetlist.reduce(
+        (sum: number, net: any) => sum + (net.connections?.length || 0),
+        0
+      ),
+    });
+    return currentNetlist;
+  }, [netlist]);
+
   // Create circuit and canvas data from current canvas state
   const getCurrentCanvasData = useCallback(async () => {
     if (!canvas) return { circuit: null, canvasData: {} };
@@ -58,7 +72,7 @@ export function useCanvasAutoSave({
     const { serializeCanvasData, serializeCanvasToCircuit } = await import(
       "@/canvas/utils/canvasSerializer"
     );
-    const canvasData = serializeCanvasData(canvas, netlist);
+    const canvasData = serializeCanvasData(canvas, getCurrentNetlist());
     const circuit = serializeCanvasToCircuit(canvas);
 
     return { circuit, canvasData };
@@ -309,12 +323,15 @@ export function useCanvasAutoSave({
         description: data.circuit?.description || "",
       };
 
-      // Call DatabaseService directly with fresh data instead of relying on auto-save hook
-      // This avoids timing issues with async state updates
       console.log("💾 Calling DatabaseService directly with fresh data", {
         projectId: currentProjectId,
         componentCount: circuitData.components.length,
         connectionCount: circuitData.connections.length,
+        netlistNets: getCurrentNetlist().length,
+        netlistConnections: getCurrentNetlist().reduce(
+          (sum: number, net: any) => sum + (net.connections?.length || 0),
+          0
+        ),
       });
 
       await DatabaseService.createVersion(
@@ -322,7 +339,8 @@ export function useCanvasAutoSave({
         circuitData,
         extendedCanvasData,
         `Manual save ${new Date().toLocaleTimeString()}`,
-        "Manual save via Ctrl+S or Export button"
+        "Manual save via Ctrl+S or Export button",
+        getCurrentNetlist() // NEW: Pass current netlist data
       );
 
       markClean();

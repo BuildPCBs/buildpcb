@@ -19,6 +19,7 @@ interface ProjectContextType {
   // Current project state
   currentProject: Project | null;
   currentCircuit: Circuit | null;
+  currentNetlist: any[] | null; // NEW: Current netlist state
   isLoading: boolean;
   error: string | null;
 
@@ -28,7 +29,8 @@ interface ProjectContextType {
   saveProject: (
     circuitData: Circuit,
     canvasData: Record<string, any>,
-    chatData?: Record<string, any>
+    chatData?: Record<string, any>,
+    netlistData?: any[] // NEW: Netlist data parameter
   ) => Promise<void>;
   renameProject: (newName: string) => Promise<void>;
   restoreCanvasData: (canvas: any) => Promise<void>;
@@ -48,6 +50,7 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [currentCircuit, setCurrentCircuit] = useState<Circuit | null>(null);
+  const [currentNetlist, setCurrentNetlist] = useState<any[] | null>(null); // NEW: Netlist state
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isNewProject, setIsNewProject] = useState(false);
@@ -124,6 +127,10 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
 
         setCurrentCircuit(circuit);
 
+        // Load the netlist data for this project
+        const netlist: any[] = latestVersion?.netlist_data || [];
+        setCurrentNetlist(netlist);
+
         // Store canvas data for later restoration (when canvas is ready)
         // ALWAYS prioritize latest version data over project settings
         const canvasData = latestVersion?.canvas_data;
@@ -155,6 +162,7 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
           projectId: project.id,
           componentCount: circuit.components.length,
           connectionCount: circuit.connections.length,
+          netlistCount: netlist.length,
         });
       } catch (err) {
         const errorMessage =
@@ -222,6 +230,10 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
 
       setCurrentCircuit(circuit);
 
+      // Load the netlist data for this project
+      const netlist: any[] = latestVersion?.netlist_data || [];
+      setCurrentNetlist(netlist);
+
       // Load canvas data - ALWAYS prioritize latest version data
       const canvasData = latestVersion?.canvas_data;
 
@@ -260,6 +272,7 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
         isFirstTimeUser: result.isFirstTimeUser,
         componentCount: circuit.components.length,
         connectionCount: circuit.connections.length,
+        netlistCount: netlist.length,
       });
     } catch (err) {
       const errorMessage =
@@ -275,7 +288,8 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
     async (
       circuitData: Circuit,
       canvasData: Record<string, any>,
-      chatData?: Record<string, any>
+      chatData?: Record<string, any>,
+      netlistData?: any[] // NEW: Netlist data parameter
     ) => {
       if (!currentProject) {
         throw new Error("No project loaded");
@@ -314,7 +328,8 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
           currentProject.id,
           finalCircuitData,
           canvasData,
-          chatData
+          chatData,
+          netlistData // NEW: Pass netlist data
         );
         setCurrentCircuit(finalCircuitData);
 
@@ -511,6 +526,7 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
   const value: ProjectContextType = {
     currentProject,
     currentCircuit,
+    currentNetlist, // NEW: Add netlist to context
     isLoading,
     error,
     loadProject,

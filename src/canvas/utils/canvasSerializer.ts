@@ -123,13 +123,16 @@ export function serializeCanvasToCircuit(
  */
 export function serializeCanvasData(
   canvas: fabric.Canvas | null,
-  netlist?: any
+  netlist?: any[] | (() => any[])
 ): Record<string, any> {
   if (!canvas) return {};
 
   try {
     // Get the base canvas data
     const canvasData = canvas.toJSON();
+
+    // Resolve netlist if it's a function
+    const resolvedNetlist = typeof netlist === "function" ? netlist() : netlist;
 
     // Extract and preserve electrical metadata for wires
     const electricalMetadata: Record<string, any> = {};
@@ -184,13 +187,14 @@ export function serializeCanvasData(
     const extendedCanvasData = {
       ...canvasData,
       electricalMetadata,
-      netlist: netlist || null,
+      netlist: resolvedNetlist || null,
     };
 
     console.log("💾 Canvas data serialized with electrical metadata:", {
       objectCount: canvas.getObjects().length,
       electricalMetadataCount: Object.keys(electricalMetadata).length,
-      hasNetlist: !!netlist,
+      hasNetlist: !!resolvedNetlist,
+      netlistNetCount: resolvedNetlist?.length || 0,
     });
 
     return extendedCanvasData;

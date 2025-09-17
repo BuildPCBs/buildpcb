@@ -92,20 +92,39 @@ export function IDEFabricCanvas({
   const viewportState = useCanvasViewport(fabricCanvas);
 
   const [netlist, setNetlist] = useState<any[]>([]);
+  const netlistRef = useRef<any[]>([]);
+  const [isNetlistRestored, setIsNetlistRestored] = useState(false);
 
   // Simple Wiring Tool - Works with Database Pin Data
   const wiringTool = useSimpleWiringTool({
     canvas: fabricCanvas,
     enabled: !!fabricCanvas,
-    onNetlistChange: setNetlist,
+    initialNetlist: netlist, // Use restored netlist as initial state
+    onNetlistChange: (nets) => {
+      logger.wire("📡 Netlist updated from wiring tool:", {
+        netCount: nets.length,
+        totalConnections: nets.reduce(
+          (sum, net) => sum + net.connections.length,
+          0
+        ),
+        isRestored: isNetlistRestored,
+      });
+      setNetlist(nets);
+      netlistRef.current = nets; // Update ref immediately for immediate access
+    },
   });
+
+  // Keep netlistRef in sync with parent's netlist state (source of truth)
+  useEffect(() => {
+    netlistRef.current = netlist;
+  }, [netlist]);
 
   const { currentProject, restoreCanvasData } = useProject();
 
   // Auto-save functionality
   const autoSave = useCanvasAutoSave({
     canvas: fabricCanvas,
-    netlist: netlist,
+    netlist: () => netlistRef.current, // Use ref for current value (avoids stale closure)
     enabled: !!currentProject, // Only enable when we have a project
   });
 
@@ -293,19 +312,63 @@ export function IDEFabricCanvas({
   useEffect(() => {
     if (typeof window !== "undefined") {
       const handleNetlistRestored = (event: CustomEvent) => {
-        const { netlist } = event.detail;
+        const { netlist: restoredNetlist } = event.detail;
         logger.wire("Netlist restored from project data:", {
-          netCount: netlist?.nets?.length || 0,
+          netCount: restoredNetlist?.nets?.length || 0,
           totalConnections:
-            netlist?.nets?.reduce(
+            restoredNetlist?.nets?.reduce(
               (sum: number, net: any) => sum + (net.connections?.length || 0),
               0
             ) || 0,
         });
-        setNetlist(netlist || []);
-        // Also update the wiring tool's netlist
-        if (wiringToolRef.current.setNetlist) {
-          wiringToolRef.current.setNetlist(netlist?.nets || []);
+
+        // Update the netlist state FIRST before recreating wiring tool
+        if (restoredNetlist?.nets) {
+          logger.wire("Setting restored netlist as initial state...");
+          setNetlist(restoredNetlist.nets);
+          netlistRef.current = restoredNetlist.nets;
+          setIsNetlistRestored(true);
+          
+          // The wiring tool will be recreated with new initialNetlist via dependency change
+          // No need to call setNetlist on existing tool - it will be re-initialized
+        }
+
+        // Recreate visual wires on the canvas
+        if (fabricCanvas && restoredNetlist?.nets) {
+          logger.wire("Recreating visual wires from restored netlist...");
+
+          // Clear any existing wires first
+          const existingWires = fabricCanvas.getObjects().filter((obj: any) =>
+            obj.wireType === "connection" || (obj.data?.type === "junctionDot" && obj.data?.pinConnection)
+          );
+          existingWires.forEach((wire) => fabricCanvas.remove(wire));
+
+          // Recreate wires for each net
+          restoredNetlist.nets.forEach((net: any) => {
+            if (net.connections && net.connections.length >= 2) {
+              // Create wires between consecutive connections in the net
+              for (let i = 0; i < net.connections.length - 1; i++) {
+                const fromConn = net.connections[i];
+                const toConn = net.connections[i + 1];
+
+                // Find the pins for these connections
+                const fromPin = findPinForConnection(fromConn.componentId, fromConn.pinNumber);
+                const toPin = findPinForConnection(toConn.componentId, toConn.pinNumber);
+
+                if (fromPin && toPin) {
+                  // Create the visual wire
+                  const wire = createWireBetweenPins(fromPin, toPin);
+                  if (wire) {
+                    // Add junction dots
+                    addJunctionDotsToWire(wire);
+                  }
+                }
+              }
+            }
+          });
+
+          fabricCanvas.renderAll();
+          logger.wire("Visual wires recreated successfully");
         }
       };
 
@@ -321,6 +384,191 @@ export function IDEFabricCanvas({
         );
       };
     }
+  }, [fabricCanvas]);
+
+  // Helper function to find a pin by component ID and pin number
+  const findPinForConnection = useCallback((componentId: string, pinNumber: string) => {
+    if (!fabricCanvas) return null;
+
+    const objects = fabricCanvas.getObjects();
+    for (const obj of objects) {
+      if (obj.type === "group") {
+        // Check objects within groups
+        const groupObjects = (obj as fabric.Group).getObjects();
+        for (const groupObj of groupObjects) {
+          const pinData = (groupObj as any).data;
+          if (pinData && pinData.type === "pin" &&
+              pinData.componentId === componentId &&
+              pinData.pinNumber.toString() === pinNumber.toString()) {
+            return groupObj;
+          }
+        }
+      } else {
+        // Check direct objects
+        const pinData = (obj as any).data;
+        if (pinData && pinData.type === "pin" &&
+            pinData.componentId === componentId &&
+            pinData.pinNumber.toString() === pinNumber.toString()) {
+          return obj;
+        }
+      }
+    }
+    return null;
+  }, [fabricCanvas]);
+
+  // Helper function to create a wire between two pins
+  const createWireBetweenPins = useCallback((fromPin: fabric.Object, toPin: fabric.Object) => {
+    if (!fabricCanvas) return null;
+
+    const fromCenter = getAbsoluteCenter(fromPin);
+    const toCenter = getAbsoluteCenter(toPin);
+
+    // Calculate orthogonal path (L-shaped with 90° corners)
+    const dx = toCenter.x - fromCenter.x;
+    const dy = toCenter.y - fromCenter.y;
+
+    // Decide whether to go horizontal first or vertical first
+    const goHorizontalFirst = Math.abs(dx) > Math.abs(dy);
+
+    // Create SVG path data for smooth wire rendering
+    let pathData = `M ${fromCenter.x} ${fromCenter.y}`;
+
+    if (goHorizontalFirst) {
+      // Horizontal first, then vertical
+      if (Math.abs(dx) > 1) {
+        pathData += ` L ${toCenter.x} ${fromCenter.y}`;
+      }
+      if (Math.abs(dy) > 1) {
+        pathData += ` L ${toCenter.x} ${toCenter.y}`;
+      }
+    } else {
+      // Vertical first, then horizontal
+      if (Math.abs(dy) > 1) {
+        pathData += ` L ${fromCenter.x} ${toCenter.y}`;
+      }
+      if (Math.abs(dx) > 1) {
+        pathData += ` L ${toCenter.x} ${toCenter.y}`;
+      }
+    }
+
+    // Create a single path object for smooth wire rendering
+    const wirePath = new fabric.Path(pathData, {
+      stroke: "#0038DF",
+      strokeWidth: 1,
+      fill: "",
+      selectable: false,
+      hasControls: false,
+      hasBorders: false,
+      evented: false,
+      strokeLineCap: "round",
+      strokeLineJoin: "round",
+    });
+
+    // Add connection data to the path
+    const fromPinData = (fromPin as any).data;
+    const toPinData = (toPin as any).data;
+    (wirePath as any).connectionData = {
+      fromComponentId: fromPinData.componentId,
+      fromPinNumber: fromPinData.pinNumber.toString(),
+      toComponentId: toPinData.componentId,
+      toPinNumber: toPinData.pinNumber.toString(),
+    };
+
+    // Mark as wire
+    (wirePath as any).wireType = "connection";
+
+    fabricCanvas.add(wirePath);
+    return wirePath;
+  }, [fabricCanvas]);
+
+  // Helper function to get absolute center of a pin (accounting for group transformations)
+  const getAbsoluteCenter = useCallback((pin: fabric.Object) => {
+    if (pin.group) {
+      const pinCenter = new fabric.Point(pin.left || 0, pin.top || 0);
+      return fabric.util.transformPoint(
+        pinCenter,
+        pin.group.calcTransformMatrix()
+      );
+    }
+    return new fabric.Point(pin.left || 0, pin.top || 0);
+  }, []);
+
+  // Helper function to add junction dots to a wire
+  const addJunctionDotsToWire = useCallback((wire: fabric.Line | fabric.Path) => {
+    if (!fabricCanvas) return;
+
+    // Get the actual wire endpoints from the wire's path
+    const endpoints = getWireEndpoints(wire);
+    if (!endpoints) return;
+
+    // Create junction dots at wire endpoints
+    const createJunctionDot = (position: fabric.Point) => {
+      const dot = new fabric.Circle({
+        radius: 3,
+        fill: "#0038DF",
+        stroke: "#ffffff",
+        strokeWidth: 1,
+        left: position.x,
+        top: position.y,
+        selectable: false,
+        hasControls: false,
+        hasBorders: false,
+        evented: false,
+        originX: "center",
+        originY: "center",
+      });
+      (dot as any).data = { type: "junctionDot", pinConnection: true };
+      return dot;
+    };
+
+    const startDot = createJunctionDot(new fabric.Point(endpoints.start.x, endpoints.start.y));
+    const endDot = createJunctionDot(new fabric.Point(endpoints.end.x, endpoints.end.y));
+
+    fabricCanvas.add(startDot);
+    fabricCanvas.add(endDot);
+  }, [fabricCanvas]);
+
+  // Helper function to get wire endpoints
+  const getWireEndpoints = useCallback((wire: fabric.Line | fabric.Path) => {
+    if (wire.type === "line") {
+      const line = wire as fabric.Line;
+      return {
+        start: { x: line.x1 || 0, y: line.y1 || 0 },
+        end: { x: line.x2 || 0, y: line.y2 || 0 },
+      };
+    } else if (wire.type === "path") {
+      const path = wire as fabric.Path;
+      const pathData = path.path;
+      if (pathData && pathData.length > 0) {
+        // Get the first move command (start point)
+        const startCmd = pathData[0];
+        if (
+          startCmd.length >= 3 &&
+          typeof startCmd[1] === "number" &&
+          typeof startCmd[2] === "number"
+        ) {
+          const start = { x: startCmd[1] as number, y: startCmd[2] as number };
+
+          // Find the last line command with coordinates
+          let end = start;
+          for (let i = pathData.length - 1; i >= 0; i--) {
+            const cmd = pathData[i];
+            if (
+              cmd[0] === "L" &&
+              cmd.length >= 3 &&
+              typeof cmd[1] === "number" &&
+              typeof cmd[2] === "number"
+            ) {
+              end = { x: cmd[1] as number, y: cmd[2] as number };
+              break;
+            }
+          }
+
+          return { start, end };
+        }
+      }
+    }
+    return null;
   }, []);
 
   // Ruler dimensions and grid settings
@@ -446,7 +694,28 @@ export function IDEFabricCanvas({
 
     // Provide netlist access to parent
     if (onNetlistReady) {
-      onNetlistReady(() => netlist);
+      onNetlistReady(() => {
+        const currentNetlist = netlistRef.current; // Use ref for current value (avoids stale closure)
+
+        // DEBUG: Let's see what the actual netlist contains
+        logger.wire("🔍 DEBUG - netlist inspection:", {
+          netlistType: typeof netlistRef.current,
+          netlistIsArray: Array.isArray(netlistRef.current),
+          netlistLength: netlistRef.current?.length || 0,
+          netlistContent: netlistRef.current,
+          currentNetlistIsArray: Array.isArray(currentNetlist),
+          currentNetlistLength: currentNetlist?.length || 0,
+        });
+
+        logger.wire("Netlist getter called, returning current netlist:", {
+          netCount: currentNetlist.length,
+          totalConnections: currentNetlist.reduce(
+            (sum, net) => sum + (net.connections?.length || 0),
+            0
+          ),
+        });
+        return currentNetlist;
+      });
     }
 
     // Register canvas with command manager
@@ -906,10 +1175,31 @@ export function IDEFabricCanvas({
         bounds.left + bounds.width < -100 ||
         bounds.top + bounds.height < -100
       ) {
-        // Don't remove components or important objects
-        if (!(obj as any).componentType && !(obj as any).isAlignmentGuide) {
+        // Don't remove components, wires, junction dots, or important objects
+        if (
+          !(obj as any).componentType &&
+          !(obj as any).isAlignmentGuide &&
+          !(obj as any).wireType &&
+          !((obj as any).data?.type === "junctionDot")
+        ) {
+          logger.canvas("Removing off-screen object:", {
+            type: obj.type,
+            componentType: (obj as any).componentType,
+            wireType: (obj as any).wireType,
+            dataType: (obj as any).data?.type,
+            bounds,
+          });
+
           fabricCanvas.remove(obj);
           removedCount++;
+        } else {
+          logger.canvas("Keeping protected object:", {
+            type: obj.type,
+            componentType: (obj as any).componentType,
+            wireType: (obj as any).wireType,
+            dataType: (obj as any).data?.type,
+            isProtected: true,
+          });
         }
       }
     });

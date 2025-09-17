@@ -242,6 +242,157 @@ export const builtInCanvasCommands = {
       console.log(`🎯 Command manager: Event emitted for ${params?.name}`);
     },
   } as CanvasCommand,
+
+  // NEW: Command to add a wire between two components
+  WIRE_ADD: {
+    id: "wire:add",
+    name: "Add Wire",
+    handler: async (
+      canvas: fabric.Canvas,
+      params?: {
+        fromComponentId: string;
+        fromPinNumber: string;
+        toComponentId: string;
+        toPinNumber: string;
+        netId?: string;
+        path?: any; // Optional saved wire path
+      }
+    ) => {
+      if (!params) {
+        console.error("❌ wire:add: Missing parameters");
+        return;
+      }
+
+      const {
+        fromComponentId,
+        fromPinNumber,
+        toComponentId,
+        toPinNumber,
+        netId,
+        path,
+      } = params;
+
+      console.log(
+        `🔗 wire:add: Creating wire from ${fromComponentId}:${fromPinNumber} to ${toComponentId}:${toPinNumber}`
+      );
+
+      // Find the pin objects
+      const findPinByComponentAndNumber = (
+        componentId: string,
+        pinNumber: string
+      ): fabric.Object | null => {
+        const objects = canvas.getObjects();
+        for (const obj of objects) {
+          if (obj.type === "group") {
+            const groupObjects = (obj as fabric.Group).getObjects();
+            for (const groupObj of groupObjects) {
+              const pinData = (groupObj as any).data;
+              if (
+                pinData &&
+                pinData.type === "pin" &&
+                pinData.componentId === componentId &&
+                pinData.pinNumber === pinNumber
+              ) {
+                return groupObj;
+              }
+            }
+          } else {
+            const pinData = (obj as any).data;
+            if (
+              pinData &&
+              pinData.type === "pin" &&
+              pinData.componentId === componentId &&
+              pinData.pinNumber === pinNumber
+            ) {
+              return obj;
+            }
+          }
+        }
+        return null;
+      };
+
+      const fromPin = findPinByComponentAndNumber(
+        fromComponentId,
+        fromPinNumber
+      );
+      const toPin = findPinByComponentAndNumber(toComponentId, toPinNumber);
+
+      if (!fromPin || !toPin) {
+        console.error(
+          `❌ wire:add: Could not find pins - fromPin: ${!!fromPin}, toPin: ${!!toPin}`
+        );
+        return;
+      }
+
+      // Get pin positions
+      const fromPoint = fromPin.getCenterPoint();
+      const toPoint = toPin.getCenterPoint();
+
+      // Create wire points
+      let points: fabric.Point[];
+      if (path && Array.isArray(path)) {
+        // Use saved path if available
+        points = path.map((p: any) => new fabric.Point(p.x, p.y));
+      } else {
+        // Create simple straight line
+        points = [fromPoint, toPoint];
+      }
+
+      // Create the wire
+      const wire = new fabric.Polyline(points, {
+        fill: "transparent",
+        stroke: "#888888",
+        strokeWidth: 2,
+        strokeLineCap: "round",
+        strokeLineJoin: "round",
+        selectable: true,
+        evented: true,
+        lockMovementX: true,
+        lockMovementY: true,
+        lockRotation: true,
+        lockScalingX: true,
+        lockScalingY: true,
+        hasControls: false,
+        hasBorders: true,
+        wireType: "connection",
+        startComponentId: fromComponentId,
+        startPinIndex: fromPinNumber,
+        endComponentId: toComponentId,
+        endPinIndex: toPinNumber,
+        netId: netId || `net_${Date.now()}`,
+        objectCaching: false,
+      } as any);
+
+      canvas.add(wire);
+
+      // Add endpoint dots
+      const fromDot = new fabric.Circle({
+        radius: 3,
+        fill: "#888888",
+        left: fromPoint.x - 3,
+        top: fromPoint.y - 3,
+        selectable: false,
+        evented: false,
+        wireEndpoint: true,
+      });
+
+      const toDot = new fabric.Circle({
+        radius: 3,
+        fill: "#888888",
+        left: toPoint.x - 3,
+        top: toPoint.y - 3,
+        selectable: false,
+        evented: false,
+        wireEndpoint: true,
+      });
+
+      canvas.add(fromDot);
+      canvas.add(toDot);
+
+      canvas.renderAll();
+      console.log(`✅ wire:add: Wire created successfully`);
+    },
+  } as CanvasCommand,
 };
 
 // Register built-in commands

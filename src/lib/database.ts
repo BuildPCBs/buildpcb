@@ -2,6 +2,83 @@ import { supabase } from "@/lib/supabase";
 import { Circuit } from "@/lib/schemas/circuit";
 import { logger } from "./logger";
 
+/**
+ * Validate netlist data structure
+ */
+function validateNetlist(netlist: any[]): boolean {
+  if (!Array.isArray(netlist)) {
+    logger.api("❌ Netlist validation failed: not an array");
+    return false;
+  }
+
+  const netIds = new Set<string>();
+
+  for (let i = 0; i < netlist.length; i++) {
+    const net = netlist[i];
+
+    // Check net structure
+    if (!net || typeof net !== "object") {
+      logger.api(`❌ Netlist validation failed: net ${i} is not an object`);
+      return false;
+    }
+
+    if (!net.netId || typeof net.netId !== "string") {
+      logger.api(`❌ Netlist validation failed: net ${i} missing valid netId`);
+      return false;
+    }
+
+    if (netIds.has(net.netId)) {
+      logger.api(`❌ Netlist validation failed: duplicate netId ${net.netId}`);
+      return false;
+    }
+    netIds.add(net.netId);
+
+    if (!Array.isArray(net.connections)) {
+      logger.api(
+        `❌ Netlist validation failed: net ${net.netId} connections not an array`
+      );
+      return false;
+    }
+
+    // Check connections
+    for (let j = 0; j < net.connections.length; j++) {
+      const conn = net.connections[j];
+
+      if (!conn || typeof conn !== "object") {
+        logger.api(
+          `❌ Netlist validation failed: net ${net.netId} connection ${j} is not an object`
+        );
+        return false;
+      }
+
+      if (!conn.componentId || typeof conn.componentId !== "string") {
+        logger.api(
+          `❌ Netlist validation failed: net ${net.netId} connection ${j} missing valid componentId`
+        );
+        return false;
+      }
+
+      if (!conn.pinNumber || typeof conn.pinNumber !== "string") {
+        logger.api(
+          `❌ Netlist validation failed: net ${net.netId} connection ${j} missing valid pinNumber`
+        );
+        return false;
+      }
+    }
+
+    // Optional name field
+    if (net.name !== undefined && typeof net.name !== "string") {
+      logger.api(
+        `❌ Netlist validation failed: net ${net.netId} name is not a string`
+      );
+      return false;
+    }
+  }
+
+  logger.api(`✅ Netlist validation passed: ${netlist.length} nets validated`);
+  return true;
+}
+
 export interface Project {
   id: string;
   name?: string;
@@ -14,6 +91,7 @@ export interface Project {
   last_opened_at: string;
   canvas_settings: Record<string, any>;
   grid_settings: Record<string, any>;
+  netlist_data?: any[]; // NEW: Netlist data for the project
   tags: string[];
   category?: string;
 }
@@ -28,6 +106,7 @@ export interface ProjectVersion {
   created_at: string;
   circuit_data: Circuit;
   canvas_data: Record<string, any>;
+  netlist_data?: any[]; // NEW: Netlist data for this version
   changelog?: string;
   is_major_version: boolean;
   parent_version_id?: string;
@@ -305,6 +384,22 @@ export class DatabaseService {
 
     if (error && error.code !== "PGRST116") throw error; // PGRST116 = no rows
 
+    // Validate netlist data if present
+    if (
+      data?.netlist_data &&
+      Array.isArray(data.netlist_data) &&
+      data.netlist_data.length > 0
+    ) {
+      if (!validateNetlist(data.netlist_data)) {
+        logger.api("❌ Loaded netlist data is invalid, setting to null");
+        data.netlist_data = null;
+      } else {
+        logger.api(
+          `✅ Loaded valid netlist with ${data.netlist_data.length} nets`
+        );
+      }
+    }
+
     logger.api("Latest version data:", {
       hasData: !!data,
       versionNumber: data?.version_number,
@@ -315,6 +410,8 @@ export class DatabaseService {
       canvasDataSize: data?.canvas_data
         ? JSON.stringify(data.canvas_data).length
         : 0,
+      hasNetlistData: !!data?.netlist_data,
+      netlistNetCount: data?.netlist_data?.length || 0,
     });
 
     return data;
@@ -328,12 +425,20 @@ export class DatabaseService {
     circuitData: Circuit,
     canvasData: Record<string, any> = {},
     versionName?: string,
-    changelog?: string
+    changelog?: string,
+    netlistData?: any[] // NEW: Netlist data parameter
   ): Promise<ProjectVersion> {
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
+
+    // Validate netlist data if provided
+    if (netlistData !== undefined && netlistData.length > 0) {
+      if (!validateNetlist(netlistData)) {
+        throw new Error("Invalid netlist data provided for version creation");
+      }
+    }
 
     // Use a retry mechanism to handle concurrent version creation
     let retries = 3;
@@ -354,7 +459,10 @@ export class DatabaseService {
           "Creating version",
           nextVersionNumber,
           "for project",
-          projectId
+          projectId,
+          "with netlist:",
+          netlistData?.length || 0,
+          "nets"
         );
 
         const { data, error } = await supabase
@@ -366,6 +474,7 @@ export class DatabaseService {
               version_name: versionName,
               circuit_data: circuitData,
               canvas_data: canvasData,
+              netlist_data: netlistData || [], // NEW: Store netlist data
               changelog,
               created_by: user.id,
             },
@@ -390,8 +499,10 @@ export class DatabaseService {
           throw error;
         }
 
-        // Update project's updated_at timestamp
-        await this.updateProject(projectId, {});
+        // Update project's updated_at timestamp AND netlist_data cache
+        await this.updateProject(projectId, {
+          netlist_data: netlistData || [], // NEW: Update projects cache
+        });
 
         // Log activity (don't fail the version creation if activity logging fails)
         try {

@@ -35,7 +35,7 @@ export function IDECanvas() {
   // Use the auto-save mechanism
   const autoSave = useCanvasAutoSave({
     canvas: fabricCanvas,
-    netlist: getNetlist ? getNetlist() : [],
+    netlist: getNetlist || (() => []),
     enabled: !!currentProject, // Only enable when we have a project
   });
 
@@ -49,10 +49,16 @@ export function IDECanvas() {
       throw new Error("Cannot save: canvas not initialized");
     }
 
+    const currentNetlist = getNetlist ? getNetlist() : [];
     console.log("💾 Shared save function called", {
       hasProject: !!currentProject,
       projectId: currentProject?.id,
       canvasObjects: fabricCanvas.getObjects().length,
+      netlistNets: currentNetlist.length,
+      netlistConnections: currentNetlist.reduce(
+        (sum: number, net: any) => sum + (net.connections?.length || 0),
+        0
+      ),
     });
 
     // Call the auto-save mechanism

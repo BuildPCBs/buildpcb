@@ -48,6 +48,27 @@ export function useSimpleWiringTool({
   const [connections, setConnections] = useState<WireConnection[]>([]);
   const [bendPoints, setBendPoints] = useState<fabric.Point[]>([]);
   const netlist = useNetlist(initialNetlist);
+  const lastNotifiedNetlistLength = useRef(0);
+
+  // Monitor netlist changes and notify parent (only when length actually changes)
+  useEffect(() => {
+    if (
+      onNetlistChange &&
+      netlist.nets.length > 0 &&
+      netlist.nets.length !== lastNotifiedNetlistLength.current
+    ) {
+      logger.wire("🔔 Netlist changed, notifying parent:", {
+        netCount: netlist.nets.length,
+        totalConnections: netlist.nets.reduce(
+          (sum, net) => sum + net.connections.length,
+          0
+        ),
+        previousLength: lastNotifiedNetlistLength.current,
+      });
+      onNetlistChange(netlist.nets);
+      lastNotifiedNetlistLength.current = netlist.nets.length;
+    }
+  }, [netlist.nets]); // Removed onNetlistChange from dependencies
   const startPinRef = useRef<{ pin: fabric.Object } | null>(null);
   const currentWireRef = useRef<fabric.Line | fabric.Path | null>(null);
 
@@ -713,9 +734,13 @@ export function useSimpleWiringTool({
               // Clear bend points after creating the wire
               setBendPoints([]);
 
-              if (onNetlistChange) {
-                onNetlistChange(netlist.nets);
-              }
+              // The useNetlist hook methods (createNet, addConnectionToNet, mergeNets)
+              // have already been called and updated the internal state. The useEffect
+              // that monitors netlist.nets will automatically notify the parent component
+              // when the state update completes.
+              logger.wire(
+                "🎯 Wire creation completed, useEffect will handle parent notification"
+              );
             }
 
             // Reset drawing state and pin appearance
@@ -1055,7 +1080,8 @@ export function useSimpleWiringTool({
     clearJunctionDots(); // Clear junction dots
     netlist.clearAllNets();
     if (onNetlistChange) {
-      onNetlistChange(netlist.nets);
+      logger.wire("🧹 Clearing all nets (netlist empty)");
+      onNetlistChange([]); // Pass empty array directly since clearAllNets is asynchronous
     }
     canvas.renderAll();
   }, [canvas, connections, netlist, onNetlistChange, clearJunctionDots]);

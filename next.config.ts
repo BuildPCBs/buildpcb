@@ -10,7 +10,10 @@ const nextConfig: NextConfig = {
           }
         : false,
   },
-  /* config options here */
+  // Ensure proper handling of client components in Next.js 15
+  serverExternalPackages: [],
+  // Ensure proper handling of client reference manifests
+  transpilePackages: [],
 };
 
 export default nextConfig;

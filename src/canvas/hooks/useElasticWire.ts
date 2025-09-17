@@ -327,8 +327,57 @@ export function useElasticWire({
         // Add to connections
         setElasticConnections((prev) => [...prev, connection]);
 
+        // Manually construct updated netlist to avoid async state timing issues
+        let updatedNets = [...netlist.nets];
+        if (fromNet && toNet) {
+          if (fromNet.netId !== toNet.netId) {
+            // Merging nets: remove toNet, update fromNet with merged connections
+            updatedNets = updatedNets.filter(
+              (net) => net.netId !== toNet.netId
+            );
+            const mergedNetIndex = updatedNets.findIndex(
+              (net) => net.netId === fromNet.netId
+            );
+            if (mergedNetIndex !== -1) {
+              updatedNets[mergedNetIndex] = {
+                ...updatedNets[mergedNetIndex],
+                connections: [...fromNet.connections, ...toNet.connections],
+              };
+            }
+          }
+        } else if (fromNet) {
+          // Adding to existing net
+          const netIndex = updatedNets.findIndex(
+            (net) => net.netId === fromNet.netId
+          );
+          if (netIndex !== -1) {
+            updatedNets[netIndex] = {
+              ...updatedNets[netIndex],
+              connections: [...fromNet.connections, toConnection],
+            };
+          }
+        } else if (toNet) {
+          // Adding to existing net
+          const netIndex = updatedNets.findIndex(
+            (net) => net.netId === toNet.netId
+          );
+          if (netIndex !== -1) {
+            updatedNets[netIndex] = {
+              ...updatedNets[netIndex],
+              connections: [...toNet.connections, fromConnection],
+            };
+          }
+        } else {
+          // Creating new net
+          const newNet = {
+            netId: connection.netId,
+            connections: [fromConnection, toConnection],
+          };
+          updatedNets = [...updatedNets, newNet];
+        }
+
         if (onNetlistChange) {
-          onNetlistChange(netlist.nets);
+          onNetlistChange(updatedNets);
         }
       }
 
@@ -423,7 +472,7 @@ export function useElasticWire({
     netlist.clearAllNets();
 
     if (onNetlistChange) {
-      onNetlistChange(netlist.nets);
+      onNetlistChange([]); // Pass empty array directly since clearAllNets is asynchronous
     }
 
     canvas.renderAll();
@@ -479,11 +528,35 @@ export function useElasticWire({
         // Remove from connections
         setElasticConnections((prev) => prev.filter((conn) => conn.id !== id));
 
+        // Manually construct updated netlist to avoid async state timing issues
+        let updatedNets = [...netlist.nets];
+
+        // Find and update nets that contained these connections
+        updatedNets = updatedNets
+          .map((net) => {
+            const filteredConnections = net.connections.filter(
+              (conn) =>
+                !(
+                  conn.componentId === fromConnection.componentId &&
+                  conn.pinNumber === fromConnection.pinNumber
+                ) &&
+                !(
+                  conn.componentId === toConnection.componentId &&
+                  conn.pinNumber === toConnection.pinNumber
+                )
+            );
+            return {
+              ...net,
+              connections: filteredConnections,
+            };
+          })
+          .filter((net) => net.connections.length > 1); // Remove nets with 0 or 1 connections
+
         // Destroy the elastic wire
         connection.elasticWire.destroy();
 
         if (onNetlistChange) {
-          onNetlistChange(netlist.nets);
+          onNetlistChange(updatedNets);
         }
 
         canvas.renderAll();
