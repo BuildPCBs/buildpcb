@@ -1307,7 +1307,9 @@ export function IDEFabricCanvas({
       // DEBUG: Track component pins during movement
       if (movingObject && movingObject.type === "group") {
         const groupObjects = (movingObject as fabric.Group).getObjects();
-        const pins = groupObjects.filter((obj: any) => obj.data?.type === "pin");
+        const pins = groupObjects.filter(
+          (obj: any) => obj.data?.type === "pin"
+        );
         const visiblePins = pins.filter((pin: any) => pin.visible !== false);
 
         logger.canvas(`🎯 Component moving - pins status:`, {
@@ -1373,7 +1375,9 @@ export function IDEFabricCanvas({
       // DEBUG: Track component pins after movement
       if (movedObject && movedObject.type === "group") {
         const groupObjects = (movedObject as fabric.Group).getObjects();
-        const pins = groupObjects.filter((obj: any) => obj.data?.type === "pin");
+        const pins = groupObjects.filter(
+          (obj: any) => obj.data?.type === "pin"
+        );
         const visiblePins = pins.filter((pin: any) => pin.visible !== false);
 
         logger.canvas(`✅ Component moved - pins status:`, {

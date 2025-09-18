@@ -201,9 +201,7 @@ function ComponentPreview({ component, onClose }: ComponentPreviewProps) {
           logger.component("Image length:", component.image.length);
 
           const timestamp = new Date().toISOString();
-          logger.component(
-            `Adding ${component.package_id} to canvas from overlay`
-          );
+          logger.component(`Adding ${component.name} to canvas from overlay`);
 
           try {
             logger.component(
@@ -216,7 +214,7 @@ function ComponentPreview({ component, onClose }: ComponentPreviewProps) {
                 id: component.id,
                 type: component.type,
                 svgPath: component.image,
-                name: component.package_id,
+                name: component.name,
                 category: component.category,
                 description: component.description,
                 manufacturer: component.manufacturer,
@@ -421,7 +419,7 @@ export function ComponentPickerOverlay({
           if (selectedComponent) {
             const timestamp = new Date().toISOString();
             logger.component(
-              `Adding ${selectedComponent.package_id} to canvas from overlay`
+              `Adding ${selectedComponent.name} to canvas from overlay`
             );
             logger.component(`Selected component data:`, {
               id: selectedComponent.id,
@@ -438,7 +436,7 @@ export function ComponentPickerOverlay({
               id: selectedComponent.id,
               type: selectedComponent.type,
               svgPath: selectedComponent.image,
-              name: selectedComponent.package_id,
+              name: selectedComponent.name,
               category: selectedComponent.category,
               description: selectedComponent.description,
               manufacturer: selectedComponent.manufacturer,
