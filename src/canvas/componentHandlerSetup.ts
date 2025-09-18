@@ -14,13 +14,12 @@ interface ComponentPayload {
   databaseComponent?: any;
   x?: number;
   y?: number;
-  preservedComponentId?: string; // For preserving component IDs during reload
+  preservedComponentId?: string; // For maintaining component IDs during restoration
 }
 
 let isComponentHandlerSetup = false;
 let componentEventUnsubscribe: (() => void) | null = null;
-// Remove the blocking flag - allow concurrent component processing
-// let isProcessingComponent = false;
+// Removed isProcessingComponent - allowing concurrent component creation during restoration
 
 export function setupComponentHandler(canvas: fabric.Canvas) {
   if ((canvas as any)._componentHandlersSetup) {
@@ -41,249 +40,268 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
   componentEventUnsubscribe = canvasCommandManager.on(
     "component:add",
     async (payload: ComponentPayload) => {
-      // Remove blocking check - allow concurrent processing
-      const currentCanvas = canvasCommandManager.getCanvas();
-      if (!currentCanvas) {
-        console.error("❌ ERROR: No active canvas available.");
-        return;
-      }
-
-      logger.canvas(`===== STARTING COMPONENT CREATION: ${payload.name} =====`);
-
-      // Check for duplicate components on canvas
-      const existingComponents = currentCanvas.getObjects().filter((obj) => {
-        const objData = (obj as any).data;
-        return (
-          objData?.type === "component" &&
-          (objData?.originalDatabaseId === payload.id ||
-            objData?.componentId === payload.preservedComponentId)
-        );
-      });
-
-      if (existingComponents.length > 0) {
-        logger.canvas(
-          `🚫 Component already exists on canvas: ${payload.name} (${payload.id}), skipping duplicate`
-        );
-        logger.canvas(
-          `Found ${existingComponents.length} existing component(s) with same ID`
-        );
-        return;
-      }
-
-      // Log current canvas state for debugging
-      const totalObjects = currentCanvas.getObjects().length;
-      const componentObjects = currentCanvas
-        .getObjects()
-        .filter((obj) => (obj as any).data?.type === "component").length;
-      logger.canvas(
-        `📊 Canvas state: ${totalObjects} total objects, ${componentObjects} components before adding ${payload.name}`
+      console.log(
+        `🚀 COMPONENT HANDLER CALLED: ${payload.name}, preservedId: ${payload.preservedComponentId}`
       );
 
-      // Check if this is a temporary component ID (components without proper database uid)
-      if (payload.id.startsWith("temp_")) {
-        logger.canvas(
-          `Skipping component creation for temporary ID: ${payload.id}`
-        );
-        console.error(
-          `Cannot create component with temporary ID: ${payload.id}. This component is missing from the database.`
-        );
-        return;
-      }
-
       try {
-        // 1. Fetch component's SVG and pin configuration from the database with timeout
-        const fetchPromise = supabase
-          .from("components_v2")
-          .select("symbol_svg, symbol_data")
-          .eq("uid", payload.id)
-          .single();
+        // Remove global processing lock to allow concurrent component creation during restoration
+        // This enables multiple components to be loaded simultaneously without blocking
 
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(
-            () =>
-              reject(
-                new Error(`Database fetch timeout for component ${payload.id}`)
-              ),
-            8000
-          )
-        );
-
-        const { data: dbComponent } = await Promise.race([
-          fetchPromise,
-          timeoutPromise,
-        ]);
-
-        const svgString = dbComponent?.symbol_svg;
-        if (!svgString) {
-          throw new Error(`No SVG found for component ID: ${payload.id}`);
+        const currentCanvas = canvasCommandManager.getCanvas();
+        if (!currentCanvas) {
+          console.error("❌ ERROR: No active canvas available.");
+          return;
         }
 
-        // 2. Load the SVG string into Fabric.js objects with timeout
-        const svgLoadPromise = fabric.loadSVGFromString(svgString);
-        const svgTimeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(
-            () =>
-              reject(
-                new Error(`SVG loading timeout for component ${payload.name}`)
-              ),
-            5000
-          )
+        console.log(
+          `🎯 Component creation started: ${payload.name}, canvas instance: ${
+            (currentCanvas as any)._id || "no-id"
+          }, preservedId: ${payload.preservedComponentId}`
         );
 
-        const { objects: allSvgObjects } = await Promise.race([
-          svgLoadPromise,
-          svgTimeoutPromise,
-        ]);
+        logger.canvas(
+          `===== STARTING COMPONENT CREATION: ${payload.name} =====`
+        );
 
-        // 3. Get Pin Metadata (name, type) from the database JSON
-        let dbPins: any[] = [];
+        // Check if this is a temporary component ID (components without proper database uid)
+        if (payload.id.startsWith("temp_")) {
+          logger.canvas(
+            `Skipping component creation for temporary ID: ${payload.id}`
+          );
+          console.error(
+            `Cannot create component with temporary ID: ${payload.id}. This component is missing from the database.`
+          );
+          return;
+        }
+
         try {
-          if (dbComponent?.symbol_data) {
-            let symbolData;
-            if (typeof dbComponent.symbol_data === "string") {
-              symbolData = JSON.parse(dbComponent.symbol_data);
-            } else {
-              // symbol_data is already an object
-              symbolData = dbComponent.symbol_data;
-            }
-            dbPins = symbolData.pins || [];
+          // 1. Fetch component's SVG and pin configuration from the database
+          const { data: dbComponent } = await supabase
+            .from("components_v2")
+            .select("symbol_svg, symbol_data")
+            .eq("uid", payload.id)
+            .single();
+
+          const svgString = dbComponent?.symbol_svg;
+          if (!svgString) {
+            throw new Error(`No SVG found for component ID: ${payload.id}`);
           }
-        } catch (error) {
-          logger.canvas("Failed to parse symbol_data:", error);
-        }
 
-        // 4. Create Interactive Pins from the tagged SVG elements
-        // Use preserved component ID if available, otherwise generate new one
-        const componentId =
-          payload.preservedComponentId ||
-          `component_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-        if (payload.preservedComponentId) {
-          logger.canvas(
-            `🔗 Using preserved component ID: ${componentId} for ${payload.name}`
+          // 2. Load the SVG string into Fabric.js objects
+          console.log(
+            `📦 Loading SVG for ${payload.name}, svgLength: ${svgString.length}`
           );
-        } else {
+          const svgLoadResult = await fabric.loadSVGFromString(svgString);
+          const allSvgObjects = svgLoadResult.objects;
+          console.log(`📦 SVG loaded: ${allSvgObjects.length} objects created`);
+
+          // 3. Get Pin Metadata (name, type) from the database JSON
+          let dbPins: any[] = [];
+          try {
+            if (dbComponent?.symbol_data) {
+              let symbolData;
+              if (typeof dbComponent.symbol_data === "string") {
+                symbolData = JSON.parse(dbComponent.symbol_data);
+              } else {
+                // symbol_data is already an object
+                symbolData = dbComponent.symbol_data;
+              }
+              dbPins = symbolData.pins || [];
+            }
+          } catch (error) {
+            logger.canvas("Failed to parse symbol_data:", error);
+          }
+
+          // 4. Create Interactive Pins from the tagged SVG elements
+          // Generate or use preserved component ID for wire connections
+          const componentId =
+            payload.preservedComponentId || `component_${Date.now()}`;
+
+          if (payload.preservedComponentId) {
+            logger.canvas(
+              `Using preserved component ID: ${payload.preservedComponentId}`
+            );
+          } else {
+            logger.canvas(`Generated new component ID: ${componentId}`);
+          }
+          const interactivePins: fabric.Circle[] = [];
+
+          // We also separate the main symbol parts from the pin markers
+          const symbolParts: fabric.Object[] = [];
+
+          allSvgObjects.forEach((obj) => {
+            // Check for the "signpost" ID added by the Python script
+            // We cast `obj` to `any` to access the `id` property which is not in the default FabricObject type
+            if (obj && (obj as any).id && (obj as any).id.startsWith("pin-")) {
+              const pinNumber = (obj as any).id.split("-")[1];
+              const pinDataFromDb =
+                dbPins.find((p) => p.number === pinNumber) || {};
+
+              const center = obj.getCenterPoint();
+
+              const interactivePin = new fabric.Circle({
+                radius: 3, // Visual size of the connectable point
+                fill: "rgba(0, 255, 0, 0.7)",
+                stroke: "#059669",
+                strokeWidth: 0.4,
+                left: center.x,
+                top: center.y,
+                originX: "center",
+                originY: "center",
+                opacity: 0, // Hidden until mouse hover
+                visible: false, // Initially not visible
+              });
+
+              interactivePin.set("data", {
+                type: "pin",
+                componentId: componentId,
+                pinNumber: pinNumber,
+                pinName: pinDataFromDb.name || `Pin ${pinNumber}`,
+                electricalType: pinDataFromDb.electrical_type || "unknown",
+                isConnectable: true,
+              });
+
+              interactivePins.push(interactivePin);
+
+              // Hide the original SVG path for the pin line itself
+              obj.visible = false;
+            }
+
+            if (obj) {
+              symbolParts.push(obj);
+            }
+          });
+
           logger.canvas(
-            `🆕 Generated new component ID: ${componentId} for ${payload.name}`
+            `Created ${interactivePins.length} interactive pins for ${payload.name}.`
           );
-        }
 
-        const interactivePins: fabric.Circle[] = [];
+          // 5. Position the final component on the canvas
+          let { x: componentX, y: componentY } = payload;
+          if (componentX === undefined || componentY === undefined) {
+            const vpCenter = currentCanvas.getVpCenter();
+            componentX = vpCenter.x;
+            componentY = vpCenter.y;
+          }
 
-        // We also separate the main symbol parts from the pin markers
-        const symbolParts: fabric.Object[] = [];
+          // 6. Create the final "Component Sandwich" group
+          // This group includes all original SVG parts plus our new interactive pins.
+          // Fabric.js handles the internal coordinate system automatically.
+          console.log(
+            `🥪 Creating component group with ${symbolParts.length} symbol parts and ${interactivePins.length} pins`
+          );
 
-        allSvgObjects.forEach((obj) => {
-          // Check for the "signpost" ID added by the Python script
-          // We cast `obj` to `any` to access the `id` property which is not in the default FabricObject type
-          if (obj && (obj as any).id && (obj as any).id.startsWith("pin-")) {
-            const pinNumber = (obj as any).id.split("-")[1];
-            const pinDataFromDb =
-              dbPins.find((p) => p.number === pinNumber) || {};
-
-            const center = obj.getCenterPoint();
-
-            const interactivePin = new fabric.Circle({
-              radius: 3, // Visual size of the connectable point
-              fill: "rgba(0, 255, 0, 0.7)",
-              stroke: "#059669",
-              strokeWidth: 0.4,
-              left: center.x,
-              top: center.y,
+          const componentSandwich = new fabric.Group(
+            [...symbolParts, ...interactivePins],
+            {
+              left: componentX,
+              top: componentY,
               originX: "center",
               originY: "center",
-              opacity: 0, // Hidden until mouse hover
-              visible: false, // Initially not visible
-            });
+              hasControls: false,
+              hasBorders: true,
+              lockScalingX: true,
+              lockScalingY: true,
+            }
+          );
 
-            interactivePin.set("data", {
-              type: "pin",
-              componentId: componentId,
-              pinNumber: pinNumber,
-              pinName: pinDataFromDb.name || `Pin ${pinNumber}`,
-              electricalType: pinDataFromDb.electrical_type || "unknown",
-              isConnectable: true,
-            });
+          console.log(
+            `🥪 Component group created successfully, type: ${componentSandwich.type}`
+          );
 
-            interactivePins.push(interactivePin);
+          // 7. Attach metadata and add the final object to the canvas
+          console.log(
+            `🏷️ Setting component data: componentId=${componentId}, componentName=${payload.name}`
+          );
+          componentSandwich.set("data", {
+            type: "component",
+            componentId: componentId,
+            componentName: payload.name,
+            isComponentSandwich: true,
+            originalDatabaseId: payload.id, // Store the original database ID for serialization
+          });
 
-            // Hide the original SVG path for the pin line itself
-            obj.visible = false;
+          // Set componentType as a direct property for canvas event handlers
+          componentSandwich.set("componentType", "component");
+          componentSandwich.set("id", componentId); // Set ID as direct property for reliable access
+
+          if (dbComponent) {
+            componentSandwich.set("databaseComponent", dbComponent);
           }
 
-          if (obj) {
-            symbolParts.push(obj);
-          }
-        });
+          console.log(`➕ Adding component to canvas: ${componentId}`);
+          currentCanvas.add(componentSandwich);
+          console.log(
+            `➕ Component added to canvas, canvas now has ${
+              currentCanvas.getObjects().length
+            } objects`
+          );
 
-        logger.canvas(
-          `Created ${interactivePins.length} interactive pins for ${payload.name}.`
-        );
+          // Small delay to ensure component is fully added before verification
+          await new Promise((resolve) => setTimeout(resolve, 10));
 
-        // 5. Position the final component on the canvas
-        let { x: componentX, y: componentY } = payload;
-        if (componentX === undefined || componentY === undefined) {
-          const vpCenter = currentCanvas.getVpCenter();
-          componentX = vpCenter.x;
-          componentY = vpCenter.y;
+          // DEBUGGING: Verify the component was actually added and doesn't conflict
+          const canvasObjects = currentCanvas.getObjects();
+          const componentCount = canvasObjects.filter(
+            (obj: any) => obj.data?.componentId
+          ).length;
+          const thisComponent = canvasObjects.find(
+            (obj: any) => obj.data?.componentId === componentId
+          );
+
+          console.log(
+            `🔍 Component added verification: ID=${componentId}, found=${!!thisComponent}, total components=${componentCount}`
+          );
+          console.log(`📊 Canvas state after adding ${componentId}:`, {
+            totalObjects: canvasObjects.length,
+            lastAddedObject: canvasObjects[canvasObjects.length - 1]?.type,
+            lastAddedData: (canvasObjects[canvasObjects.length - 1] as any)
+              ?.data,
+            allComponentIds: canvasObjects
+              .filter((obj: any) => obj.data?.componentId)
+              .map((obj: any) => obj.data.componentId),
+          });
+
+          // Extra verification - check if component exists with different data structure
+          const componentByType = canvasObjects.find(
+            (obj: any) =>
+              obj.data?.type === "component" &&
+              obj.data?.componentId === componentId
+          );
+          console.log(`🔍 Component by type check: ${!!componentByType}`);
+
+          currentCanvas.requestRenderAll();
+
+          logger.canvas(`✅ Successfully added ${payload.name} to canvas.`);
+        } catch (error) {
+          console.error(
+            `❌ CRITICAL ERROR in component handler for ${payload.name}:`,
+            error
+          );
+          console.error(
+            `❌ COMPONENT CREATION FAILED for ${payload.name}:`,
+            error
+          );
+        } finally {
+          // No longer needed: isProcessingComponent = false;
         }
-
-        // 6. Create the final "Component Sandwich" group
-        // This group includes all original SVG parts plus our new interactive pins.
-        // Fabric.js handles the internal coordinate system automatically.
-        const componentSandwich = new fabric.Group(
-          [...symbolParts, ...interactivePins],
-          {
-            left: componentX,
-            top: componentY,
-            originX: "center",
-            originY: "center",
-            hasControls: false,
-            hasBorders: true,
-            lockScalingX: true,
-            lockScalingY: true,
-          }
-        );
-
-        // 7. Attach metadata and add the final object to the canvas
-        componentSandwich.set("data", {
-          type: "component",
-          componentId: componentId,
-          componentName: payload.name,
-          isComponentSandwich: true,
-          originalDatabaseId: payload.id, // Store the original database ID for serialization
-        });
-
-        // Set componentType as a direct property for canvas event handlers
-        componentSandwich.set("componentType", "component");
-        componentSandwich.set("id", componentId); // Set ID as direct property for reliable access
-
-        if (dbComponent) {
-          componentSandwich.set("databaseComponent", dbComponent);
-        }
-
-        currentCanvas.add(componentSandwich);
-        currentCanvas.requestRenderAll();
-
-        // Log final canvas state
-        const finalTotalObjects = currentCanvas.getObjects().length;
-        const finalComponentObjects = currentCanvas
-          .getObjects()
-          .filter((obj) => (obj as any).data?.type === "component").length;
-        logger.canvas(
-          `📊 Canvas state after adding: ${finalTotalObjects} total objects, ${finalComponentObjects} components`
-        );
-
-        logger.canvas(
-          `✅ Successfully added ${payload.name} to canvas with ID ${componentId}.`
-        );
-      } catch (error) {
+      } catch (handlerError) {
         console.error(
-          `❌ COMPONENT CREATION FAILED for ${payload.name}:`,
-          error
+          `❌ HANDLER-LEVEL ERROR for ${payload?.name || "unknown"}:`,
+          handlerError
         );
+        // No longer needed: isProcessingComponent = false;
       }
     }
+  );
+
+  console.log(`✅ Component handler registered successfully for canvas`);
+  logger.canvas("✅ Component event listener registered successfully");
+
+  // CRITICAL TEST: This log should ALWAYS appear
+  console.log(
+    `🔥 COMPONENTHANDLER: Handler setup completed - THIS LOG SHOULD ALWAYS APPEAR`
   );
 
   return () => {

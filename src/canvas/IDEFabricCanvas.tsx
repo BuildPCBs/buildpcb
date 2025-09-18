@@ -328,47 +328,192 @@ export function IDEFabricCanvas({
           setNetlist(restoredNetlist.nets);
           netlistRef.current = restoredNetlist.nets;
           setIsNetlistRestored(true);
-          
-          // The wiring tool will be recreated with new initialNetlist via dependency change
-          // No need to call setNetlist on existing tool - it will be re-initialized
+
+          // UPDATE THE WIRING TOOL'S NETLIST: Call setNetlist on the wiring tool to update its internal netlist
+          if (wiringTool && wiringTool.setNetlist) {
+            logger.wire(
+              "🔄 Updating wiring tool netlist with restored nets..."
+            );
+            wiringTool.setNetlist(restoredNetlist.nets);
+          }
         }
 
         // Recreate visual wires on the canvas
         if (fabricCanvas && restoredNetlist?.nets) {
           logger.wire("Recreating visual wires from restored netlist...");
 
+          // Clear pin wire tracker for fresh offset calculation
+          pinWireTracker.current.clear();
+
           // Clear any existing wires first
-          const existingWires = fabricCanvas.getObjects().filter((obj: any) =>
-            obj.wireType === "connection" || (obj.data?.type === "junctionDot" && obj.data?.pinConnection)
-          );
+          const existingWires = fabricCanvas
+            .getObjects()
+            .filter(
+              (obj: any) =>
+                obj.wireType === "connection" ||
+                (obj.data?.type === "junctionDot" && obj.data?.pinConnection)
+            );
           existingWires.forEach((wire) => fabricCanvas.remove(wire));
 
           // Recreate wires for each net
-          restoredNetlist.nets.forEach((net: any) => {
+          let totalWiresCreated = 0;
+          restoredNetlist.nets.forEach((net: any, netIndex: number) => {
+            logger.wire(
+              `🔗 Processing net ${netIndex + 1}/${
+                restoredNetlist.nets.length
+              }: ${net.netId}`,
+              {
+                connections: net.connections.length,
+                netConnections: net.connections,
+              }
+            );
+
+            // Log detailed connection analysis
+            if (net.connections && net.connections.length >= 2) {
+              logger.wire(`🔍 Analyzing connections for net ${net.netId}:`);
+              net.connections.forEach((conn: any, idx: number) => {
+                logger.wire(
+                  `  ${idx + 1}. ${conn.componentId}:${conn.pinNumber}`
+                );
+              });
+
+              // Check for same starting pins
+              const connectionsByPin = new Map<string, any[]>();
+              net.connections.forEach((conn: any) => {
+                const pinId = `${conn.componentId}:${conn.pinNumber}`;
+                if (!connectionsByPin.has(pinId)) {
+                  connectionsByPin.set(pinId, []);
+                }
+                connectionsByPin.get(pinId)!.push(conn);
+              });
+
+              // Log pin analysis
+              connectionsByPin.forEach((conns, pinId) => {
+                if (conns.length > 1) {
+                  logger.wire(
+                    `⚠️ Multiple connections from/to same pin ${pinId}: ${conns.length} connections`
+                  );
+                }
+              });
+            }
+
             if (net.connections && net.connections.length >= 2) {
               // Create wires between consecutive connections in the net
+              logger.wire(
+                `🔗 Creating ${
+                  net.connections.length - 1
+                } consecutive wire pairs for net ${net.netId}`
+              );
+
               for (let i = 0; i < net.connections.length - 1; i++) {
                 const fromConn = net.connections[i];
                 const toConn = net.connections[i + 1];
 
+                logger.wire(
+                  `🔍 Wire ${i + 1}/${
+                    net.connections.length - 1
+                  }: Looking for pins: ${fromConn.componentId}:${
+                    fromConn.pinNumber
+                  } → ${toConn.componentId}:${toConn.pinNumber}`
+                );
+
                 // Find the pins for these connections
-                const fromPin = findPinForConnection(fromConn.componentId, fromConn.pinNumber);
-                const toPin = findPinForConnection(toConn.componentId, toConn.pinNumber);
+                const fromPin = findPinForConnection(
+                  fromConn.componentId,
+                  fromConn.pinNumber
+                );
+                const toPin = findPinForConnection(
+                  toConn.componentId,
+                  toConn.pinNumber
+                );
+
+                logger.wire(
+                  `📍 Pin search results: fromPin=${!!fromPin}, toPin=${!!toPin}`
+                );
 
                 if (fromPin && toPin) {
                   // Create the visual wire
+                  logger.wire(`✅ Creating wire between found pins`);
                   const wire = createWireBetweenPins(fromPin, toPin);
                   if (wire) {
+                    totalWiresCreated++;
+                    // Register the wire with the wiring tool so it follows component movement
+                    wiringTool.registerRestoredWire(
+                      wire,
+                      fromConn.componentId,
+                      fromConn.pinNumber.toString(),
+                      toConn.componentId,
+                      toConn.pinNumber.toString()
+                    );
+
                     // Add junction dots
                     addJunctionDotsToWire(wire);
+                    logger.wire(
+                      `🔴 Wire created, registered with wiring tool, and dots added successfully`
+                    );
+                  } else {
+                    logger.wire(`❌ Failed to create wire object`);
                   }
+                } else {
+                  logger.wire(
+                    `❌ Missing pins: fromPin=${!!fromPin}, toPin=${!!toPin}, skipping wire creation`
+                  );
+
+                  // Debug: List all available components and pins
+                  const allComponents = fabricCanvas
+                    .getObjects()
+                    .filter(
+                      (obj) =>
+                        (obj.type === "group" &&
+                          (obj as any).data?.type === "component") ||
+                        (obj as any).data?.type === "component"
+                    );
+                  logger.wire(
+                    `🔍 Available components on canvas:`,
+                    allComponents.map((comp) => {
+                      const compData = (comp as any).data;
+                      return {
+                        componentId: compData?.componentId,
+                        type: compData?.componentType,
+                        pins:
+                          comp.type === "group"
+                            ? (comp as fabric.Group)
+                                .getObjects()
+                                .filter(
+                                  (obj) => (obj as any).data?.type === "pin"
+                                ).length
+                            : 0,
+                      };
+                    })
+                  );
                 }
               }
+            } else {
+              logger.wire(
+                `⚠️ Net ${net.netId} has insufficient connections (${
+                  net.connections?.length || 0
+                }), skipping`
+              );
             }
           });
 
           fabricCanvas.renderAll();
-          logger.wire("Visual wires recreated successfully");
+          logger.wire("Visual wires recreated successfully", {
+            totalWiresCreated,
+            totalNetsProcessed: restoredNetlist.nets.length,
+            currentCanvasObjects: fabricCanvas.getObjects().length,
+          });
+        }
+      };
+
+      // Handle component deletion from external sources (like AI commands)
+      const handleDeleteComponent = (event: CustomEvent) => {
+        const { componentId, component } = event.detail;
+        logger.canvas(`🗑️ External component deletion request: ${componentId}`);
+
+        if (component && fabricCanvas) {
+          handleObjectDeletion(component);
+          fabricCanvas.renderAll();
         }
       };
 
@@ -377,109 +522,230 @@ export function IDEFabricCanvas({
         handleNetlistRestored as EventListener
       );
 
+      window.addEventListener(
+        "deleteComponent",
+        handleDeleteComponent as EventListener
+      );
+
       return () => {
         window.removeEventListener(
           "netlistRestored",
           handleNetlistRestored as EventListener
+        );
+        window.removeEventListener(
+          "deleteComponent",
+          handleDeleteComponent as EventListener
         );
       };
     }
   }, [fabricCanvas]);
 
   // Helper function to find a pin by component ID and pin number
-  const findPinForConnection = useCallback((componentId: string, pinNumber: string) => {
-    if (!fabricCanvas) return null;
+  const findPinForConnection = useCallback(
+    (componentId: string, pinNumber: string) => {
+      if (!fabricCanvas) {
+        logger.wire(`❌ findPinForConnection: No canvas`);
+        return null;
+      }
 
-    const objects = fabricCanvas.getObjects();
-    for (const obj of objects) {
-      if (obj.type === "group") {
-        // Check objects within groups
-        const groupObjects = (obj as fabric.Group).getObjects();
-        for (const groupObj of groupObjects) {
-          const pinData = (groupObj as any).data;
-          if (pinData && pinData.type === "pin" &&
+      logger.wire(
+        `🔍 findPinForConnection: Looking for ${componentId}:${pinNumber}`
+      );
+
+      const objects = fabricCanvas.getObjects();
+      let totalPinsChecked = 0;
+      let foundComponents = 0;
+
+      for (const obj of objects) {
+        if (obj.type === "group") {
+          const groupData = (obj as any).data;
+          if (groupData?.type === "component") {
+            foundComponents++;
+            logger.wire(
+              `📦 Checking component group: ${groupData.componentId}`
+            );
+          }
+
+          // Check objects within groups
+          const groupObjects = (obj as fabric.Group).getObjects();
+          for (const groupObj of groupObjects) {
+            const pinData = (groupObj as any).data;
+            if (pinData && pinData.type === "pin") {
+              totalPinsChecked++;
+              logger.wire(
+                `📍 Found pin: ${pinData.componentId}:${pinData.pinNumber}`
+              );
+
+              if (
+                pinData.componentId === componentId &&
+                pinData.pinNumber.toString() === pinNumber.toString()
+              ) {
+                logger.wire(
+                  `✅ Found matching pin: ${componentId}:${pinNumber}`
+                );
+                return groupObj;
+              }
+            }
+          }
+        } else {
+          // Check direct objects
+          const pinData = (obj as any).data;
+          if (pinData && pinData.type === "pin") {
+            totalPinsChecked++;
+            logger.wire(
+              `📍 Found direct pin: ${pinData.componentId}:${pinData.pinNumber}`
+            );
+
+            if (
               pinData.componentId === componentId &&
-              pinData.pinNumber.toString() === pinNumber.toString()) {
-            return groupObj;
+              pinData.pinNumber.toString() === pinNumber.toString()
+            ) {
+              logger.wire(
+                `✅ Found matching direct pin: ${componentId}:${pinNumber}`
+              );
+              return obj;
+            }
           }
         }
-      } else {
-        // Check direct objects
-        const pinData = (obj as any).data;
-        if (pinData && pinData.type === "pin" &&
-            pinData.componentId === componentId &&
-            pinData.pinNumber.toString() === pinNumber.toString()) {
-          return obj;
-        }
       }
-    }
-    return null;
-  }, [fabricCanvas]);
+
+      logger.wire(
+        `❌ Pin not found: ${componentId}:${pinNumber}. Checked ${totalPinsChecked} pins across ${foundComponents} components`
+      );
+      return null;
+    },
+    [fabricCanvas]
+  );
+
+  // Helper function to track pin wire connections for offset calculation
+  const pinWireTracker = useRef<Map<string, number>>(new Map());
+
+  // Helper function to get offset for multiple wires from same pin
+  const getPinWireOffset = useCallback(
+    (pinId: string, pinCenter: fabric.Point) => {
+      const currentCount = pinWireTracker.current.get(pinId) || 0;
+      pinWireTracker.current.set(pinId, currentCount + 1);
+
+      if (currentCount === 0) {
+        // First wire from this pin - no offset
+        logger.wire(`📍 Pin ${pinId}: First wire, no offset applied`);
+        return pinCenter;
+      }
+
+      // Apply circular offset for additional wires (3px radius)
+      const offsetRadius = 3;
+      const angleStep = (2 * Math.PI) / 8; // Support up to 8 wires per pin
+      const angle = angleStep * currentCount;
+
+      const offsetPoint = new fabric.Point(
+        pinCenter.x + Math.cos(angle) * offsetRadius,
+        pinCenter.y + Math.sin(angle) * offsetRadius
+      );
+
+      logger.wire(
+        `📍 Pin ${pinId}: Wire #${currentCount + 1}, offset applied`,
+        {
+          original: { x: pinCenter.x, y: pinCenter.y },
+          offset: { x: offsetPoint.x, y: offsetPoint.y },
+          angle: angle * (180 / Math.PI), // Convert to degrees for readability
+        }
+      );
+
+      return offsetPoint;
+    },
+    []
+  );
 
   // Helper function to create a wire between two pins
-  const createWireBetweenPins = useCallback((fromPin: fabric.Object, toPin: fabric.Object) => {
-    if (!fabricCanvas) return null;
+  const createWireBetweenPins = useCallback(
+    (fromPin: fabric.Object, toPin: fabric.Object) => {
+      if (!fabricCanvas) return null;
 
-    const fromCenter = getAbsoluteCenter(fromPin);
-    const toCenter = getAbsoluteCenter(toPin);
+      const fromCenter = getAbsoluteCenter(fromPin);
+      const toCenter = getAbsoluteCenter(toPin);
 
-    // Calculate orthogonal path (L-shaped with 90° corners)
-    const dx = toCenter.x - fromCenter.x;
-    const dy = toCenter.y - fromCenter.y;
+      // Generate unique pin identifiers
+      const fromPinData = (fromPin as any).data;
+      const toPinData = (toPin as any).data;
+      const fromPinId = `${fromPinData.componentId}:${fromPinData.pinNumber}`;
+      const toPinId = `${toPinData.componentId}:${toPinData.pinNumber}`;
 
-    // Decide whether to go horizontal first or vertical first
-    const goHorizontalFirst = Math.abs(dx) > Math.abs(dy);
+      // Apply offsets for multiple wires from same pin
+      const offsetFromCenter = getPinWireOffset(fromPinId, fromCenter);
+      const offsetToCenter = getPinWireOffset(toPinId, toCenter);
 
-    // Create SVG path data for smooth wire rendering
-    let pathData = `M ${fromCenter.x} ${fromCenter.y}`;
+      // Calculate orthogonal path (L-shaped with 90° corners) using offset centers
+      const dx = offsetToCenter.x - offsetFromCenter.x;
+      const dy = offsetToCenter.y - offsetFromCenter.y;
 
-    if (goHorizontalFirst) {
-      // Horizontal first, then vertical
-      if (Math.abs(dx) > 1) {
-        pathData += ` L ${toCenter.x} ${fromCenter.y}`;
+      // Decide whether to go horizontal first or vertical first
+      const goHorizontalFirst = Math.abs(dx) > Math.abs(dy);
+
+      // Create SVG path data for smooth wire rendering
+      let pathData = `M ${offsetFromCenter.x} ${offsetFromCenter.y}`;
+
+      if (goHorizontalFirst) {
+        // Horizontal first, then vertical
+        if (Math.abs(dx) > 1) {
+          pathData += ` L ${offsetToCenter.x} ${offsetFromCenter.y}`;
+        }
+        if (Math.abs(dy) > 1) {
+          pathData += ` L ${offsetToCenter.x} ${offsetToCenter.y}`;
+        }
+      } else {
+        // Vertical first, then horizontal
+        if (Math.abs(dy) > 1) {
+          pathData += ` L ${offsetFromCenter.x} ${offsetToCenter.y}`;
+        }
+        if (Math.abs(dx) > 1) {
+          pathData += ` L ${offsetToCenter.x} ${offsetToCenter.y}`;
+        }
       }
-      if (Math.abs(dy) > 1) {
-        pathData += ` L ${toCenter.x} ${toCenter.y}`;
-      }
-    } else {
-      // Vertical first, then horizontal
-      if (Math.abs(dy) > 1) {
-        pathData += ` L ${fromCenter.x} ${toCenter.y}`;
-      }
-      if (Math.abs(dx) > 1) {
-        pathData += ` L ${toCenter.x} ${toCenter.y}`;
-      }
-    }
 
-    // Create a single path object for smooth wire rendering
-    const wirePath = new fabric.Path(pathData, {
-      stroke: "#0038DF",
-      strokeWidth: 1,
-      fill: "",
-      selectable: false,
-      hasControls: false,
-      hasBorders: false,
-      evented: false,
-      strokeLineCap: "round",
-      strokeLineJoin: "round",
-    });
+      logger.wire(`🎨 Creating wire path: ${pathData}`, {
+        fromPinId,
+        toPinId,
+        offsetFromCenter: { x: offsetFromCenter.x, y: offsetFromCenter.y },
+        offsetToCenter: { x: offsetToCenter.x, y: offsetToCenter.y },
+      });
 
-    // Add connection data to the path
-    const fromPinData = (fromPin as any).data;
-    const toPinData = (toPin as any).data;
-    (wirePath as any).connectionData = {
-      fromComponentId: fromPinData.componentId,
-      fromPinNumber: fromPinData.pinNumber.toString(),
-      toComponentId: toPinData.componentId,
-      toPinNumber: toPinData.pinNumber.toString(),
-    };
+      // Create a single path object for smooth wire rendering
+      const wirePath = new fabric.Path(pathData, {
+        stroke: "#0038DF",
+        strokeWidth: 1,
+        fill: "",
+        selectable: false,
+        hasControls: false,
+        hasBorders: false,
+        evented: false,
+        strokeLineCap: "round",
+        strokeLineJoin: "round",
+      });
 
-    // Mark as wire
-    (wirePath as any).wireType = "connection";
+      // Add connection data to the path
+      (wirePath as any).connectionData = {
+        fromComponentId: fromPinData.componentId,
+        fromPinNumber: fromPinData.pinNumber.toString(),
+        toComponentId: toPinData.componentId,
+        toPinNumber: toPinData.pinNumber.toString(),
+      };
 
-    fabricCanvas.add(wirePath);
-    return wirePath;
-  }, [fabricCanvas]);
+      // Mark as wire
+      (wirePath as any).wireType = "connection";
+
+      fabricCanvas.add(wirePath);
+
+      // Debug: Confirm wire was added to canvas
+      logger.wire(`✅ Wire added to canvas`, {
+        pathData,
+        canvasObjectCount: fabricCanvas.getObjects().length,
+        wireId: (wirePath as any).connectionData,
+      });
+
+      return wirePath;
+    },
+    [fabricCanvas]
+  );
 
   // Helper function to get absolute center of a pin (accounting for group transformations)
   const getAbsoluteCenter = useCallback((pin: fabric.Object) => {
@@ -494,39 +760,46 @@ export function IDEFabricCanvas({
   }, []);
 
   // Helper function to add junction dots to a wire
-  const addJunctionDotsToWire = useCallback((wire: fabric.Line | fabric.Path) => {
-    if (!fabricCanvas) return;
+  const addJunctionDotsToWire = useCallback(
+    (wire: fabric.Line | fabric.Path) => {
+      if (!fabricCanvas) return;
 
-    // Get the actual wire endpoints from the wire's path
-    const endpoints = getWireEndpoints(wire);
-    if (!endpoints) return;
+      // Get the actual wire endpoints from the wire's path
+      const endpoints = getWireEndpoints(wire);
+      if (!endpoints) return;
 
-    // Create junction dots at wire endpoints
-    const createJunctionDot = (position: fabric.Point) => {
-      const dot = new fabric.Circle({
-        radius: 3,
-        fill: "#0038DF",
-        stroke: "#ffffff",
-        strokeWidth: 1,
-        left: position.x,
-        top: position.y,
-        selectable: false,
-        hasControls: false,
-        hasBorders: false,
-        evented: false,
-        originX: "center",
-        originY: "center",
-      });
-      (dot as any).data = { type: "junctionDot", pinConnection: true };
-      return dot;
-    };
+      // Create junction dots at wire endpoints
+      const createJunctionDot = (position: fabric.Point) => {
+        const dot = new fabric.Circle({
+          radius: 3,
+          fill: "#0038DF",
+          stroke: "#ffffff",
+          strokeWidth: 1,
+          left: position.x,
+          top: position.y,
+          selectable: false,
+          hasControls: false,
+          hasBorders: false,
+          evented: false,
+          originX: "center",
+          originY: "center",
+        });
+        (dot as any).data = { type: "junctionDot", pinConnection: true };
+        return dot;
+      };
 
-    const startDot = createJunctionDot(new fabric.Point(endpoints.start.x, endpoints.start.y));
-    const endDot = createJunctionDot(new fabric.Point(endpoints.end.x, endpoints.end.y));
+      const startDot = createJunctionDot(
+        new fabric.Point(endpoints.start.x, endpoints.start.y)
+      );
+      const endDot = createJunctionDot(
+        new fabric.Point(endpoints.end.x, endpoints.end.y)
+      );
 
-    fabricCanvas.add(startDot);
-    fabricCanvas.add(endDot);
-  }, [fabricCanvas]);
+      fabricCanvas.add(startDot);
+      fabricCanvas.add(endDot);
+    },
+    [fabricCanvas]
+  );
 
   // Helper function to get wire endpoints
   const getWireEndpoints = useCallback((wire: fabric.Line | fabric.Path) => {
@@ -1429,7 +1702,9 @@ export function IDEFabricCanvas({
     // Handle multiple selected objects (activeSelection)
     if (activeObject.type === "activeSelection") {
       const objects = (activeObject as any)._objects || [];
-      objects.forEach((obj: fabric.Object) => fabricCanvas.remove(obj));
+      objects.forEach((obj: fabric.Object) => {
+        handleObjectDeletion(obj);
+      });
       fabricCanvas.discardActiveObject();
       fabricCanvas.renderAll();
       debouncedSaveState();
@@ -1440,11 +1715,274 @@ export function IDEFabricCanvas({
     }
 
     // Handle single object
-    fabricCanvas.remove(activeObject);
+    handleObjectDeletion(activeObject);
     fabricCanvas.renderAll();
     debouncedSaveState();
     logger.canvas("--- ACTION SUCCESS: handleDelete (deleted 1 object) ---");
   };
+
+  // Helper function to handle deletion of individual objects with proper cleanup
+  const handleObjectDeletion = useCallback(
+    (obj: fabric.Object) => {
+      if (!fabricCanvas) return;
+
+      const objData = (obj as any).data;
+      logger.canvas(`🗑️ handleObjectDeletion called for object:`, {
+        type: obj.type,
+        objDataType: objData?.type,
+        componentId: objData?.componentId,
+        hasData: !!objData,
+      });
+
+      // Check if this is a component
+      if (objData?.type === "component" || obj.type === "group") {
+        let componentId = objData?.componentId;
+
+        // Fallback: try to get componentId from group objects if not found
+        if (!componentId && obj.type === "group") {
+          const groupObjects = (obj as fabric.Group).getObjects();
+          for (const groupObj of groupObjects) {
+            const groupObjData = (groupObj as any).data;
+            if (groupObjData?.componentId) {
+              componentId = groupObjData.componentId;
+              logger.canvas(
+                `🔄 Found componentId from group object: ${componentId}`
+              );
+              break;
+            }
+          }
+        }
+
+        logger.canvas(`🗑️ Deleting component: ${componentId}`);
+
+        if (componentId) {
+          // Find and remove all wires connected to this component
+          const connectedWires = fabricCanvas
+            .getObjects()
+            .filter((wire: any) => {
+              return (
+                wire.wireType === "connection" &&
+                wire.connectionData &&
+                (wire.connectionData.fromComponentId === componentId ||
+                  wire.connectionData.toComponentId === componentId)
+              );
+            });
+
+          logger.canvas(
+            `🔗 Found ${connectedWires.length} connected wires to remove`
+          );
+
+          // Remove connected wires from canvas
+          connectedWires.forEach((wire) => {
+            fabricCanvas.remove(wire);
+            logger.canvas(
+              `🔗 Removed wire: ${JSON.stringify((wire as any).connectionData)}`
+            );
+          });
+
+          // Update netlist: remove all connections involving this component
+          if (obj.type === "group") {
+            const groupObjects = (obj as fabric.Group).getObjects();
+            groupObjects.forEach((groupObj) => {
+              const pinData = (groupObj as any).data;
+              if (pinData?.type === "pin") {
+                // Update the local netlist state
+                setNetlist((prevNets) => {
+                  const updatedNets = prevNets
+                    .map((net) => ({
+                      ...net,
+                      connections: net.connections.filter(
+                        (conn: any) =>
+                          !(
+                            conn.componentId === componentId &&
+                            conn.pinNumber === pinData.pinNumber
+                          )
+                      ),
+                    }))
+                    .filter((net) => net.connections.length > 0); // Remove empty nets
+
+                  netlistRef.current = updatedNets;
+                  return updatedNets;
+                });
+
+                logger.canvas(
+                  `🔗 Removed netlist connection: ${componentId}:${pinData.pinNumber}`
+                );
+
+                // Clean up pin wire tracker
+                const pinId = `${componentId}:${pinData.pinNumber}`;
+                pinWireTracker.current.delete(pinId);
+                logger.canvas(`📍 Cleaned up pin tracker for: ${pinId}`);
+              }
+            });
+          }
+
+          // Update the wiring tool's netlist as well
+          if (wiringTool && wiringTool.setNetlist) {
+            wiringTool.setNetlist(netlistRef.current);
+          }
+
+          // Trigger auto-save to persist netlist changes
+          if (autoSave?.saveNow) {
+            logger.canvas(`💾 Triggering auto-save after component deletion`);
+            autoSave.saveNow();
+          }
+        }
+      }
+
+      // Check if this is a wire
+      else if ((obj as any).wireType === "connection") {
+        const connectionData = (obj as any).connectionData;
+        logger.canvas(`🔗 Deleting wire: ${JSON.stringify(connectionData)}`);
+
+        if (connectionData) {
+          // Update the local netlist state to remove wire connections
+          setNetlist((prevNets) => {
+            const updatedNets = prevNets
+              .map((net) => ({
+                ...net,
+                connections: net.connections.filter(
+                  (conn: any) =>
+                    !(
+                      (conn.componentId === connectionData.fromComponentId &&
+                        conn.pinNumber === connectionData.fromPinNumber) ||
+                      (conn.componentId === connectionData.toComponentId &&
+                        conn.pinNumber === connectionData.toPinNumber)
+                    )
+                ),
+              }))
+              .filter((net) => net.connections.length > 0); // Remove empty nets
+
+            netlistRef.current = updatedNets;
+            return updatedNets;
+          });
+
+          logger.canvas(`🔗 Removed wire from netlist`);
+
+          // Update pin wire tracker counts
+          const fromPinId = `${connectionData.fromComponentId}:${connectionData.fromPinNumber}`;
+          const toPinId = `${connectionData.toComponentId}:${connectionData.toPinNumber}`;
+
+          // Decrement or remove tracker entries
+          const fromCount = pinWireTracker.current.get(fromPinId) || 0;
+          const toCount = pinWireTracker.current.get(toPinId) || 0;
+
+          if (fromCount <= 1) {
+            pinWireTracker.current.delete(fromPinId);
+          } else {
+            pinWireTracker.current.set(fromPinId, fromCount - 1);
+          }
+
+          if (toCount <= 1) {
+            pinWireTracker.current.delete(toPinId);
+          } else {
+            pinWireTracker.current.set(toPinId, toCount - 1);
+          }
+
+          logger.canvas(
+            `📍 Updated pin trackers: ${fromPinId}=${
+              fromCount - 1
+            }, ${toPinId}=${toCount - 1}`
+          );
+
+          // Update the wiring tool's netlist as well
+          if (wiringTool && wiringTool.setNetlist) {
+            wiringTool.setNetlist(netlistRef.current);
+          }
+
+          // Trigger auto-save to persist netlist changes
+          if (autoSave?.saveNow) {
+            logger.canvas(`💾 Triggering auto-save after wire deletion`);
+            autoSave.saveNow();
+          }
+        }
+      }
+
+      // Remove the object from canvas
+      fabricCanvas.remove(obj);
+
+      // Debug: Check for orphaned pins after component deletion
+      if (objData?.type === "component" || obj.type === "group") {
+        const componentId = objData?.componentId;
+        logger.canvas(
+          `🔍 Starting orphaned object cleanup for component: ${componentId}`
+        );
+
+        const allObjects = fabricCanvas.getObjects();
+        logger.canvas(`📊 Total objects on canvas: ${allObjects.length}`);
+
+        // Log all pin objects for debugging
+        const allPins = allObjects.filter((canvasObj: any) => {
+          const canvasObjData = canvasObj.data;
+          return canvasObjData?.type === "pin";
+        });
+
+        logger.canvas(`📍 Total pins on canvas: ${allPins.length}`);
+        allPins.forEach((pin, index) => {
+          const pinData = (pin as any).data;
+          logger.canvas(
+            `  Pin ${index + 1}: ${pinData?.componentId}:${
+              pinData?.pinNumber
+            } (target: ${componentId})`
+          );
+        });
+
+        const orphanedPins = allObjects.filter((canvasObj: any) => {
+          const canvasObjData = canvasObj.data;
+          const isPin = canvasObjData?.type === "pin";
+          const matchesComponent = canvasObjData?.componentId === componentId;
+
+          if (isPin) {
+            logger.canvas(
+              `🔍 Pin check: ${canvasObjData?.componentId}:${canvasObjData?.pinNumber} - matches target ${componentId}? ${matchesComponent}`
+            );
+          }
+
+          return isPin && matchesComponent;
+        });
+
+        if (orphanedPins.length > 0) {
+          logger.canvas(
+            `🔍 Found ${orphanedPins.length} orphaned pins after component deletion, removing them...`
+          );
+          orphanedPins.forEach((orphanPin) => {
+            fabricCanvas.remove(orphanPin);
+            logger.canvas(
+              `🗑️ Removed orphaned pin: ${
+                (orphanPin as any).data?.componentId
+              }:${(orphanPin as any).data?.pinNumber}`
+            );
+          });
+        } else {
+          logger.canvas(`✅ No orphaned pins found after component deletion`);
+        }
+
+        // Also check for any other orphaned objects related to this component
+        const orphanedObjects = allObjects.filter((canvasObj: any) => {
+          const canvasObjData = canvasObj.data;
+          return canvasObjData?.componentId === objData?.componentId;
+        });
+
+        if (orphanedObjects.length > 0) {
+          logger.canvas(
+            `🔍 Found ${orphanedObjects.length} total orphaned objects for component ${objData?.componentId}:`
+          );
+          orphanedObjects.forEach((orphanObj, index) => {
+            const orphanData = (orphanObj as any).data;
+            logger.canvas(
+              `  ${index + 1}. Type: ${orphanData?.type}, ComponentId: ${
+                orphanData?.componentId
+              }`
+            );
+            fabricCanvas.remove(orphanObj);
+          });
+        }
+      }
+
+      logger.canvas(`✅ Object removed from canvas`);
+    },
+    [fabricCanvas, netlist, wiringTool, autoSave]
+  );
 
   const handleCopy = () => {
     logger.canvas("DEBUG: handleCopy called");

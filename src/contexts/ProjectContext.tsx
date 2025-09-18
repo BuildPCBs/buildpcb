@@ -13,7 +13,7 @@ import { Circuit } from "@/lib/schemas/circuit";
 import { ProjectService, ProjectLoadResult } from "@/lib/project-service";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
-import { loadCanvasFromCircuit } from "@/canvas/utils/canvasSerializer";
+import { loadCanvasFromLogicalCircuit } from "@/canvas/utils/logicalSerializer";
 
 interface ProjectContextType {
   // Current project state
@@ -409,47 +409,80 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
             : [],
         });
 
-        // Extract netlist and chat data before loading canvas
-        const savedNetlist = currentProject.canvas_settings.netlist;
-        const canvasDataWithoutNetlist = { ...currentProject.canvas_settings };
-        delete canvasDataWithoutNetlist.netlist;
-
-        const chatData = canvasDataWithoutNetlist.chatData;
-        const canvasDataWithoutChat = { ...canvasDataWithoutNetlist };
+        // Extract chat data before loading canvas
+        const chatData = currentProject.canvas_settings.chatData;
+        const canvasDataWithoutChat = { ...currentProject.canvas_settings };
         delete canvasDataWithoutChat.chatData;
 
         // Load circuit data to recreate components
         if (currentCircuit) {
-          await loadCanvasFromCircuit(canvas, currentCircuit);
+          console.log("🔄 Loading components using logical circuit loader...", {
+            componentCount: currentCircuit.components?.length || 0,
+            firstComponent: currentCircuit.components?.[0],
+          });
+
+          try {
+            await loadCanvasFromLogicalCircuit(canvas, currentCircuit as any);
+            console.log("✅ Logical circuit loading completed");
+
+            // DEBUG: Check how many objects are actually on the canvas
+            const canvasObjects = canvas.getObjects();
+            console.log("🔍 Canvas objects after component loading:", {
+              totalObjects: canvasObjects.length,
+              components: canvasObjects.filter(
+                (obj: any) => obj.data?.type === "component"
+              ).length,
+              groups: canvasObjects.filter((obj: any) => obj.type === "group")
+                .length,
+              objectTypes: canvasObjects.map((obj: any) => ({
+                type: obj.type,
+                dataType: obj.data?.type,
+              })),
+            });
+          } catch (error) {
+            console.error(
+              "❌ Logical circuit loading failed, trying fallback:",
+              error
+            );
+
+            // Fallback to basic circuit loader if logical fails
+            const { loadCanvasFromCircuit } = await import(
+              "@/canvas/utils/canvasSerializer"
+            );
+            await loadCanvasFromCircuit(canvas, currentCircuit);
+            console.log("✅ Fallback circuit loading completed");
+          }
         }
 
-        // Restore netlist if available
+        // Restore netlist if available - Use currentNetlist which comes from project_versions.netlist_data
         if (
-          savedNetlist &&
-          Array.isArray(savedNetlist) &&
-          savedNetlist.length > 0
+          currentNetlist &&
+          Array.isArray(currentNetlist) &&
+          currentNetlist.length > 0
         ) {
-          console.log("🔗 Restoring netlist:", {
-            netCount: savedNetlist.length,
-            totalConnections: savedNetlist.reduce(
+          console.log("🔗 Restoring netlist from netlist_data:", {
+            netCount: currentNetlist.length,
+            totalConnections: currentNetlist.reduce(
               (sum, net) => sum + (net.connections?.length || 0),
               0
             ),
           });
 
           // Dispatch custom event to notify wiring tool of restored netlist
+          // Fix event structure to match what the listener expects
+          // IMPORTANT: Delay netlist restoration to ensure components are fully loaded first
           setTimeout(() => {
             console.log(
               "🚀 Dispatching netlistRestored event with",
-              savedNetlist.length,
-              "nets"
+              currentNetlist.length,
+              "nets (delayed to ensure components are ready)"
             );
             window.dispatchEvent(
               new CustomEvent("netlistRestored", {
-                detail: { netlist: savedNetlist },
+                detail: { netlist: { nets: currentNetlist } },
               })
             );
-          }, 200); // Small delay to ensure wiring tool is ready
+          }, 1000); // Increased delay to 1 second to ensure all components are fully loaded
         }
 
         // Then apply any additional canvas layout data from canvasDataWithoutChat

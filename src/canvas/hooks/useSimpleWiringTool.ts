@@ -34,6 +34,14 @@ interface UseSimpleWiringToolReturn {
   nets: any[];
   setNetlist: (nets: any[]) => void;
   updateWiresForComponent: (componentId: string) => void;
+  registerRestoredWire: (
+    wire: fabric.Line | fabric.Path,
+    fromComponentId: string,
+    fromPinNumber: string,
+    toComponentId: string,
+    toPinNumber: string
+  ) => void;
+  refreshAllJunctionDots: () => void; // Add junction dot refresh function
 }
 
 export function useSimpleWiringTool({
@@ -459,6 +467,32 @@ export function useSimpleWiringTool({
     getWireSegments,
     doLinesIntersect,
     createJunctionDot,
+  ]);
+
+  // Comprehensive junction dot refresh - clears all and recalculates based on current wires
+  const refreshAllJunctionDots = useCallback(() => {
+    if (!canvas) return;
+
+    logger.wire("🔄 Refreshing all junction dots (clear + recalculate)");
+
+    // Clear all existing junction dots
+    clearJunctionDots();
+
+    // Add endpoint dots for all current connections
+    connections.forEach((connection) => {
+      addWireEndpointDots(connection.wire);
+    });
+
+    // Recalculate all intersection dots
+    addWireIntersectionDots();
+
+    logger.wire("✅ Junction dots refresh completed");
+  }, [
+    canvas,
+    connections,
+    clearJunctionDots,
+    addWireEndpointDots,
+    addWireIntersectionDots,
   ]);
 
   // Create an orthogonal wire between two pins (KiCad style - only 90° angles)
@@ -1185,45 +1219,10 @@ export function useSimpleWiringTool({
         `📍 Found ${connectedConnections.length} wires connected to component`
       );
 
-      // Clear pin connection dots only for the specific wires we're updating
-      const dotsToRemove: fabric.Object[] = [];
-      const canvasObjects = canvas.getObjects();
-
-      connectedConnections.forEach((connection) => {
-        const endpoints = getWireEndpoints(connection.wire);
-        if (endpoints) {
-          // Find dots that are close to this wire's endpoints
-          canvasObjects.forEach((obj) => {
-            if (
-              obj.type === "circle" &&
-              (obj as any).data?.type === "junctionDot" &&
-              (obj as any).data?.pinConnection
-            ) {
-              const objCenter = { x: obj.left || 0, y: obj.top || 0 };
-              const distanceToStart = Math.sqrt(
-                Math.pow(objCenter.x - endpoints.start.x, 2) +
-                  Math.pow(objCenter.y - endpoints.start.y, 2)
-              );
-              const distanceToEnd = Math.sqrt(
-                Math.pow(objCenter.x - endpoints.end.x, 2) +
-                  Math.pow(objCenter.y - endpoints.end.y, 2)
-              );
-
-              // Mark dot for removal if it's close to either endpoint (within 5px tolerance)
-              if (
-                (distanceToStart < 5 || distanceToEnd < 5) &&
-                !dotsToRemove.includes(obj)
-              ) {
-                dotsToRemove.push(obj);
-              }
-            }
-          });
-        }
-      });
-
-      // Remove the marked dots
-      dotsToRemove.forEach((dot) => canvas.remove(dot));
-      logger.wire(`🔴 Removed ${dotsToRemove.length} old endpoint dots`);
+      // Clear ALL junction dots to ensure clean state before recalculation
+      // This prevents orphaned intersection dots when wires are moved
+      logger.wire("🧹 Clearing all junction dots before recalculation");
+      clearJunctionDots();
 
       // Update each connected wire with intelligent rerouting
       connectedConnections.forEach((connection, index) => {
@@ -1367,6 +1366,11 @@ export function useSimpleWiringTool({
         addWireEndpointDots(connection.wire);
       });
 
+      // Recalculate intersection dots for all wires after component movement
+      // This ensures junction dots appear/disappear correctly when wires intersect
+      logger.wire("🔍 Recalculating intersection dots after wire updates");
+      addWireIntersectionDots();
+
       // Force canvas redraw to show updates
       canvas.renderAll();
       logger.wire(
@@ -1481,6 +1485,36 @@ export function useSimpleWiringTool({
       });
     },
     [updateWiresForComponent]
+  );
+
+  // Register a wire that was restored from netlist data
+  const registerRestoredWire = useCallback(
+    (
+      wire: fabric.Line | fabric.Path,
+      fromComponentId: string,
+      fromPinNumber: string,
+      toComponentId: string,
+      toPinNumber: string
+    ) => {
+      logger.wire("📝 Registering restored wire with wiring tool:", {
+        fromComponentId,
+        fromPinNumber,
+        toComponentId,
+        toPinNumber,
+      });
+
+      const wireConnection: WireConnection = {
+        fromComponentId,
+        fromPinNumber,
+        toComponentId,
+        toPinNumber,
+        wire,
+      };
+
+      setConnections((prev) => [...prev, wireConnection]);
+      logger.wire("✅ Restored wire registered successfully");
+    },
+    []
   );
 
   // Set up component movement listener
@@ -1601,5 +1635,7 @@ export function useSimpleWiringTool({
     nets: elasticWires ? elasticWire.nets : netlist.nets,
     setNetlist: elasticWires ? elasticWire.setNetlist : netlist.setNets,
     updateWiresForComponent,
+    registerRestoredWire,
+    refreshAllJunctionDots, // Add the junction dot refresh function
   };
 }

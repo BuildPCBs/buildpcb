@@ -165,16 +165,36 @@ export async function loadCanvasFromLogicalCircuit(
     await new Promise((resolve) => setTimeout(resolve, 50)); // Small delay to ensure clearing is complete
 
     const totalComponents = circuit.components?.length || 0;
+
+    // DEBUGGING: Check for duplicate component IDs that could cause overwrites
+    const componentIds = circuit.components?.map((c) => c.id) || [];
+    const uniqueIds = new Set(componentIds);
+    if (componentIds.length !== uniqueIds.size) {
+      console.error(`🚨 DUPLICATE COMPONENT IDs DETECTED!`, {
+        totalComponents: componentIds.length,
+        uniqueIds: uniqueIds.size,
+        duplicates: componentIds.filter(
+          (id, index) => componentIds.indexOf(id) !== index
+        ),
+      });
+    }
+
     console.log(
       `🧹 Canvas cleared, starting component loading with ${totalComponents} components`
+    );
+    console.log(`📋 Component IDs to load:`, componentIds);
+
+    // CRITICAL TEST: This log should ALWAYS appear
+    console.log(
+      `🔥 LOGICALSERIALIZER: Starting component batch processing - THIS LOG SHOULD ALWAYS APPEAR`
     );
 
     // Import required functions
     const { canvasCommandManager } = await import("../canvas-command-manager");
     const { supabase } = await import("../../lib/supabase");
 
-    // Process components in parallel with concurrency control
-    const MAX_CONCURRENT_COMPONENTS = 5; // Limit concurrent operations
+    // Process components in smaller batches with better timing control
+    const MAX_CONCURRENT_COMPONENTS = 2; // Reduced to prevent overload
     const componentPromises: Promise<void>[] = [];
 
     for (let i = 0; i < totalComponents; i += MAX_CONCURRENT_COMPONENTS) {
@@ -188,7 +208,12 @@ export async function loadCanvasFromLogicalCircuit(
             console.log(
               `🔍 Loading component ${globalIndex + 1}/${totalComponents}: ${
                 component.databaseId
-              }`
+              }`,
+              {
+                originalId: component.id,
+                databaseId: component.databaseId,
+                position: component.position,
+              }
             );
 
             // Fetch component from database with timeout
@@ -237,37 +262,114 @@ export async function loadCanvasFromLogicalCircuit(
                 );
               }, 15000); // 15 second timeout for component addition
 
-              canvasCommandManager.executeCommand("component:add", {
-                id: dbComponent.uid,
-                type: dbComponent.type,
-                svgPath: dbComponent.symbol_svg || "",
-                name: dbComponent.name,
-                category: dbComponent.category,
-                description: dbComponent.description,
-                manufacturer: dbComponent.manufacturer,
-                partNumber: dbComponent.part_number,
-                pinCount: dbComponent.symbol_data?.pins?.length || 0,
-                databaseComponent: dbComponent,
-                x: component.position.x,
-                y: component.position.y,
-                // CRITICAL: Pass the saved component ID to maintain wire connections
-                preservedComponentId: component.id,
-              });
+              // CRITICAL CHECK: Monitor canvas state before component addition
+              const canvasBeforeAdd = canvas.getObjects();
+              console.log(
+                `📊 BEFORE adding component ${globalIndex + 1}: ${
+                  canvasBeforeAdd.length
+                } objects on canvas`
+              );
 
-              // Listen for completion (this is a simplified approach - in practice you'd need a proper completion signal)
+              console.log(
+                `🎯 EXECUTING component:add command for ${dbComponent.name}`
+              );
+              const commandResult = canvasCommandManager.executeCommand(
+                "component:add",
+                {
+                  id: dbComponent.uid,
+                  type: dbComponent.type,
+                  svgPath: dbComponent.symbol_svg || "",
+                  name: dbComponent.name,
+                  category: dbComponent.category,
+                  description: dbComponent.description,
+                  manufacturer: dbComponent.manufacturer,
+                  partNumber: dbComponent.part_number,
+                  pinCount: dbComponent.symbol_data?.pins?.length || 0,
+                  databaseComponent: dbComponent,
+                  x: component.position.x,
+                  y: component.position.y,
+                  // CRITICAL: Pass the saved component ID to maintain wire connections
+                  preservedComponentId: component.id,
+                }
+              );
+
+              console.log(
+                `🎯 executeCommand result for ${dbComponent.name}:`,
+                commandResult
+              );
+
+              // Add immediate canvas check after command
+              const canvasAfterCommand = canvas.getObjects();
+              console.log(
+                `📊 IMMEDIATELY after executeCommand: ${canvasAfterCommand.length} objects on canvas`
+              );
+
+              console.log(
+                `🆔 Component ${globalIndex + 1}: db=${
+                  dbComponent.uid
+                }, preserved=${component.id}, position=(${
+                  component.position.x
+                }, ${component.position.y})`
+              );
+
+              // CRITICAL CHECK: Ensure database UIDs are unique
+              console.log(
+                `🔍 Database UID check: ${
+                  dbComponent.uid
+                }, type: ${typeof dbComponent.uid}`
+              );
+
+              // Listen for completion with proper timeout and retry mechanism
               setTimeout(() => {
                 clearTimeout(timeout);
                 resolve();
-              }, 100); // Small delay to allow command to start processing
+              }, 1000); // Increased delay significantly to allow component creation to complete properly
             });
 
             await addPromise;
+
+            // DEBUGGING: Check if component was actually added to canvas
+            const canvasObjects = canvas.getObjects();
+            const justAddedComponent = canvasObjects.find(
+              (obj: any) => obj.data?.componentId === component.id
+            );
+
+            console.log(
+              `🎯 Canvas verification: instance=${
+                (canvas as any)._id || "no-id"
+              }, component=${component.id}`
+            );
 
             console.log(
               `✅ Added component ${globalIndex + 1}/${totalComponents}: ${
                 dbComponent.name
               } at (${component.position.x}, ${component.position.y})`
             );
+            console.log(
+              `🔍 Component verification: ${component.id} found on canvas:`,
+              !!justAddedComponent
+            );
+            console.log(
+              `📊 Canvas state: ${canvasObjects.length} total objects, ${
+                canvasObjects.filter((obj: any) => obj.data?.componentId).length
+              } components`
+            );
+
+            if (!justAddedComponent) {
+              console.error(
+                `❌ CRITICAL: Component ${component.id} was not found on canvas after being added!`
+              );
+              // Extra debugging - show all objects on canvas
+              console.log(
+                `🔍 All canvas objects:`,
+                canvasObjects.map((obj: any, idx) => ({
+                  index: idx,
+                  type: obj.type,
+                  data: obj.data,
+                  hasComponentId: !!obj.data?.componentId,
+                }))
+              );
+            }
           } catch (error) {
             const errorMessage =
               error instanceof Error ? error.message : "Unknown error";
@@ -291,12 +393,50 @@ export async function loadCanvasFromLogicalCircuit(
 
       // Wait for current batch to complete before starting next batch
       await Promise.allSettled(batchPromises);
+
+      // Add delay between batches to prevent system overload
+      if (i + MAX_CONCURRENT_COMPONENTS < totalComponents) {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
     }
 
     // Wait for all component loading to complete
     const results = await Promise.allSettled(componentPromises);
+
+    // CRITICAL TEST: This should appear when components finish processing
+    console.log(
+      `🔥🔥🔥 COMPONENT PROCESSING FINISHED - LOOK FOR THIS LOG! 🔥🔥🔥`
+    );
+    console.log(
+      `🔥 Results status:`,
+      results.map((r) => r.status)
+    );
+
     const successful = results.filter((r) => r.status === "fulfilled").length;
     const failed = results.filter((r) => r.status === "rejected").length;
+
+    console.log(
+      `📊 Component loading results: ${successful} successful, ${failed} failed`
+    );
+
+    // DEBUG: Check what components are actually on the canvas
+    const canvasObjects = canvas.getObjects();
+    const componentObjects = canvasObjects.filter(
+      (obj: any) => obj.data?.type === "component" || obj.type === "group"
+    );
+    console.log("🔍 Components found on canvas after loading:", {
+      totalCanvasObjects: canvasObjects.length,
+      componentCount: componentObjects.length,
+      componentDetails: componentObjects.map((obj: any) => ({
+        type: obj.type,
+        componentId: obj.data?.componentId,
+        dataType: obj.data?.type,
+        hasData: !!obj.data,
+      })),
+    });
+
+    // Add a longer delay to ensure all components are fully processed
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     console.log(
       `📊 Component loading complete: ${successful} successful, ${failed} failed out of ${totalComponents} total`
@@ -308,70 +448,12 @@ export async function loadCanvasFromLogicalCircuit(
       );
     }
 
-    // Restore wire connections after a delay to ensure components are fully loaded
+    // DISABLED: Wire connections are now handled by netlist restoration system
+    // This prevents duplicate wire creation and ID conflicts
     if (circuit.connections && circuit.connections.length > 0) {
       console.log(
-        `🔗 Restoring ${circuit.connections.length} wire connections`
+        `🔗 Skipping ${circuit.connections.length} wire connections - will be handled by netlist restoration`
       );
-
-      // Wait for components to be properly added to canvas before restoring wires
-      await new Promise((resolve) => setTimeout(resolve, 200));
-
-      for (const connection of circuit.connections) {
-        try {
-          console.log(
-            `🔗 Restoring wire: ${connection.from.componentId}:${connection.from.pin} → ${connection.to.componentId}:${connection.to.pin}`
-          );
-
-          // Find the actual components on the canvas to verify they exist
-          const canvasObjects = canvas.getObjects();
-          const fromComponent = canvasObjects.find((obj) => {
-            const objData = (obj as any).data;
-            return objData?.componentId === connection.from.componentId;
-          });
-          const toComponent = canvasObjects.find((obj) => {
-            const objData = (obj as any).data;
-            return objData?.componentId === connection.to.componentId;
-          });
-
-          if (!fromComponent) {
-            console.error(
-              `❌ Source component not found: ${connection.from.componentId}`
-            );
-            continue;
-          }
-          if (!toComponent) {
-            console.error(
-              `❌ Target component not found: ${connection.to.componentId}`
-            );
-            continue;
-          }
-
-          console.log(`✅ Found both components for wire restoration`);
-
-          // Execute wire:add command
-          const success = canvasCommandManager.executeCommand("wire:add", {
-            fromComponentId: connection.from.componentId,
-            fromPinNumber: connection.from.pin,
-            toComponentId: connection.to.componentId,
-            toPinNumber: connection.to.pin,
-            netId: (connection as any).properties?.netId,
-            path: (connection as any).properties?.path,
-          });
-
-          if (!success) {
-            console.error(
-              `❌ Failed to restore wire: ${connection.from.componentId} → ${connection.to.componentId}`
-            );
-          } else {
-            console.log(
-              `✅ Restored wire: ${connection.from.componentId} → ${connection.to.componentId}`
-            );
-          }
-        } catch (error) {
-          console.error(`❌ Error restoring wire ${connection.id}:`, error);
-        }
-      }
     }
 
     // NEW: Restore netlist data if provided

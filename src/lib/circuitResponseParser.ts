@@ -493,7 +493,7 @@ async function addComponentToCanvas(
 }
 
 /**
- * Remove component from canvas
+ * Remove component from canvas with proper wire cleanup
  */
 async function removeComponentFromCanvas(
   componentId: string,
@@ -506,8 +506,17 @@ async function removeComponentFromCanvas(
   );
 
   if (componentToRemove) {
+    // Trigger a custom event that the canvas can handle with proper cleanup
+    const deleteEvent = new CustomEvent("deleteComponent", {
+      detail: { componentId, component: componentToRemove },
+    });
+    window.dispatchEvent(deleteEvent);
+
+    // Fallback: basic removal if no event handler
     canvas.remove(componentToRemove);
     canvas.renderAll();
+
+    console.log(`Component ${componentId} removed from canvas`);
   } else {
     console.warn(`Component ${componentId} not found on canvas`);
   }
