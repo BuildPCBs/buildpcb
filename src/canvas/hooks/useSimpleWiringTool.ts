@@ -1198,6 +1198,32 @@ export function useSimpleWiringTool({
       );
       logger.wire("📊 Current connections count:", connections.length);
 
+      // DEBUG: Check component structure before wire updates
+      const componentObj = canvas
+        .getObjects()
+        .find(
+          (obj: any) =>
+            obj.data?.componentId === componentId || obj.id === componentId
+        );
+      if (componentObj && componentObj.type === "group") {
+        const groupObjects = (componentObj as fabric.Group).getObjects();
+        const pins = groupObjects.filter(
+          (obj: any) => obj.data?.type === "pin"
+        );
+        logger.wire(
+          `🔍 Component ${componentId} structure before wire update:`,
+          {
+            totalObjects: groupObjects.length,
+            pins: pins.length,
+            pinDetails: pins.map((pin: any) => ({
+              id: pin.data?.pinId,
+              visible: pin.visible,
+              opacity: pin.opacity,
+            })),
+          }
+        );
+      }
+
       // Get all objects on canvas for obstacle detection
       const allObjects = canvas.getObjects();
       const obstacles = allObjects.filter(
@@ -1415,6 +1441,26 @@ export function useSimpleWiringTool({
             }
           }
         });
+      }
+
+      // DEBUG: Check component structure after wire updates
+      if (componentObj && componentObj.type === "group") {
+        const groupObjects = (componentObj as fabric.Group).getObjects();
+        const pins = groupObjects.filter(
+          (obj: any) => obj.data?.type === "pin"
+        );
+        logger.wire(
+          `🔍 Component ${componentId} structure after wire update:`,
+          {
+            totalObjects: groupObjects.length,
+            pins: pins.length,
+            pinDetails: pins.map((pin: any) => ({
+              id: pin.data?.pinId,
+              visible: pin.visible,
+              opacity: pin.opacity,
+            })),
+          }
+        );
       }
     },
     [

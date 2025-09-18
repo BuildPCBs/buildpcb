@@ -21,6 +21,7 @@ import { ComponentPickerOverlay } from "./ui/ComponentPickerOverlay";
 import { CanvasProvider } from "../contexts/CanvasContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { supabase } from "@/lib/supabase";
+import { EditableProjectName } from "@/components/project/EditableProjectName";
 
 interface IDEFabricCanvasProps {
   className?: string;
@@ -1303,6 +1304,23 @@ export function IDEFabricCanvas({
       // Show rulers when any object starts moving
       setAreRulersVisible(true);
 
+      // DEBUG: Track component pins during movement
+      if (movingObject && movingObject.type === "group") {
+        const groupObjects = (movingObject as fabric.Group).getObjects();
+        const pins = groupObjects.filter((obj: any) => obj.data?.type === "pin");
+        const visiblePins = pins.filter((pin: any) => pin.visible !== false);
+
+        logger.canvas(`🎯 Component moving - pins status:`, {
+          totalPins: pins.length,
+          visiblePins: visiblePins.length,
+          pinDetails: pins.map((pin: any) => ({
+            id: pin.data?.pinId,
+            visible: pin.visible,
+            opacity: pin.opacity,
+          })),
+        });
+      }
+
       // PART 2: Snap-to-Grid Logic
       if (
         movingObject &&
@@ -1351,6 +1369,23 @@ export function IDEFabricCanvas({
 
     const handleObjectMoved = (e: any) => {
       const movedObject = e.target;
+
+      // DEBUG: Track component pins after movement
+      if (movedObject && movedObject.type === "group") {
+        const groupObjects = (movedObject as fabric.Group).getObjects();
+        const pins = groupObjects.filter((obj: any) => obj.data?.type === "pin");
+        const visiblePins = pins.filter((pin: any) => pin.visible !== false);
+
+        logger.canvas(`✅ Component moved - pins status:`, {
+          totalPins: pins.length,
+          visiblePins: visiblePins.length,
+          pinDetails: pins.map((pin: any) => ({
+            id: pin.data?.pinId,
+            visible: pin.visible,
+            opacity: pin.opacity,
+          })),
+        });
+      }
 
       // Remove alignment guides when movement stops
       removeAlignmentGuides();
@@ -2482,19 +2517,33 @@ export function IDEFabricCanvas({
             {!autoSave.saving && !autoSave.isDirty && (
               <div className="w-2 h-2 bg-green-400 rounded-full"></div>
             )}
-            <span>
-              {autoSave.saving && "Saving..."}
-              {!autoSave.saving && autoSave.isDirty && "Unsaved changes"}
-              {!autoSave.saving &&
-                !autoSave.isDirty &&
-                autoSave.lastSaved &&
-                `Saved ${autoSave.lastSaved.toLocaleTimeString()}`}
-              {(!autoSave.saving &&
-                !autoSave.isDirty &&
-                !autoSave.lastSaved &&
-                currentProject.name) ||
-                "Project"}
-            </span>
+            {autoSave.saving ? (
+              <span>Saving...</span>
+            ) : autoSave.isDirty ? (
+              <span>Unsaved changes</span>
+            ) : autoSave.lastSaved ? (
+              <div className="flex items-center gap-2">
+                <span>Saved {autoSave.lastSaved.toLocaleTimeString()}</span>
+                <span className="text-gray-300">•</span>
+                <EditableProjectName
+                  onRenameSuccess={(newName) => {
+                    console.log(`✅ Project renamed to: ${newName}`);
+                  }}
+                  onRenameError={(error) => {
+                    console.error(`❌ Failed to rename project: ${error}`);
+                  }}
+                />
+              </div>
+            ) : (
+              <EditableProjectName
+                onRenameSuccess={(newName) => {
+                  console.log(`✅ Project renamed to: ${newName}`);
+                }}
+                onRenameError={(error) => {
+                  console.error(`❌ Failed to rename project: ${error}`);
+                }}
+              />
+            )}
           </div>
           {autoSave.error && (
             <div className="text-xs text-red-300 mt-1">

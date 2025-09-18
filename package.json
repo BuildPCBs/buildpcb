@@ -1,6 +1,6 @@
 {
   "name": "buildpcb",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -17,7 +17,11 @@
     "populate:svgs": "npx tsx scripts/populate-svg-symbols.ts",
     "update:components": "npx tsx scripts/update_component_data.ts",
     "parse:symbols": "npx tsx scripts/parse_kicad_symbols.ts",
-    "check:components": "npx tsx scripts/check_components.ts"
+    "check:components": "npx tsx scripts/check_components.ts",
+    "version:patch": "standard-version --release-as patch",
+    "version:minor": "standard-version --release-as minor",
+    "version:major": "standard-version --release-as major",
+    "version:status": "echo 'Current version:' && grep '\"version\"' package.json && echo 'Last 5 commits:' && git log --oneline -5"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.0",
@@ -48,6 +52,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.4.4",
+    "standard-version": "^9.5.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

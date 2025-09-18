@@ -185,18 +185,75 @@ export const createSimpleComponent = (
     centeredRotation: true, // Enable smooth rotation around center
   });
 
-  // Add to canvas
-  logger.canvas(
-    `Adding component to canvas at position:`,
-    component.left,
-    component.top
-  );
-  logger.canvas(`Canvas objects before add:`, fabricCanvas.getObjects().length);
+  // Add hover event handlers to show/hide pins
+  logger.canvas(`🎯 Setting up pin hover handlers for ${componentInfo.name}`);
 
-  fabricCanvas.add(component);
+  // Function to show pins on component hover
+  const showPins = () => {
+    pin1.set({
+      visible: true,
+      opacity: 1,
+      evented: true,
+    });
+    pin2.set({
+      visible: true,
+      opacity: 1,
+      evented: true,
+    });
+    fabricCanvas.renderAll();
+  };
 
-  logger.canvas(`Canvas objects after add:`, fabricCanvas.getObjects().length);
-  logger.canvas(`Component added successfully:`, componentInfo.name);
+  // Function to hide pins when not hovering
+  const hidePins = () => {
+    pin1.set({
+      visible: false,
+      opacity: 0,
+      evented: false,
+    });
+    pin2.set({
+      visible: false,
+      opacity: 0,
+      evented: false,
+    });
+    fabricCanvas.renderAll();
+  };
+
+  // Add hover event handlers to the component group
+  component.on("mouseover", showPins);
+  component.on("mouseout", hidePins);
+
+  // Also add hover handlers to individual pins to keep them visible when hovering directly on pins
+  pin1.on("mouseover", showPins);
+  pin1.on("mouseout", (e: any) => {
+    // Only hide pins if mouse is not over the component group
+    const pointer = fabricCanvas.getPointer(e.e);
+    const componentBounds = component.getBoundingRect();
+    const isOverComponent =
+      pointer.x >= componentBounds.left &&
+      pointer.x <= componentBounds.left + componentBounds.width &&
+      pointer.y >= componentBounds.top &&
+      pointer.y <= componentBounds.top + componentBounds.height;
+
+    if (!isOverComponent) {
+      hidePins();
+    }
+  });
+
+  pin2.on("mouseover", showPins);
+  pin2.on("mouseout", (e: any) => {
+    // Only hide pins if mouse is not over the component group
+    const pointer = fabricCanvas.getPointer(e.e);
+    const componentBounds = component.getBoundingRect();
+    const isOverComponent =
+      pointer.x >= componentBounds.left &&
+      pointer.x <= componentBounds.left + componentBounds.width &&
+      pointer.y >= componentBounds.top &&
+      pointer.y <= componentBounds.top + componentBounds.height;
+
+    if (!isOverComponent) {
+      hidePins();
+    }
+  });
 
   fabricCanvas.renderAll();
 
@@ -302,6 +359,74 @@ export const recreateSimpleComponentPins = (
     hasControls: true,
     hasBorders: true,
     centeredRotation: true,
+  });
+
+  // Add hover event handlers to the recreated component
+  logger.canvas(`🎯 Setting up pin hover handlers for recreated component`);
+
+  // Function to show pins on component hover
+  const showPins = () => {
+    pin1.set({
+      visible: true,
+      opacity: 1,
+      evented: true,
+    });
+    pin2.set({
+      visible: true,
+      opacity: 1,
+      evented: true,
+    });
+    fabricCanvas.renderAll();
+  };
+
+  // Function to hide pins when not hovering
+  const hidePins = () => {
+    pin1.set({
+      visible: false,
+      opacity: 0,
+      evented: false,
+    });
+    pin2.set({
+      visible: false,
+      opacity: 0,
+      evented: false,
+    });
+    fabricCanvas.renderAll();
+  };
+
+  // Add hover event handlers to the component group
+  newComponent.on("mouseover", showPins);
+  newComponent.on("mouseout", hidePins);
+
+  // Also add hover handlers to individual pins
+  pin1.on("mouseover", showPins);
+  pin1.on("mouseout", (e: any) => {
+    const pointer = fabricCanvas.getPointer(e.e);
+    const componentBounds = newComponent.getBoundingRect();
+    const isOverComponent =
+      pointer.x >= componentBounds.left &&
+      pointer.x <= componentBounds.left + componentBounds.width &&
+      pointer.y >= componentBounds.top &&
+      pointer.y <= componentBounds.top + componentBounds.height;
+
+    if (!isOverComponent) {
+      hidePins();
+    }
+  });
+
+  pin2.on("mouseover", showPins);
+  pin2.on("mouseout", (e: any) => {
+    const pointer = fabricCanvas.getPointer(e.e);
+    const componentBounds = newComponent.getBoundingRect();
+    const isOverComponent =
+      pointer.x >= componentBounds.left &&
+      pointer.x <= componentBounds.left + componentBounds.width &&
+      pointer.y >= componentBounds.top &&
+      pointer.y <= componentBounds.top + componentBounds.height;
+
+    if (!isOverComponent) {
+      hidePins();
+    }
   });
 
   logger.canvas(

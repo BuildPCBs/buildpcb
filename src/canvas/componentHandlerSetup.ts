@@ -238,8 +238,55 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
             } objects`
           );
 
-          // Small delay to ensure component is fully added before verification
-          await new Promise((resolve) => setTimeout(resolve, 10));
+          // 8. Add hover event handlers to show/hide pins
+          console.log(`🎯 Setting up pin hover handlers for ${componentId}`);
+
+          // Function to show pins on component hover
+          const showPins = () => {
+            interactivePins.forEach((pin) => {
+              pin.set({
+                visible: true,
+                opacity: 1,
+                evented: true,
+              });
+            });
+            currentCanvas.renderAll();
+          };
+
+          // Function to hide pins when not hovering
+          const hidePins = () => {
+            interactivePins.forEach((pin) => {
+              pin.set({
+                visible: false,
+                opacity: 0,
+                evented: false,
+              });
+            });
+            currentCanvas.renderAll();
+          };
+
+          // Add hover event handlers to the component group
+          componentSandwich.on("mouseover", showPins);
+          componentSandwich.on("mouseout", hidePins);
+
+          // Also add hover handlers to individual pins to keep them visible when hovering directly on pins
+          interactivePins.forEach((pin) => {
+            pin.on("mouseover", showPins);
+            pin.on("mouseout", (e: any) => {
+              // Only hide pins if mouse is not over the component group
+              const pointer = currentCanvas.getPointer(e.e);
+              const componentBounds = componentSandwich.getBoundingRect();
+              const isOverComponent =
+                pointer.x >= componentBounds.left &&
+                pointer.x <= componentBounds.left + componentBounds.width &&
+                pointer.y >= componentBounds.top &&
+                pointer.y <= componentBounds.top + componentBounds.height;
+
+              if (!isOverComponent) {
+                hidePins();
+              }
+            });
+          });
 
           // DEBUGGING: Verify the component was actually added and doesn't conflict
           const canvasObjects = currentCanvas.getObjects();

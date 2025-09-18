@@ -288,6 +288,55 @@ export const recreateIntelligentComponentPins = (
     centeredRotation: true,
   });
 
+  // Add hover event handlers to show/hide pins
+  console.log(`🎯 Setting up pin hover handlers for intelligent component`);
+
+  // Function to show pins on component hover
+  const showPins = () => {
+    newPins.forEach((pin) => {
+      pin.set({
+        visible: true,
+        opacity: 1,
+        evented: true,
+      });
+    });
+    fabricCanvas.renderAll();
+  };
+
+  // Function to hide pins when not hovering
+  const hidePins = () => {
+    newPins.forEach((pin) => {
+      pin.set({
+        visible: false,
+        opacity: 0,
+        evented: false,
+      });
+    });
+    fabricCanvas.renderAll();
+  };
+
+  // Add hover event handlers to the component group
+  newComponent.on("mouseover", showPins);
+  newComponent.on("mouseout", hidePins);
+
+  // Also add hover handlers to individual pins
+  newPins.forEach((pin) => {
+    pin.on("mouseover", showPins);
+    pin.on("mouseout", (e: any) => {
+      const pointer = fabricCanvas.getPointer(e.e);
+      const componentBounds = newComponent.getBoundingRect();
+      const isOverComponent =
+        pointer.x >= componentBounds.left &&
+        pointer.x <= componentBounds.left + componentBounds.width &&
+        pointer.y >= componentBounds.top &&
+        pointer.y <= componentBounds.top + componentBounds.height;
+
+      if (!isOverComponent) {
+        hidePins();
+      }
+    });
+  });
+
   console.log(
     `✅ Intelligent pin recreation: Added ${newPins.length} functional pins to pasted component`
   );
