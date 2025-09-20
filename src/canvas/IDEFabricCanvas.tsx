@@ -4,6 +4,11 @@ import React, { useRef, useEffect, useState, useCallback } from "react";
 import * as fabric from "fabric";
 import { useCanvasZoom } from "./hooks/useCanvasZoom";
 import { useCanvasPan } from "./hooks/useCanvasPan";
+import {
+  debugUndoRedo,
+  debugHistoryStack,
+  debugStateSaving,
+} from "./test-undo-redo";
 import { useCanvasHotkeys } from "./hooks/useCanvasHotkeys";
 import { useSimpleWiringTool } from "./hooks/useSimpleWiringTool";
 import { useCanvasViewport } from "./hooks/useCanvasViewport";
@@ -163,6 +168,13 @@ export function IDEFabricCanvas({
   useEffect(() => {
     if (fabricCanvas && initializeHistory) {
       initializeHistory();
+
+      // Add temporary debug logging
+      const cleanup = debugUndoRedo();
+      debugHistoryStack(fabricCanvas);
+      debugStateSaving(fabricCanvas);
+
+      return cleanup;
     }
   }, [fabricCanvas]); // Remove initializeHistory from deps to prevent re-running
 
@@ -2185,13 +2197,17 @@ export function IDEFabricCanvas({
 
   const handleUndo = () => {
     logger.canvas("--- ACTION START: handleUndo ---");
-    historyUndo();
+    console.log("🔍 DEBUG: handleUndo wrapper called - calling historyUndo");
+    const result = historyUndo();
+    console.log("🔍 DEBUG: historyUndo returned:", result);
     logger.canvas("--- ACTION END: handleUndo ---");
   };
 
   const handleRedo = () => {
     logger.canvas("--- ACTION START: handleRedo ---");
-    historyRedo();
+    console.log("🔍 DEBUG: handleRedo wrapper called - calling historyRedo");
+    const result = historyRedo();
+    console.log("🔍 DEBUG: historyRedo returned:", result);
     logger.canvas("--- ACTION END: handleRedo ---");
   };
 

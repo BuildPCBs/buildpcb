@@ -116,17 +116,17 @@ export function useCanvasHotkeys({
           case "z":
             e.preventDefault();
             if (e.shiftKey) {
-              console.log("TRIGGER: Ctrl/Cmd+Shift+Z shortcut pressed.");
+              console.log("🔍 DEBUG: Ctrl/Cmd+Shift+Z shortcut pressed - calling onRedo");
               onRedo();
             } else {
-              console.log("TRIGGER: Ctrl/Cmd+Z shortcut pressed.");
+              console.log("🔍 DEBUG: Ctrl/Cmd+Z shortcut pressed - calling onUndo");
               onUndo();
             }
             break;
 
           case "y":
             e.preventDefault();
-            console.log("TRIGGER: Ctrl/Cmd+Y shortcut pressed.");
+            console.log("🔍 DEBUG: Ctrl/Cmd+Y shortcut pressed - calling onRedo");
             onRedo();
             break;
 

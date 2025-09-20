@@ -41,14 +41,14 @@ AI-powered PCB design IDE using Next.js 15 + React 19 + TypeScript + Tailwind CS
   - Type safety and performance for large canvases.
 - React Patterns: Functional components, proper deps, memoization, error boundaries.
 
-**Response Format & Communication**
+<!-- **Response Format & Communication**
 
 - Always start with:
   1. What I understand.
   2. My approach.
   3. Expected outcome.
 - Tool Usage: Focus on actions, not tools; efficient reads.
-- Code Presentation: Markdown, backticks for files/symbols, explain Fabric.js logic.
+- Code Presentation: Markdown, backticks for files/symbols, explain Fabric.js logic. -->
 
 **Project-Specific Patterns**
 

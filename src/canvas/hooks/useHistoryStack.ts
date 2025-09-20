@@ -18,32 +18,35 @@ export function useHistoryStack({
   maxHistorySize = 50,
 }: UseHistoryStackProps) {
   const [history, setHistory] = useState<HistoryState[]>([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [historyIndex, setHistoryIndex] = useState(0);
   const isUndoRedoInProgress = useRef(false);
-  const isInitializing = useRef(false);
-  const isHistoryInitialized = useRef(false);
+  const hasInitialized = useRef(false);
 
   // Save current canvas state to history
   const saveState = useCallback(() => {
-    if (!canvas || isUndoRedoInProgress.current) return;
+    console.log("🔍 DEBUG: saveState called", {
+      hasCanvas: !!canvas,
+      isUndoRedoInProgress: isUndoRedoInProgress.current,
+      hasInitialized: hasInitialized.current,
+      currentHistoryLength: history.length,
+      currentHistoryIndex: historyIndex,
+    });
+
+    if (!canvas || isUndoRedoInProgress.current) {
+      console.log("🔍 DEBUG: saveState early return", {
+        reason: !canvas ? "no canvas" : "undo/redo in progress",
+      });
+      return;
+    }
 
     // If history is not initialized, initialize it first
-    if (!isHistoryInitialized.current) {
-      if (isInitializing.current) {
-        console.log(
-          "⏳ History initialization already in progress, waiting..."
-        );
-        return;
-      }
-
+    if (!hasInitialized.current) {
       console.log("🎬 Auto-initializing history before saving state");
-      isInitializing.current = true;
 
       try {
         // Check if canvas is in a valid state
         if (canvas.disposed) {
           console.warn("⚠️ Canvas is disposed, cannot save state");
-          isInitializing.current = false;
           return;
         }
 
@@ -52,7 +55,6 @@ export function useHistoryStack({
         // Additional validation
         if (!canvasState) {
           console.warn("⚠️ Canvas.toObject() returned null/undefined");
-          isInitializing.current = false;
           return;
         }
 
@@ -64,17 +66,18 @@ export function useHistoryStack({
         // Use functional updates to avoid race conditions
         setHistory([initialState]);
         setHistoryIndex(0);
-        isHistoryInitialized.current = true;
+        hasInitialized.current = true;
 
-        console.log("✅ History auto-initialized successfully");
-        isInitializing.current = false;
+        console.log("✅ History auto-initialized successfully", {
+          historyLength: 1,
+          historyIndex: 0,
+        });
 
         // Return after initialization to prevent infinite loop
         // The initialization itself is enough for the first state
         return;
       } catch (error) {
         console.error("❌ Failed to auto-initialize history:", error);
-        isInitializing.current = false;
         return;
       }
     }
@@ -124,7 +127,13 @@ export function useHistoryStack({
       });
 
       setHistoryIndex((prev) => {
-        const newIndex = Math.min(prev + 1, maxHistorySize - 1);
+        // Simply increment to point to the newly added state
+        const newIndex = prev + 1;
+        console.log("🔍 DEBUG: State saved to history", {
+          previousIndex: prev,
+          newIndex: newIndex,
+          historyLength: "will be " + (prev + 2), // prev + 1 for the new item + 1 for display
+        });
         return newIndex;
       });
     } catch (error) {
@@ -140,24 +149,17 @@ export function useHistoryStack({
     }
 
     // Don't reinitialize if already initialized
-    if (isHistoryInitialized.current) {
+    if (hasInitialized.current) {
       console.log("ℹ️ History already initialized, skipping");
       return;
     }
 
-    if (isInitializing.current) {
-      console.log("⏳ History initialization already in progress, skipping");
-      return;
-    }
-
     console.log("🎬 Initializing history stack");
-    isInitializing.current = true;
 
     try {
       // Check if canvas is in a valid state
       if (canvas.disposed) {
         console.warn("⚠️ Canvas is disposed, cannot initialize history");
-        isInitializing.current = false;
         return;
       }
 
@@ -168,7 +170,6 @@ export function useHistoryStack({
         console.warn(
           "⚠️ Canvas.toObject() returned null/undefined during initialization"
         );
-        isInitializing.current = false;
         return;
       }
 
@@ -179,23 +180,39 @@ export function useHistoryStack({
 
       setHistory([initialState]);
       setHistoryIndex(0);
-      isHistoryInitialized.current = true;
-      isInitializing.current = false;
+      hasInitialized.current = true;
     } catch (error) {
       console.error("❌ Failed to initialize history:", error);
-      isInitializing.current = false;
     }
   }, [canvas]); // Remove historyIndex to prevent re-running during initialization
 
   // Undo last action
   const handleUndo = useCallback(() => {
+    console.log("🔍 DEBUG: handleUndo called", {
+      hasCanvas: !!canvas,
+      historyIndex: historyIndex,
+      historyLength: history.length,
+      canUndo: historyIndex > 0 && history.length > 0,
+    });
+
     if (!canvas || historyIndex <= 0 || history.length === 0) {
-      console.log("⚠️ Cannot undo: No previous states available");
+      console.log("⚠️ Cannot undo: No previous states available", {
+        hasCanvas: !!canvas,
+        historyIndex: historyIndex,
+        historyLength: history.length,
+      });
       return false;
     }
 
     const previousStateIndex = historyIndex - 1;
     const previousState = history[previousStateIndex];
+
+    console.log("🔍 DEBUG: Undo details", {
+      currentIndex: historyIndex,
+      previousIndex: previousStateIndex,
+      hasPreviousState: !!previousState,
+      hasCanvasState: !!previousState?.canvasState,
+    });
 
     if (!previousState || !previousState.canvasState) {
       console.log("⚠️ Cannot undo: Invalid previous state");
@@ -210,7 +227,10 @@ export function useHistoryStack({
         canvas.renderAll();
         setHistoryIndex(previousStateIndex);
         isUndoRedoInProgress.current = false;
-        console.log("✅ Undo completed");
+        console.log("✅ Undo completed", {
+          newIndex: previousStateIndex,
+          totalHistory: history.length,
+        });
       });
     } catch (error) {
       console.error("Error during undo operation:", error);
@@ -223,13 +243,32 @@ export function useHistoryStack({
 
   // Redo last undone action
   const handleRedo = useCallback(() => {
+    console.log("🔍 DEBUG: handleRedo called", {
+      hasCanvas: !!canvas,
+      historyIndex: historyIndex,
+      historyLength: history.length,
+      canRedo: historyIndex < history.length - 1,
+    });
+
     if (!canvas || historyIndex >= history.length - 1 || history.length === 0) {
-      console.log("⚠️ Cannot redo: No future states available");
+      console.log("⚠️ Cannot redo: No future states available", {
+        hasCanvas: !!canvas,
+        historyIndex: historyIndex,
+        historyLength: history.length,
+        condition: historyIndex >= history.length - 1 ? "at end" : "no history",
+      });
       return false;
     }
 
     const nextStateIndex = historyIndex + 1;
     const nextState = history[nextStateIndex];
+
+    console.log("🔍 DEBUG: Redo details", {
+      currentIndex: historyIndex,
+      nextIndex: nextStateIndex,
+      hasNextState: !!nextState,
+      hasCanvasState: !!nextState?.canvasState,
+    });
 
     if (!nextState || !nextState.canvasState) {
       console.log("⚠️ Cannot redo: Invalid next state");
@@ -244,7 +283,10 @@ export function useHistoryStack({
         canvas.renderAll();
         setHistoryIndex(nextStateIndex);
         isUndoRedoInProgress.current = false;
-        console.log("✅ Redo completed");
+        console.log("✅ Redo completed", {
+          newIndex: nextStateIndex,
+          totalHistory: history.length,
+        });
       });
     } catch (error) {
       console.error("Error during redo operation:", error);
