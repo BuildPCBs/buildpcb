@@ -8,7 +8,7 @@ import {
   debugUndoRedo,
   debugHistoryStack,
   debugStateSaving,
-} from "./test-undo-redo";
+} from "./undo-redo";
 import { useCanvasHotkeys } from "./hooks/useCanvasHotkeys";
 import { useSimpleWiringTool } from "./hooks/useSimpleWiringTool";
 import { useCanvasViewport } from "./hooks/useCanvasViewport";
