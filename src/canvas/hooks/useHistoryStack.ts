@@ -5,6 +5,7 @@ import * as fabric from "fabric";
 
 interface HistoryState {
   canvasState: any;
+
   timestamp: number;
 }
 
