@@ -1074,6 +1074,7 @@ export function useSimpleWiringTool({
       canvas.selection = true;
       canvas.defaultCursor = "default";
       canvas.hoverCursor = "move";
+      (canvas as any).wireMode = false;
       setPinsVisible(false);
       if (currentWireRef.current) {
         canvas.remove(currentWireRef.current);
@@ -1098,6 +1099,7 @@ export function useSimpleWiringTool({
         canvas.selection = !newMode;
         canvas.defaultCursor = newMode ? "crosshair" : "default";
         canvas.hoverCursor = newMode ? "crosshair" : "move";
+        (canvas as any).wireMode = newMode;
         setPinsVisible(newMode);
         if (!newMode) exitWireMode(); // Now 'exitWireMode' is defined and accessible
       }

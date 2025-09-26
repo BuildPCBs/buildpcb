@@ -243,6 +243,7 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
 
           // Function to show pins on component hover
           const showPins = () => {
+            if (!(currentCanvas as any).wireMode) return; // Only show pins in wire mode
             interactivePins.forEach((pin) => {
               pin.set({
                 visible: true,
@@ -255,6 +256,7 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
 
           // Function to hide pins when not hovering
           const hidePins = () => {
+            if ((currentCanvas as any).wireMode) return; // Don't hide pins in wire mode
             interactivePins.forEach((pin) => {
               pin.set({
                 visible: false,

@@ -956,6 +956,9 @@ export function IDEFabricCanvas({
       backgroundColor: "#FFFFFF", // White background for better grid visibility
     });
 
+    // Initialize wire mode flag on canvas
+    (canvas as any).wireMode = false;
+
     // Create and apply grid pattern immediately
     const gridPattern = createGridPattern(canvas, gridSize, 1); // Start with zoom = 1
     if (gridPattern) {
