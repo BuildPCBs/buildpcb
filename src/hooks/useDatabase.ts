@@ -208,6 +208,37 @@ export function useComponentLibrary() {
     []
   );
 
+  const searchComponentsSemantic = useCallback(
+    async (
+      query: string = "",
+      category?: string,
+      limit = 50,
+      similarityThreshold = 0.7
+    ) => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await DatabaseService.searchComponentsSemantic(
+          query,
+          category,
+          limit,
+          similarityThreshold
+        );
+        setComponents(data);
+        return data;
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Failed to search components semantically"
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
   const fetchCategories = useCallback(async () => {
     try {
       const data = await DatabaseService.getComponentCategories();
@@ -253,6 +284,7 @@ export function useComponentLibrary() {
     loading,
     error,
     searchComponents,
+    searchComponentsSemantic,
     recordUsage,
     refetch: () => {
       fetchCategories();

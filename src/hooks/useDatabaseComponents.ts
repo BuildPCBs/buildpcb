@@ -295,20 +295,23 @@ export function useDatabaseComponents() {
     )}`;
   };
 
-  const searchComponents = (query: string): ComponentDisplayData[] => {
-    if (!query.trim()) return components;
+  const searchComponents = useCallback(
+    (query: string): ComponentDisplayData[] => {
+      if (!query.trim()) return components;
 
-    const searchTerm = query.toLowerCase();
-    return components.filter(
-      (component) =>
-        component.name.toLowerCase().includes(searchTerm) ||
-        component.category.toLowerCase().includes(searchTerm) ||
-        component.description?.toLowerCase().includes(searchTerm) ||
-        component.manufacturer?.toLowerCase().includes(searchTerm) ||
-        component.partNumber?.toLowerCase().includes(searchTerm) ||
-        component.type.toLowerCase().includes(searchTerm)
-    );
-  };
+      const searchTerm = query.toLowerCase();
+      return components.filter(
+        (component) =>
+          component.name.toLowerCase().includes(searchTerm) ||
+          component.category.toLowerCase().includes(searchTerm) ||
+          component.description?.toLowerCase().includes(searchTerm) ||
+          component.manufacturer?.toLowerCase().includes(searchTerm) ||
+          component.partNumber?.toLowerCase().includes(searchTerm) ||
+          component.type.toLowerCase().includes(searchTerm)
+      );
+    },
+    [components]
+  );
 
   const getComponentsByCategory = (
     category: string

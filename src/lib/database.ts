@@ -580,6 +580,62 @@ export class DatabaseService {
   }
 
   /**
+   * Search components using semantic vector similarity
+   */
+  static async searchComponentsSemantic(
+    query: string,
+    category?: string,
+    limit = 50,
+    similarityThreshold = 0.7 // Increase to 0.8-0.9 for more relevant but fewer results
+  ): Promise<Component[]> {
+    if (!query.trim()) {
+      // Fallback to regular search if no query
+      return this.searchComponents(query, category, limit);
+    }
+
+    try {
+      // Call the semantic search API route
+      const searchStart = Date.now();
+      const response = await fetch("/api/semantic-search", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          query,
+          category,
+          limit,
+          similarityThreshold,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.warn(
+          "Semantic search API failed, falling back to text search:",
+          errorText
+        );
+        return this.searchComponents(query, category, limit);
+      }
+
+      const result = await response.json();
+      console.log(
+        `Semantic search took ${Date.now() - searchStart}ms, found ${
+          result.components?.length || 0
+        } results`
+      );
+
+      return result.components || [];
+    } catch (error) {
+      console.warn(
+        "Semantic search failed, falling back to text search:",
+        error
+      );
+      return this.searchComponents(query, category, limit);
+    }
+  }
+
+  /**
    * Get component categories
    */
   static async getComponentCategories(): Promise<string[]> {
