@@ -80,3 +80,5 @@ src/components/debug/CanvasDebug.tsx
 src/components/debug/ComponentVisibilityTest.tsx
 ./scripts/symbols_index_with_pins.json
 symbols_index_with_pins.json
+
+docs/
