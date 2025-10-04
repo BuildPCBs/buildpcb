@@ -37,11 +37,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get full component data for the results from components_v2 using uids
+    // Get full component data for the results from components_index using uids
     if (results.length > 0) {
       const uids = results.map((r: any) => r.id); // r.id contains the uid from embeddings search
       const { data: fullComponents, error: fullError } = await supabase
-        .from("components_v2")
+        .from("components_index")
         .select("*")
         .in("uid", uids);
 

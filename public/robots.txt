@@ -1,0 +1,24 @@
+# BuildPCBs - AI-Powered PCB Design IDE
+# This website provides an interactive platform for designing printed circuit boards (PCBs)
+# using advanced AI assistance, canvas-based editing, and professional engineering tools.
+# Users can create, edit, and collaborate on PCB designs with features like:
+# - Component library with semantic search
+# - Real-time circuit validation
+# - Professional wiring tools
+# - Version control and collaboration
+# - Export capabilities for manufacturing
+
+# Allow all web crawlers to access the entire site
+User-agent: *
+Allow: /
+
+# Disallow access to API routes (internal functionality)
+Disallow: /api/
+
+# Disallow access to admin or sensitive areas (if any)
+Disallow: /admin/
+Disallow: /_next/
+Disallow: /static/
+
+# Sitemap location
+Sitemap: https://buildpcb.com/sitemap.xml

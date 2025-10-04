@@ -1,0 +1,6 @@
+Contact: mailto:security@buildpcb.com
+Contact: https://buildpcb.com/contact
+Encryption: https://buildpcb.com/pgp-key.txt
+Preferred-Languages: en
+Canonical: https://buildpcb.com/.well-known/security.txt
+Policy: https://buildpcb.com/security-policy

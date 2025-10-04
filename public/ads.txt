@@ -1,0 +1,8 @@
+# ads.txt file for BuildPCBs
+# This file lists authorized sellers for programmatic advertising
+
+# Direct
+buildpcb.com, DIRECT
+
+# Note: BuildPCBs currently does not participate in programmatic advertising
+# This file is included for future advertising partnerships

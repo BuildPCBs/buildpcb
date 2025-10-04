@@ -1,0 +1,34 @@
+{
+  "name": "BuildPCBs - AI-Powered PCB Design IDE",
+  "short_name": "BuildPCBs",
+  "description": "Professional PCB design platform with AI assistance, real-time validation, and collaborative tools for engineers",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "orientation": "landscape-primary",
+  "categories": ["productivity", "design", "engineering"],
+  "lang": "en-US",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/link-preview.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    }
+  ]
+}
