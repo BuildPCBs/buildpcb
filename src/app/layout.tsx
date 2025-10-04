@@ -54,6 +54,16 @@ export const metadata: Metadata = {
     ],
     creator: siteConfig.twitterCreator,
   },
+  other: {
+    "og:image:secure_url": siteConfig.ogImage,
+    "og:image:width": "1200",
+    "og:image:height": "630",
+    "og:image:alt": `${siteConfig.name} - AI-Powered PCB Design IDE`,
+    // LinkedIn specific
+    "og:image:type": "image/png",
+    // Discord/Slack rich embeds
+    "twitter:image:alt": `${siteConfig.name} - AI-Powered PCB Design IDE`,
+  },
   robots: {
     index: true,
     follow: true,
