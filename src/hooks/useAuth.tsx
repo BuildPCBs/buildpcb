@@ -115,13 +115,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signInWithOtp = async (email: string) => {
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        shouldCreateUser: true,
-      },
-    });
-    return { error };
+    // Retry mechanism for AuthRetryableFetchError
+    const maxRetries = 3;
+    let lastError;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const { error } = await supabase.auth.signInWithOtp({
+          email,
+          options: {
+            shouldCreateUser: true,
+          },
+        });
+        
+        // If successful or non-retryable error, return immediately
+        if (!error || error.name !== 'AuthRetryableFetchError') {
+          return { error };
+        }
+        
+        lastError = error;
+        
+        // Wait before retry (exponential backoff)
+        if (attempt < maxRetries) {
+          const delay = Math.pow(2, attempt - 1) * 1000; // 1s, 2s, 4s
+          logger.auth(`OTP attempt ${attempt} failed, retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+        
+      } catch (error: any) {
+        lastError = error;
+        if (attempt < maxRetries && error.name === 'AuthRetryableFetchError') {
+          const delay = Math.pow(2, attempt - 1) * 1000;
+          logger.auth(`OTP attempt ${attempt} failed, retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else {
+          break;
+        }
+      }
+    }
+    
+    logger.auth(`All OTP attempts failed after ${maxRetries} retries`);
+    return { error: lastError };
   };
 
   const verifyOtp = async (email: string, token: string) => {

@@ -82,3 +82,5 @@ src/components/debug/ComponentVisibilityTest.tsx
 symbols_index_with_pins.json
 
 docs/
+
+supabase_export/
