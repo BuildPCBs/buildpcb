@@ -127,33 +127,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             shouldCreateUser: true,
           },
         });
-        
+
         // If successful or non-retryable error, return immediately
-        if (!error || error.name !== 'AuthRetryableFetchError') {
+        if (!error || error.name !== "AuthRetryableFetchError") {
           return { error };
         }
-        
+
         lastError = error;
-        
+
         // Wait before retry (exponential backoff)
         if (attempt < maxRetries) {
           const delay = Math.pow(2, attempt - 1) * 1000; // 1s, 2s, 4s
-          logger.auth(`OTP attempt ${attempt} failed, retrying in ${delay}ms...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
+          logger.auth(
+            `OTP attempt ${attempt} failed, retrying in ${delay}ms...`
+          );
+          await new Promise((resolve) => setTimeout(resolve, delay));
         }
-        
       } catch (error: any) {
         lastError = error;
-        if (attempt < maxRetries && error.name === 'AuthRetryableFetchError') {
+        if (attempt < maxRetries && error.name === "AuthRetryableFetchError") {
           const delay = Math.pow(2, attempt - 1) * 1000;
-          logger.auth(`OTP attempt ${attempt} failed, retrying in ${delay}ms...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
+          logger.auth(
+            `OTP attempt ${attempt} failed, retrying in ${delay}ms...`
+          );
+          await new Promise((resolve) => setTimeout(resolve, delay));
         } else {
           break;
         }
       }
     }
-    
+
     logger.auth(`All OTP attempts failed after ${maxRetries} retries`);
     return { error: lastError };
   };

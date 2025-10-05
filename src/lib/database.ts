@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabase, supabaseAdmin } from "@/lib/supabase";
 import { Circuit } from "@/lib/schemas/circuit";
 import { logger } from "./logger";
 
@@ -559,11 +559,11 @@ export class DatabaseService {
     category?: string,
     limit = 50
   ): Promise<Component[]> {
-    let queryBuilder = supabase.from("components").select("*");
+    let queryBuilder = supabaseAdmin.from("components_index").select("*");
 
     if (query) {
-      // Use full-text search
-      queryBuilder = queryBuilder.textSearch("search_vector", query);
+      // Use text search on search_text field
+      queryBuilder = queryBuilder.ilike("search_text", `%${query}%`);
     }
 
     if (category) {
@@ -571,11 +571,13 @@ export class DatabaseService {
     }
 
     const { data, error } = await queryBuilder
-      .order("is_verified", { ascending: false })
       .order("name")
       .limit(limit);
 
-    if (error) throw error;
+    if (error) {
+      console.error('Search components error:', error);
+      throw error;
+    }
     return data || [];
   }
 
@@ -639,12 +641,15 @@ export class DatabaseService {
    * Get component categories
    */
   static async getComponentCategories(): Promise<string[]> {
-    const { data, error } = await supabase
-      .from("components")
+    const { data, error } = await supabaseAdmin
+      .from("components_index")
       .select("category")
       .order("category");
 
-    if (error) throw error;
+    if (error) {
+      console.error('Get categories error:', error);
+      throw error;
+    }
 
     // Return unique categories
     const categories = [...new Set(data?.map((item) => item.category) || [])];
@@ -655,27 +660,109 @@ export class DatabaseService {
    * Get frequently used components for a user
    */
   static async getFrequentComponents(limit = 20): Promise<Component[]> {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return [];
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      
+      if (!user) {
+        // Return some popular components if no user
+        const { data, error } = await supabaseAdmin
+          .from("components_index")
+          .select("*")
+          .limit(limit);
+        
+        if (error) {
+          console.error('Get frequent components (fallback) error:', error);
+          return [];
+        }
+        return data || [];
+      }
 
-    const { data, error } = await supabase
-      .from("component_usage")
-      .select(
-        `
-        component_id,
-        components!inner (*)
-      `
-      )
-      .eq("user_id", user.id)
-      .order("used_at", { ascending: false })
-      .limit(limit);
+      // First, get the component IDs from usage table
+      const { data: usageData, error: usageError } = await supabase
+        .from("component_usage")
+        .select("component_id")
+        .eq("user_id", user.id)
+        .order("used_at", { ascending: false })
+        .limit(limit);
 
-    if (error) throw error;
+      if (usageError) {
+        console.error('Get component usage error:', usageError);
+        // Fallback to popular components using admin client
+        const { data: fallbackData, error: fallbackError } = await supabaseAdmin
+          .from("components_index")
+          .select("*")
+          .limit(limit);
+        
+        if (fallbackError) {
+          console.error('Get frequent components (fallback) error:', fallbackError);
+          return [];
+        }
+        return fallbackData || [];
+      }
 
-    // Extract components from the joined data
-    return data?.map((item: any) => item.components).filter(Boolean) || [];
+      if (!usageData || usageData.length === 0) {
+        // No usage data, return popular components
+        const { data: fallbackData, error: fallbackError } = await supabaseAdmin
+          .from("components_index")
+          .select("*")
+          .limit(limit);
+        
+        if (fallbackError) {
+          console.error('Get frequent components (no usage) error:', fallbackError);
+          return [];
+        }
+        return fallbackData || [];
+      }
+
+      // Get component details for the used component IDs
+      const componentIds = usageData.map(item => item.component_id);
+      const { data: componentsData, error: componentsError } = await supabaseAdmin
+        .from("components_index")
+        .select("*")
+        .in("uid", componentIds);
+
+      if (componentsError) {
+        console.error('Get components by IDs error:', componentsError);
+        // Final fallback to popular components
+        const { data: fallbackData, error: fallbackError } = await supabaseAdmin
+          .from("components_index")
+          .select("*")
+          .limit(limit);
+        
+        if (fallbackError) {
+          console.error('Get frequent components (final fallback) error:', fallbackError);
+          return [];
+        }
+        return fallbackData || [];
+      }
+
+      // Return components in the order they were used (preserve usage order)
+      const orderedComponents = componentIds
+        .map(id => componentsData?.find(comp => comp.uid === id))
+        .filter(Boolean);
+      
+      return orderedComponents;
+    } catch (error) {
+      console.error('Get frequent components error:', error);
+      
+      // Final fallback - always return some components
+      try {
+        const { data, error } = await supabaseAdmin
+          .from("components_index")
+          .select("*")
+          .limit(limit);
+        
+        if (!error && data) {
+          return data;
+        }
+      } catch (fallbackError) {
+        console.error('Final fallback error:', fallbackError);
+      }
+      
+      return [];
+    }
   }
 
   /**

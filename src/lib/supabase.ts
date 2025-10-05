@@ -13,6 +13,7 @@ if (!supabaseAnonKey) {
   throw new Error('Missing env.NEXT_PUBLIC_SUPABASE_ANON_KEY')
 }
 
+// Client for user operations (auth, user-specific data)
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: typeof window !== 'undefined' ? window.localStorage : undefined,
@@ -21,5 +22,22 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: true
   }
 })
+
+// Service client for admin operations (component data, categories)
+export const supabaseAdmin = (() => {
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  
+  if (!serviceKey) {
+    console.warn('SUPABASE_SERVICE_ROLE_KEY not found, falling back to anon key')
+    return supabase // Fallback to regular client
+  }
+  
+  return createClient(supabaseUrl, serviceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  })
+})()
 
 export default supabase
