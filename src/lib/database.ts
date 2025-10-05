@@ -112,22 +112,61 @@ export interface ProjectVersion {
   parent_version_id?: string;
 }
 
-export interface Component {
-  id: string;
+// Component from components_index (for search and AI)
+export interface ComponentIndex {
+  uid: string;
   name: string;
-  type: string;
+  embedding_vector?: number[];
+  category: string;
+  subcategory?: string;
+  pin_count: number;
+  component_type: string;
+  description: string;
+  keywords: string;
+  footprint: string;
+  datasheet: string;
+  search_text: string;
+  created_at: string;
+  updated_at: string;
+  old_uid?: string;
+}
+
+// Component from components_v2 (full details with SVG)
+export interface ComponentDetails {
+  uid: string;
+  name: string;
+  package_id: string;
+  unit_id: string;
+  symbol_svg: string;
+  symbol_data: string; // JSON string containing pins, bbox, etc.
+  created_at: string;
+  updated_at: string;
+  is_graphical_symbol: boolean;
+  category?: string;
+  subcategory?: string;
+  pin_count?: number;
+  component_type?: string;
+  is_power_symbol: boolean;
+}
+
+// Legacy Component interface (keeping for compatibility)
+export interface Component {
+  uid?: string;
+  id?: string;
+  name: string;
+  type?: string;
   category: string;
   description?: string;
-  specifications: Record<string, any>;
-  pin_configuration: Record<string, any>;
-  electrical_properties: Record<string, any>;
+  specifications?: Record<string, any>;
+  pin_configuration?: Record<string, any>;
+  electrical_properties?: Record<string, any>;
   symbol_svg?: string;
-  footprint_data: Record<string, any>;
+  footprint_data?: Record<string, any>;
   datasheet_url?: string;
   manufacturer?: string;
   part_number?: string;
-  is_verified: boolean;
-  created_by: string;
+  is_verified?: boolean;
+  created_by?: string;
   created_at: string;
   updated_at: string;
 }
@@ -558,7 +597,7 @@ export class DatabaseService {
     query: string,
     category?: string,
     limit = 50
-  ): Promise<Component[]> {
+  ): Promise<ComponentIndex[]> {
     let queryBuilder = supabaseAdmin.from("components_index").select("*");
 
     if (query) {
@@ -570,12 +609,10 @@ export class DatabaseService {
       queryBuilder = queryBuilder.eq("category", category);
     }
 
-    const { data, error } = await queryBuilder
-      .order("name")
-      .limit(limit);
+    const { data, error } = await queryBuilder.order("name").limit(limit);
 
     if (error) {
-      console.error('Search components error:', error);
+      console.error("Search components error:", error);
       throw error;
     }
     return data || [];
@@ -589,7 +626,7 @@ export class DatabaseService {
     category?: string,
     limit = 50,
     similarityThreshold = 0.7 // Increase to 0.8-0.9 for more relevant but fewer results
-  ): Promise<Component[]> {
+  ): Promise<ComponentIndex[]> {
     if (!query.trim()) {
       // Fallback to regular search if no query
       return this.searchComponents(query, category, limit);
@@ -647,7 +684,7 @@ export class DatabaseService {
       .order("category");
 
     if (error) {
-      console.error('Get categories error:', error);
+      console.error("Get categories error:", error);
       throw error;
     }
 
@@ -659,21 +696,21 @@ export class DatabaseService {
   /**
    * Get frequently used components for a user
    */
-  static async getFrequentComponents(limit = 20): Promise<Component[]> {
+  static async getFrequentComponents(limit = 20): Promise<ComponentIndex[]> {
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      
+
       if (!user) {
         // Return some popular components if no user
         const { data, error } = await supabaseAdmin
           .from("components_index")
           .select("*")
           .limit(limit);
-        
+
         if (error) {
-          console.error('Get frequent components (fallback) error:', error);
+          console.error("Get frequent components (fallback) error:", error);
           return [];
         }
         return data || [];
@@ -688,15 +725,18 @@ export class DatabaseService {
         .limit(limit);
 
       if (usageError) {
-        console.error('Get component usage error:', usageError);
+        console.error("Get component usage error:", usageError);
         // Fallback to popular components using admin client
         const { data: fallbackData, error: fallbackError } = await supabaseAdmin
           .from("components_index")
           .select("*")
           .limit(limit);
-        
+
         if (fallbackError) {
-          console.error('Get frequent components (fallback) error:', fallbackError);
+          console.error(
+            "Get frequent components (fallback) error:",
+            fallbackError
+          );
           return [];
         }
         return fallbackData || [];
@@ -708,31 +748,38 @@ export class DatabaseService {
           .from("components_index")
           .select("*")
           .limit(limit);
-        
+
         if (fallbackError) {
-          console.error('Get frequent components (no usage) error:', fallbackError);
+          console.error(
+            "Get frequent components (no usage) error:",
+            fallbackError
+          );
           return [];
         }
         return fallbackData || [];
       }
 
       // Get component details for the used component IDs
-      const componentIds = usageData.map(item => item.component_id);
-      const { data: componentsData, error: componentsError } = await supabaseAdmin
-        .from("components_index")
-        .select("*")
-        .in("uid", componentIds);
+      const componentIds = usageData.map((item) => item.component_id);
+      const { data: componentsData, error: componentsError } =
+        await supabaseAdmin
+          .from("components_index")
+          .select("*")
+          .in("uid", componentIds);
 
       if (componentsError) {
-        console.error('Get components by IDs error:', componentsError);
+        console.error("Get components by IDs error:", componentsError);
         // Final fallback to popular components
         const { data: fallbackData, error: fallbackError } = await supabaseAdmin
           .from("components_index")
           .select("*")
           .limit(limit);
-        
+
         if (fallbackError) {
-          console.error('Get frequent components (final fallback) error:', fallbackError);
+          console.error(
+            "Get frequent components (final fallback) error:",
+            fallbackError
+          );
           return [];
         }
         return fallbackData || [];
@@ -740,27 +787,27 @@ export class DatabaseService {
 
       // Return components in the order they were used (preserve usage order)
       const orderedComponents = componentIds
-        .map(id => componentsData?.find(comp => comp.uid === id))
+        .map((id) => componentsData?.find((comp) => comp.uid === id))
         .filter(Boolean);
-      
+
       return orderedComponents;
     } catch (error) {
-      console.error('Get frequent components error:', error);
-      
+      console.error("Get frequent components error:", error);
+
       // Final fallback - always return some components
       try {
         const { data, error } = await supabaseAdmin
           .from("components_index")
           .select("*")
           .limit(limit);
-        
+
         if (!error && data) {
           return data;
         }
       } catch (fallbackError) {
-        console.error('Final fallback error:', fallbackError);
+        console.error("Final fallback error:", fallbackError);
       }
-      
+
       return [];
     }
   }
@@ -788,6 +835,62 @@ export class DatabaseService {
     ]);
 
     if (error && error.code !== "23505") throw error; // Ignore duplicate key errors
+  }
+
+  /**
+   * Get full component details including SVG from components_v2
+   */
+  static async getComponentDetails(uid: string): Promise<ComponentDetails | null> {
+    const { data, error } = await supabaseAdmin
+      .from("components_v2")
+      .select("*")
+      .eq("uid", uid)
+      .single();
+
+    if (error) {
+      console.error('Get component details error:', error);
+      return null;
+    }
+
+    return data;
+  }
+
+  /**
+   * Get component details by name (fallback method)
+   */
+  static async getComponentDetailsByName(name: string): Promise<ComponentDetails | null> {
+    const { data, error } = await supabaseAdmin
+      .from("components_v2")
+      .select("*")
+      .eq("name", name)
+      .single();
+
+    if (error) {
+      console.error('Get component details by name error:', error);
+      return null;
+    }
+
+    return data;
+  }
+
+  /**
+   * Get both search metadata and full details for a component
+   */
+  static async getFullComponentInfo(uid: string): Promise<{
+    index: ComponentIndex | null;
+    details: ComponentDetails | null;
+  }> {
+    const [indexResult, detailsResult] = await Promise.allSettled([
+      supabaseAdmin.from("components_index").select("*").eq("uid", uid).single(),
+      supabaseAdmin.from("components_v2").select("*").eq("uid", uid).single()
+    ]);
+
+    return {
+      index: indexResult.status === 'fulfilled' && !indexResult.value.error 
+        ? indexResult.value.data : null,
+      details: detailsResult.status === 'fulfilled' && !detailsResult.value.error 
+        ? detailsResult.value.data : null
+    };
   }
 
   // ==================== COLLABORATION ====================

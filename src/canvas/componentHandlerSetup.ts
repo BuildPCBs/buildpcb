@@ -80,12 +80,12 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
           const { data: dbComponent } = await supabase
             .from("components_v2")
             .select("symbol_svg, symbol_data")
-            .eq("uid", payload.id)
+            .eq("name", payload.name)
             .single();
 
           const svgString = dbComponent?.symbol_svg;
           if (!svgString) {
-            throw new Error(`No SVG found for component ID: ${payload.id}`);
+            throw new Error(`No SVG found for component name: ${payload.name}`);
           }
 
           // 2. Load the SVG string into Fabric.js objects

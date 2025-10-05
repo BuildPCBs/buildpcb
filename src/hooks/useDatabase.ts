@@ -4,6 +4,8 @@ import {
   Project,
   ProjectVersion,
   Component,
+  ComponentIndex,
+  ComponentDetails,
 } from "@/lib/database";
 import { Circuit } from "@/lib/schemas/circuit";
 
@@ -179,9 +181,9 @@ export function useProjectVersions(projectId: string | null) {
  * Hook for component library
  */
 export function useComponentLibrary() {
-  const [components, setComponents] = useState<Component[]>([]);
+  const [components, setComponents] = useState<ComponentIndex[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
-  const [frequentComponents, setFrequentComponents] = useState<Component[]>([]);
+  const [frequentComponents, setFrequentComponents] = useState<ComponentIndex[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -291,6 +293,46 @@ export function useComponentLibrary() {
       fetchFrequentComponents();
       searchComponents();
     },
+  };
+}
+
+/**
+ * Hook for getting component details (SVG and full data)
+ */
+export function useComponentDetails(uid: string | null) {
+  const [details, setDetails] = useState<ComponentDetails | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchDetails = useCallback(async () => {
+    if (!uid) {
+      setDetails(null);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await DatabaseService.getComponentDetails(uid);
+      setDetails(data);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to fetch component details"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [uid]);
+
+  useEffect(() => {
+    fetchDetails();
+  }, [fetchDetails]);
+
+  return {
+    details,
+    loading,
+    error,
+    refetch: fetchDetails,
   };
 }
 
