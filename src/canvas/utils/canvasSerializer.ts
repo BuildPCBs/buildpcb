@@ -1,6 +1,7 @@
 import * as fabric from "fabric";
 import { Circuit, ConnectionModel } from "@/lib/schemas/circuit";
 import { canvasCommandManager } from "../canvas-command-manager";
+import { logger } from "@/lib/logger";
 
 /**
  * Serialize Fabric.js canvas to Circuit format with proper component handling
@@ -190,7 +191,7 @@ export function serializeCanvasData(
       netlist: resolvedNetlist || null,
     };
 
-    console.log("💾 Canvas data serialized with electrical metadata:", {
+    logger.canvas("Canvas data serialized with electrical metadata", {
       objectCount: canvas.getObjects().length,
       electricalMetadataCount: Object.keys(electricalMetadata).length,
       hasNetlist: !!resolvedNetlist,

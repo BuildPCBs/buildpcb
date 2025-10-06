@@ -183,7 +183,9 @@ export function useProjectVersions(projectId: string | null) {
 export function useComponentLibrary() {
   const [components, setComponents] = useState<ComponentIndex[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
-  const [frequentComponents, setFrequentComponents] = useState<ComponentIndex[]>([]);
+  const [frequentComponents, setFrequentComponents] = useState<
+    ComponentIndex[]
+  >([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

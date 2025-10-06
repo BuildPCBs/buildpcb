@@ -8,7 +8,10 @@ AI-powered PCB design IDE using Next.js 15 + React 19 + TypeScript + Tailwind CS
 
 - Server: Runs via `pnpm dev --turbopack`. **DO NOT START IT**—always running; use new terminals for testing.
 - Hot reload: Automatic.
-- Logging: Structured with levels using custom logger.
+- Logging: **ALWAYS use `logger` from `@/lib/logger`**, never `console.log`. Available methods:
+  - `logger.debug()`, `logger.info()`, `logger.warn()`, `logger.error()`
+  - Context-specific: `logger.canvas()`, `logger.component()`, `logger.wire()`, `logger.auth()`, `logger.api()`
+  - Auto-strips debug logs in production.
 
 **Code Organization & Architecture**
 

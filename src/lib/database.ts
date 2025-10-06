@@ -840,7 +840,9 @@ export class DatabaseService {
   /**
    * Get full component details including SVG from components_v2
    */
-  static async getComponentDetails(uid: string): Promise<ComponentDetails | null> {
+  static async getComponentDetails(
+    uid: string
+  ): Promise<ComponentDetails | null> {
     const { data, error } = await supabaseAdmin
       .from("components_v2")
       .select("*")
@@ -848,7 +850,7 @@ export class DatabaseService {
       .single();
 
     if (error) {
-      console.error('Get component details error:', error);
+      console.error("Get component details error:", error);
       return null;
     }
 
@@ -858,7 +860,9 @@ export class DatabaseService {
   /**
    * Get component details by name (fallback method)
    */
-  static async getComponentDetailsByName(name: string): Promise<ComponentDetails | null> {
+  static async getComponentDetailsByName(
+    name: string
+  ): Promise<ComponentDetails | null> {
     const { data, error } = await supabaseAdmin
       .from("components_v2")
       .select("*")
@@ -866,7 +870,7 @@ export class DatabaseService {
       .single();
 
     if (error) {
-      console.error('Get component details by name error:', error);
+      console.error("Get component details by name error:", error);
       return null;
     }
 
@@ -881,15 +885,23 @@ export class DatabaseService {
     details: ComponentDetails | null;
   }> {
     const [indexResult, detailsResult] = await Promise.allSettled([
-      supabaseAdmin.from("components_index").select("*").eq("uid", uid).single(),
-      supabaseAdmin.from("components_v2").select("*").eq("uid", uid).single()
+      supabaseAdmin
+        .from("components_index")
+        .select("*")
+        .eq("uid", uid)
+        .single(),
+      supabaseAdmin.from("components_v2").select("*").eq("uid", uid).single(),
     ]);
 
     return {
-      index: indexResult.status === 'fulfilled' && !indexResult.value.error 
-        ? indexResult.value.data : null,
-      details: detailsResult.status === 'fulfilled' && !detailsResult.value.error 
-        ? detailsResult.value.data : null
+      index:
+        indexResult.status === "fulfilled" && !indexResult.value.error
+          ? indexResult.value.data
+          : null,
+      details:
+        detailsResult.status === "fulfilled" && !detailsResult.value.error
+          ? detailsResult.value.data
+          : null,
     };
   }
 

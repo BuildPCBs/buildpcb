@@ -12,6 +12,7 @@ import {
 import { serializeCanvasToCircuit } from "@/canvas/utils/canvasSerializer";
 import { useAIChat } from "@/contexts/AIChatContext";
 import { useProject } from "@/contexts/ProjectContext";
+import { logger } from "@/lib/logger";
 
 interface UseCanvasAutoSaveOptions {
   canvas: fabric.Canvas | null;
@@ -53,7 +54,7 @@ export function useCanvasAutoSave({
   // Helper function to get current netlist
   const getCurrentNetlist = useCallback(() => {
     const currentNetlist = typeof netlist === "function" ? netlist() : netlist;
-    console.log("📊 getCurrentNetlist called:", {
+    logger.canvas("getCurrentNetlist called", {
       isFunction: typeof netlist === "function",
       netCount: currentNetlist.length,
       totalConnections: currentNetlist.reduce(

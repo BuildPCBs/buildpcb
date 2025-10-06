@@ -12,7 +12,8 @@ import {
   useDatabaseComponents,
   ComponentDisplayData,
 } from "@/hooks/useDatabaseComponents";
-import { useComponentLibrary } from "@/hooks/useDatabase";
+import { useServerSearch } from "@/hooks/useServerSearch";
+// import { useComponentLibrary } from "@/hooks/useDatabase";
 import { canvasCommandManager } from "@/canvas/canvas-command-manager";
 import { logger } from "@/lib/logger";
 
@@ -34,6 +35,7 @@ function useDebounce<T>(value: T, delay: number): T {
 }
 
 // Custom hook for persistent semantic search cache
+/*
 function usePersistentSemanticCache() {
   const [cache, setCache] = useState<Map<string, ComponentDisplayData[]>>(
     () => {
@@ -107,6 +109,7 @@ function usePersistentSemanticCache() {
 
   return { cache, setCacheItem, getCacheItem, clearCache };
 }
+*/
 
 // Lazy loading image component for memory optimization
 function LazyImage({
@@ -343,160 +346,242 @@ export function ComponentPickerOverlay({
   onClose,
 }: ComponentPickerOverlayProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const debouncedSearchQuery = useDebounce(searchQuery, 300); // 300ms debounce
+  const debouncedSearchQuery = useDebounce(searchQuery, 0); // Instant search
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [selectedComponent, setSelectedComponent] =
     useState<ComponentDisplayData | null>(null);
   const [isKeyboardNavigation, setIsKeyboardNavigation] = useState(false);
-  const [useSemanticSearch, setUseSemanticSearch] = useState(true); // Enable semantic search by default
-  const [semanticSearchResults, setSemanticSearchResults] = useState<
-    ComponentDisplayData[]
-  >([]);
-  const [isSemanticSearching, setIsSemanticSearching] = useState(false);
-  const { setCacheItem, getCacheItem, cache, clearCache } =
-    usePersistentSemanticCache();
-  const [loadedCount, setLoadedCount] = useState(50); // Start with 50 results
+  // Temporarily disable AI semantic search; stick to text search against components_v2.
+  // const [useSemanticSearch, setUseSemanticSearch] = useState(true);
+  // const [semanticSearchResults, setSemanticSearchResults] = useState<
+  //   ComponentDisplayData[]
+  // >([]);
+  // const [isSemanticSearching, setIsSemanticSearching] = useState(false);
+  // const { setCacheItem, getCacheItem, cache, clearCache } =
+  //   usePersistentSemanticCache();
+  // const [loadedCount, setLoadedCount] = useState(50);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Note: We use useDatabaseComponents only for browsing (no search query)
+  // For search, we use server-side search which is much faster
   const {
     components: databaseComponents,
     loading: componentsLoading,
+    isLoadingMore,
     error: componentsError,
     hasMore,
-    searchComponents,
     loadMore,
   } = useDatabaseComponents();
 
-  // Use semantic search from the component library
-  const {
-    components: semanticComponents,
-    loading: semanticLoading,
-    error: semanticError,
-    searchComponents: searchText,
-    searchComponentsSemantic,
-  } = useComponentLibrary();
+  // Server-side search for fast querying across all 18k components
+  const { searchComponents: serverSearch } = useServerSearch();
 
-  // Convert Component to ComponentDisplayData for compatibility
-  const convertToDisplayData = useCallback(
-    (component: any): ComponentDisplayData => ({
-      id: component.uid || component.id,
-      name: component.name,
-      package_id: component.component_type || component.type,
-      category: component.category,
-      image: component.symbol_svg
-        ? `data:image/svg+xml;base64,${btoa(component.symbol_svg)}`
-        : `data:image/svg+xml;base64,${btoa(
-            `<svg width="60" height="30" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="30" fill="#e8e8e8"/><text x="30" y="20" text-anchor="middle" font-size="12" fill="#666">${
-              component.category?.charAt(0) || "C"
-            }</text></svg>`
-          )}`,
-      type: component.component_type || component.type,
-      description: component.description,
-      manufacturer: component.manufacturer,
-      partNumber: component.part_number || component.name,
-      pinCount:
-        component.pin_count ||
-        (component.pin_configuration
-          ? Object.keys(component.pin_configuration).length
-          : 0),
-      symbol_svg: component.symbol_svg,
-    }),
+  // Use semantic search from the component library
+  // const {
+  //   components: semanticComponents,
+  //   loading: semanticLoading,
+  //   error: semanticError,
+  //   searchComponents: searchText,
+  //   searchComponentsSemantic,
+  // } = useComponentLibrary();
+
+  // // Convert Component to ComponentDisplayData for compatibility when semantic search returns plain components.
+  // const convertToDisplayData = useCallback(
+  //   (component: any): ComponentDisplayData => ({
+  //     id: component.uid || component.id,
+  //     name: component.name,
+  //     package_id: component.component_type || component.type,
+  //     category: component.category,
+  //     image: component.symbol_svg
+  //       ? `data:image/svg+xml;base64,${btoa(component.symbol_svg)}`
+  //       : `data:image/svg+xml;base64,${btoa(
+  //           `<svg width="60" height="30" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="30" fill="#e8e8e8"/><text x="30" y="20" text-anchor="middle" font-size="12" fill="#666">${
+  //             component.category?.charAt(0) || "C"
+  //           }</text></svg>`
+  //         )}`,
+  //     type: component.component_type || component.type,
+  //     description: component.description,
+  //     manufacturer: component.manufacturer,
+  //     partNumber: component.part_number || component.name,
+  //     pinCount:
+  //       component.pin_count ||
+  //       (component.pin_configuration
+  //         ? Object.keys(component.pin_configuration).length
+  //         : 0),
+  //     symbol_svg: component.symbol_svg,
+  //   }),
+  //   []
+  // );
+
+  const [searchResults, setSearchResults] = useState<ComponentDisplayData[]>(
     []
   );
+  const [isSearching, setIsSearching] = useState(false);
+
+  // Handle server search when user types
+  useEffect(() => {
+    if (!debouncedSearchQuery.trim()) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    logger.component("🔍 Starting server search", {
+      query: debouncedSearchQuery,
+    });
+
+    serverSearch(debouncedSearchQuery)
+      .then((results) => {
+        setSearchResults(results);
+        setIsSearching(false);
+        logger.component("✅ Server search SUCCESS", {
+          query: debouncedSearchQuery,
+          resultCount: results.length,
+        });
+      })
+      .catch((error) => {
+        logger.component("❌ Server search FAILED", {
+          query: debouncedSearchQuery,
+          error: error.message || error,
+          stack: error.stack,
+        });
+        setSearchResults([]);
+        setIsSearching(false);
+      });
+  }, [debouncedSearchQuery, serverSearch]);
 
   const filteredComponents = useMemo(() => {
+    logger.component("ComponentPickerOverlay filteredComponents called", {
+      componentsLoading,
+      isLoadingMore,
+      debouncedSearchQuery,
+      databaseComponentsCount: databaseComponents.length,
+      searchResultsCount: searchResults.length,
+      isSearching,
+    });
+
     if (!debouncedSearchQuery.trim()) {
-      // No search query - return all components
+      // No search query - return loaded components for browsing
+      logger.component("No search query - returning all components", {
+        count: databaseComponents.length,
+      });
       return databaseComponents;
     }
 
-    // Get text search results
-    const textResults = searchComponents(debouncedSearchQuery);
-
-    // If semantic search is enabled and we have results, merge them
-    if (useSemanticSearch && semanticSearchResults.length > 0) {
-      // Create a map of existing text results for deduplication
-      const textResultIds = new Set(textResults.map((c) => c.id));
-
-      // Add semantic results that aren't already in text results
-      const additionalSemanticResults = semanticSearchResults.filter(
-        (semanticResult) => !textResultIds.has(semanticResult.id)
-      );
-
-      // Return text results first, then semantic results (prioritize exact matches)
-      return [...textResults, ...additionalSemanticResults];
-    }
-
-    // Return text results immediately while semantic search is loading
-    return textResults;
+    // Return server search results (searches all 18k components!)
+    logger.component("Returning server search results", {
+      query: debouncedSearchQuery,
+      resultCount: searchResults.length,
+    });
+    return searchResults;
   }, [
     debouncedSearchQuery,
     databaseComponents,
-    searchComponents,
-    useSemanticSearch,
-    semanticSearchResults,
+    searchResults,
+    componentsLoading,
+    isLoadingMore,
+    isSearching,
   ]);
 
-  // Clear results when switching search modes
-  useEffect(() => {
-    setSemanticSearchResults([]);
-    setSelectedIndex(0);
-    setSelectedComponent(null);
-  }, [useSemanticSearch]);
+  const trimmedSearchQuery = searchQuery.trim();
 
-  // Perform semantic search when debounced query changes
-  useEffect(() => {
-    if (useSemanticSearch && debouncedSearchQuery.trim()) {
-      // Check cache first
-      const cacheKey = debouncedSearchQuery.toLowerCase().trim();
-      const cachedResults = getCacheItem(cacheKey);
-
-      if (cachedResults) {
-        // Use cached results
-        setSemanticSearchResults(cachedResults);
-        setIsSemanticSearching(false);
-        return;
+  const searchStatusMessage = useMemo(() => {
+    if (!trimmedSearchQuery) {
+      if (componentsLoading && databaseComponents.length === 0) {
+        return "Loading components…";
       }
-
-      // Clear previous results and start new search
-      setSemanticSearchResults([]);
-      setIsSemanticSearching(true);
-
-      const performSemanticSearch = async () => {
-        try {
-          const results = await searchComponentsSemantic(
-            debouncedSearchQuery,
-            undefined,
-            loadedCount
-          );
-          const displayResults = (results || []).map(convertToDisplayData);
-
-          // Cache the results
-          setCacheItem(cacheKey, displayResults);
-
-          setSemanticSearchResults(displayResults);
-        } catch (error) {
-          console.warn("Semantic search failed:", error);
-          setSemanticSearchResults([]);
-        } finally {
-          setIsSemanticSearching(false);
-        }
-      };
-
-      performSemanticSearch();
-    } else {
-      setSemanticSearchResults([]);
-      setIsSemanticSearching(false);
+      return `Showing ${databaseComponents.length} components`;
     }
+
+    if (isSearching) {
+      return `Searching 18k components for "${trimmedSearchQuery}"…`;
+    }
+
+    if (filteredComponents.length === 0) {
+      return `No matches for "${trimmedSearchQuery}"`;
+    }
+
+    return `Found ${filteredComponents.length} matches for "${trimmedSearchQuery}"`;
   }, [
-    debouncedSearchQuery,
-    useSemanticSearch,
-    searchComponentsSemantic,
-    convertToDisplayData,
-    getCacheItem,
+    trimmedSearchQuery,
+    isSearching,
+    databaseComponents.length,
+    filteredComponents.length,
   ]);
+
+  useEffect(() => {
+    if (!isVisible) return;
+
+    const normalizedQuery = debouncedSearchQuery.trim();
+
+    if (!normalizedQuery) {
+      logger.component("Component overlay: showing default component list", {
+        total: filteredComponents.length,
+      });
+      return;
+    }
+
+    logger.component("Component overlay: search completed", {
+      query: normalizedQuery,
+      resultCount: filteredComponents.length,
+    });
+  }, [isVisible, debouncedSearchQuery, filteredComponents.length]);
+
+  // useEffect(() => {
+  //   setSemanticSearchResults([]);
+  //   setSelectedIndex(0);
+  //   setSelectedComponent(null);
+  // }, [useSemanticSearch]);
+
+  // useEffect(() => {
+  //   if (useSemanticSearch && debouncedSearchQuery.trim()) {
+  //     const cacheKey = debouncedSearchQuery.toLowerCase().trim();
+  //     const cachedResults = getCacheItem(cacheKey);
+
+  //     if (cachedResults) {
+  //       setSemanticSearchResults(cachedResults);
+  //       setIsSemanticSearching(false);
+  //       return;
+  //     }
+
+  //     setSemanticSearchResults([]);
+  //     setIsSemanticSearching(true);
+
+  //     const performSemanticSearch = async () => {
+  //       try {
+  //         const results = await searchComponentsSemantic(
+  //           debouncedSearchQuery,
+  //           undefined,
+  //           loadedCount
+  //         );
+  //         const displayResults = (results || []).map(convertToDisplayData);
+
+  //         setCacheItem(cacheKey, displayResults);
+
+  //         setSemanticSearchResults(displayResults);
+  //       } catch (error) {
+  //         console.warn("Semantic search failed:", error);
+  //         setSemanticSearchResults([]);
+  //       } finally {
+  //         setIsSemanticSearching(false);
+  //       }
+  //     };
+
+  //     performSemanticSearch();
+  //   } else {
+  //     setSemanticSearchResults([]);
+  //     setIsSemanticSearching(false);
+  //   }
+  // }, [
+  //   debouncedSearchQuery,
+  //   useSemanticSearch,
+  //   searchComponentsSemantic,
+  //   convertToDisplayData,
+  //   getCacheItem,
+  // ]);
 
   useEffect(() => {
     // Only reset selection when search query changes or when filteredComponents is empty
@@ -535,49 +620,47 @@ export function ComponentPickerOverlay({
   }, [selectedIndex, filteredComponents, selectedComponent]);
 
   // Reset loaded count when search changes
-  useEffect(() => {
-    setLoadedCount(50);
-  }, [debouncedSearchQuery]);
+  // useEffect(() => {
+  //   setLoadedCount(50);
+  // }, [debouncedSearchQuery]);
 
-  // Load more semantic search results
-  const loadMoreSemanticResults = useCallback(async () => {
-    if (
-      !debouncedSearchQuery.trim() ||
-      !useSemanticSearch ||
-      isSemanticSearching
-    )
-      return;
+  // const loadMoreSemanticResults = useCallback(async () => {
+  //   if (
+  //     !debouncedSearchQuery.trim() ||
+  //     !useSemanticSearch ||
+  //     isSemanticSearching
+  //   )
+  //     return;
 
-    const newLoadedCount = loadedCount + 50;
-    setIsSemanticSearching(true);
+  //   const newLoadedCount = loadedCount + 50;
+  //   setIsSemanticSearching(true);
 
-    try {
-      const results = await searchComponentsSemantic(
-        debouncedSearchQuery,
-        undefined,
-        newLoadedCount
-      );
-      const displayResults = (results || []).map(convertToDisplayData);
+  //   try {
+  //     const results = await searchComponentsSemantic(
+  //       debouncedSearchQuery,
+  //       undefined,
+  //       newLoadedCount
+  //     );
+  //     const displayResults = (results || []).map(convertToDisplayData);
 
-      // Update cache and results
-      const cacheKey = debouncedSearchQuery.toLowerCase().trim();
-      setCacheItem(cacheKey, displayResults);
-      setSemanticSearchResults(displayResults);
-      setLoadedCount(newLoadedCount);
-    } catch (error) {
-      console.warn("Load more semantic search failed:", error);
-    } finally {
-      setIsSemanticSearching(false);
-    }
-  }, [
-    debouncedSearchQuery,
-    useSemanticSearch,
-    isSemanticSearching,
-    loadedCount,
-    searchComponentsSemantic,
-    convertToDisplayData,
-    setCacheItem,
-  ]);
+  //     const cacheKey = debouncedSearchQuery.toLowerCase().trim();
+  //     setCacheItem(cacheKey, displayResults);
+  //     setSemanticSearchResults(displayResults);
+  //     setLoadedCount(newLoadedCount);
+  //   } catch (error) {
+  //     console.warn("Load more semantic search failed:", error);
+  //   } finally {
+  //     setIsSemanticSearching(false);
+  //   }
+  // }, [
+  //   debouncedSearchQuery,
+  //   useSemanticSearch,
+  //   isSemanticSearching,
+  //   loadedCount,
+  //   searchComponentsSemantic,
+  //   convertToDisplayData,
+  //   setCacheItem,
+  // ]);
 
   // Focus input when overlay becomes visible
   useEffect(() => {
@@ -592,7 +675,8 @@ export function ComponentPickerOverlay({
       searchQuery.trim() &&
       filteredComponents.length === 0 &&
       hasMore &&
-      !componentsLoading
+      !componentsLoading &&
+      !isLoadingMore
     ) {
       logger.component("No search results found, loading more components...");
       loadMore();
@@ -602,6 +686,7 @@ export function ComponentPickerOverlay({
     filteredComponents.length,
     hasMore,
     componentsLoading,
+    isLoadingMore,
     loadMore,
   ]);
 
@@ -829,50 +914,32 @@ export function ComponentPickerOverlay({
             <input
               ref={inputRef}
               type="text"
-              placeholder={
-                useSemanticSearch
-                  ? "Search components semantically..."
-                  : "Search components by name, category, or part number..."
-              }
+              placeholder="Search components by name, category, or part number..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-3 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0038DF]/50 focus:border-[#0038DF]"
             />
           </div>
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setUseSemanticSearch(!useSemanticSearch)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-                  useSemanticSearch
-                    ? "bg-[#0038DF] text-white"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
-              >
-                {useSemanticSearch ? "AI Search" : "Text Search"}
-              </button>
-              {isSemanticSearching && (
-                <div className="flex items-center gap-1 text-xs text-gray-500">
-                  <div className="animate-spin rounded-full h-3 w-3 border-b border-[#0038DF]"></div>
-                  Searching...
-                </div>
-              )}
-            </div>
+            <p className="text-xs text-gray-500">
+              Text search uses the components_v2 dataset. AI search is
+              temporarily disabled.
+            </p>
+            <p className="text-xs text-gray-500 text-right ml-3 whitespace-nowrap">
+              {searchStatusMessage}
+            </p>
           </div>
         </div>
 
         <div className="flex flex-1 min-h-0">
           <div className="w-2/5 border-r border-gray-200 overflow-hidden">
             <div ref={listRef} className="h-full overflow-y-auto">
-              {(componentsLoading || isSemanticSearching) &&
-              filteredComponents.length === 0 ? (
+              {componentsLoading && filteredComponents.length === 0 ? (
                 <div className="flex items-center justify-center h-full">
                   <div className="text-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0038DF] mx-auto mb-3"></div>
                     <p className="text-sm text-gray-500">
-                      {isSemanticSearching
-                        ? "Searching components..."
-                        : "Loading components..."}
+                      Loading components...
                     </p>
                   </div>
                 </div>
@@ -898,10 +965,8 @@ export function ComponentPickerOverlay({
                     </div>
                     <p className="text-sm text-gray-500">
                       {searchQuery
-                        ? componentsLoading || isSemanticSearching
-                          ? useSemanticSearch && isSemanticSearching
-                            ? "AI searching components..."
-                            : "Searching more components..."
+                        ? componentsLoading
+                          ? "Searching more components..."
                           : "No components found"
                         : "No components available"}
                     </p>
@@ -916,9 +981,7 @@ export function ComponentPickerOverlay({
                 <div className="divide-y divide-gray-100">
                   {filteredComponents.map((component, index) => (
                     <div
-                      key={`${component.id}-${
-                        useSemanticSearch ? "semantic" : "text"
-                      }-${index}`}
+                      key={`${component.id}-text-${index}`}
                       onClick={() => {
                         // Disable scroll sync temporarily when clicking
                         setIsKeyboardNavigation(true);
@@ -937,24 +1000,28 @@ export function ComponentPickerOverlay({
                         <div className="w-12 h-12 bg-gray-50 rounded-lg flex items-center justify-center flex-shrink-0">
                           <LazyImage
                             src={component.image}
-                            alt={component.package_id}
+                            alt={component.name}
                             className="w-10 h-10 object-contain"
                             placeholder={
                               <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center text-sm font-medium text-gray-600">
-                                {component.package_id.charAt(0)}
+                                {(component.name ?? component.package_id ?? "?")
+                                  .charAt(0)
+                                  .toUpperCase()}
                               </div>
                             }
                           />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-gray-900 truncate">
-                            {component.package_id}
+                            {component.name}
                           </div>
-                          <div className="text-xs text-gray-500 flex gap-2 mt-1">
-                            <span className="bg-gray-100 px-2 py-0.5 rounded">
-                              {component.category}
-                            </span>
-                            <span>{component.pinCount || 0} pins</span>
+                          <div className="text-xs text-gray-500 flex flex-wrap gap-2 mt-1">
+                            {component.package_id && (
+                              <span className="bg-gray-100 px-2 py-0.5 rounded">
+                                {component.package_id}
+                              </span>
+                            )}
+                            <span>{component.pinCount ?? 0} pins</span>
                           </div>
                         </div>
                       </div>
@@ -971,19 +1038,6 @@ export function ComponentPickerOverlay({
                       </button>
                     </div>
                   )}
-
-                  {useSemanticSearch &&
-                    semanticSearchResults.length >= loadedCount &&
-                    !isSemanticSearching && (
-                      <div className="p-3 border-t border-gray-200 bg-gray-50 sticky bottom-0">
-                        <button
-                          onClick={loadMoreSemanticResults}
-                          className="w-full py-2 text-sm text-[#0038DF] hover:bg-[#0038DF]/10 rounded-lg transition-colors font-medium"
-                        >
-                          Load more AI results...
-                        </button>
-                      </div>
-                    )}
                 </div>
               )}
             </div>

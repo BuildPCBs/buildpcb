@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { ThinkingIndicator } from "./ThinkingIndicator";
+import { useState, useEffect } from "react";
+import { AgentStreamDisplay } from "../agent/AgentStreamDisplay";
 import { PromptEntry } from "./PromptEntry";
 import { useAIChat } from "../../contexts/AIChatContext";
 import { useCanvas } from "../../contexts/CanvasContext";
 import { useCanvasStateSnapshot } from "../../hooks/useCanvasState";
 import { logger } from "../../lib/logger";
+import { agentService } from "../../agent/AgentService";
+import { StreamMessage } from "../../agent/StreamingHandler";
 
 interface AIPromptPanelProps {
   className?: string;
@@ -20,6 +22,8 @@ export function AIPromptPanel({
   isThinking = false,
 }: AIPromptPanelProps) {
   const [localIsThinking, setLocalIsThinking] = useState(false);
+  const [streamMessages, setStreamMessages] = useState<StreamMessage[]>([]);
+
   const {
     isThinking: contextIsThinking,
     handlePromptSubmit: contextHandlePromptSubmit,
@@ -31,6 +35,26 @@ export function AIPromptPanel({
 
   // Use context isThinking, then external isThinking, then local state
   const currentIsThinking = contextIsThinking || isThinking || localIsThinking;
+
+  // Subscribe to agent streaming messages
+  useEffect(() => {
+    const streamingHandler = agentService.getStreamingHandler();
+
+    const unsubscribe = streamingHandler.subscribe((message) => {
+      setStreamMessages((prev) => [...prev, message]);
+
+      // Auto-clear success/error messages after 3 seconds
+      if (message.type === "success" || message.type === "error") {
+        setTimeout(() => {
+          setStreamMessages((prev) => prev.filter((m) => m.id !== message.id));
+        }, 3000);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   const handlePromptSubmit = async (prompt: string) => {
     logger.api("AI Prompt submitted:", prompt);
@@ -65,8 +89,8 @@ export function AIPromptPanel({
 
   return (
     <div className={`relative ${className}`}>
-      {/* Thinking Indicator */}
-      {/* <ThinkingIndicator isVisible={currentIsThinking} /> */}
+      {/* Agent Stream Display - Replaces old ThinkingIndicator */}
+      <AgentStreamDisplay messages={streamMessages} />
 
       {/* Prompt Entry */}
       <PromptEntry

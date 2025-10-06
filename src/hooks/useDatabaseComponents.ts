@@ -33,9 +33,22 @@ export interface ComponentDisplayData {
 export function useDatabaseComponents() {
   const [components, setComponents] = useState<ComponentDisplayData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
+  const searchCacheRef = useRef<
+    Map<string, { generation: number; results: ComponentDisplayData[] }>
+  >(new Map());
+  const cacheGenerationRef = useRef(0);
+
+  const invalidateSearchCache = useCallback(() => {
+    cacheGenerationRef.current += 1;
+    searchCacheRef.current.clear();
+    logger.component("Component search cache invalidated", {
+      generation: cacheGenerationRef.current,
+    });
+  }, []);
 
   const PAGE_SIZE = 100; // Reduced from 1000 to 100 for better memory management
 
@@ -44,6 +57,13 @@ export function useDatabaseComponents() {
 
   const fetchComponents = useCallback(
     async (loadMore = false) => {
+      logger.api("🚀 fetchComponents started", {
+        loadMore,
+        offset,
+        PAGE_SIZE,
+        currentComponentsCount: components.length,
+      });
+      
       try {
         logger.api("Fetching components from database...", {
           loadMore,
@@ -54,6 +74,8 @@ export function useDatabaseComponents() {
         if (!loadMore) {
           setLoading(true);
           setOffset(0);
+        } else {
+          setIsLoadingMore(true);
         }
         setError(null);
 
@@ -142,6 +164,10 @@ export function useDatabaseComponents() {
 
           logger.api("Setting", displayComponents.length, "display components");
 
+          // Invalidate cached search results before updating component state
+          cacheGenerationRef.current += 1;
+          searchCacheRef.current.clear();
+
           if (loadMore) {
             setComponents((prev) => {
               const newComponents = [...prev, ...displayComponents];
@@ -161,16 +187,26 @@ export function useDatabaseComponents() {
           logger.api("No data returned from Supabase");
         }
       } catch (err) {
-        logger.api("Error fetching components:", err);
+        logger.api("❌ Error fetching components:", {
+          error: err,
+          errorMessage: err instanceof Error ? err.message : String(err),
+          loadMore,
+          offset,
+        });
+        console.error("❌ Full error details:", err);
         setError(
           err instanceof Error ? err.message : "Failed to fetch components"
         );
       } finally {
         setLoading(false);
-        logger.api("Component fetch completed");
+        setIsLoadingMore(false);
+        logger.api("✅ Component fetch completed", {
+          finalComponentCount: components.length,
+          loadMore,
+        });
       }
     },
-    [offset]
+    [offset] // Remove invalidateSearchCache to prevent infinite re-renders
   );
 
   const loadMoreComponents = useCallback(() => {
@@ -182,11 +218,12 @@ export function useDatabaseComponents() {
   // Memory cleanup function
   const cleanupMemory = useCallback(() => {
     logger.api("Cleaning up component memory...");
+    invalidateSearchCache();
     setComponents([]);
     setOffset(0);
     setHasMore(true);
     setError(null);
-  }, []);
+  }, [invalidateSearchCache]);
 
   // Auto-cleanup when component unmounts or when memory usage gets high
   useEffect(() => {
@@ -211,8 +248,19 @@ export function useDatabaseComponents() {
 
   // Initial component fetch
   useEffect(() => {
-    logger.api("Initial component fetch triggered");
-    fetchComponents(false);
+    logger.api("🚀 Initial component fetch triggered", {
+      currentComponentCount: components.length,
+      loading,
+      hasMore,
+    });
+    
+    // Fetch immediately without delay
+    fetchComponents(false).catch((err) => {
+      logger.api("❌ Initial fetch failed:", err);
+      // Set loading to false even on error so UI isn't stuck
+      setLoading(false);
+      setError("Failed to load components");
+    });
   }, []); // Empty dependency array to run only once on mount
 
   // Helper function to determine component image with memory optimization
@@ -297,18 +345,92 @@ export function useDatabaseComponents() {
 
   const searchComponents = useCallback(
     (query: string): ComponentDisplayData[] => {
-      if (!query.trim()) return components;
+      const normalizedQuery = query.trim().toLowerCase();
 
-      const searchTerm = query.toLowerCase();
-      return components.filter(
-        (component) =>
-          component.name.toLowerCase().includes(searchTerm) ||
-          component.category.toLowerCase().includes(searchTerm) ||
-          component.description?.toLowerCase().includes(searchTerm) ||
-          component.manufacturer?.toLowerCase().includes(searchTerm) ||
-          component.partNumber?.toLowerCase().includes(searchTerm) ||
-          component.type.toLowerCase().includes(searchTerm)
-      );
+      if (!normalizedQuery) {
+        return components;
+      }
+
+      const cachedEntry = searchCacheRef.current.get(normalizedQuery);
+      if (
+        cachedEntry &&
+        cachedEntry.generation === cacheGenerationRef.current
+      ) {
+        logger.component("Component search cache hit", {
+          query: normalizedQuery,
+          resultCount: cachedEntry.results.length,
+          generation: cacheGenerationRef.current,
+        });
+        return cachedEntry.results;
+      }
+
+      logger.component("Component search cache miss", {
+        query: normalizedQuery,
+        componentCount: components.length,
+        generation: cacheGenerationRef.current,
+      });
+
+      const results = components.filter((component) => {
+        const nameMatch = component.name
+          .toLowerCase()
+          .includes(normalizedQuery);
+        const packageIdMatch = component.package_id
+          ?.toLowerCase()
+          .includes(normalizedQuery) ?? false;
+        const categoryMatch = component.category
+          .toLowerCase()
+          .includes(normalizedQuery);
+        const descriptionMatch =
+          component.description?.toLowerCase().includes(normalizedQuery) ??
+          false;
+        const manufacturerMatch =
+          component.manufacturer?.toLowerCase().includes(normalizedQuery) ??
+          false;
+        const partNumberMatch =
+          component.partNumber?.toLowerCase().includes(normalizedQuery) ??
+          false;
+        const typeMatch = component.type
+          .toLowerCase()
+          .includes(normalizedQuery);
+
+        return (
+          nameMatch ||
+          packageIdMatch ||
+          categoryMatch ||
+          descriptionMatch ||
+          manufacturerMatch ||
+          partNumberMatch ||
+          typeMatch
+        );
+      });
+
+      // Debug: Show what components we're searching through
+      if (normalizedQuery.includes("74au")) {
+        const sample74Components = components
+          .filter(c => c.name.toLowerCase().includes("74") || c.package_id?.toLowerCase().includes("74"))
+          .slice(0, 5)
+          .map(c => ({ name: c.name, package_id: c.package_id }));
+        
+        logger.component("Debug 74au search", {
+          query: normalizedQuery,
+          total74Components: sample74Components.length,
+          sample74Components,
+          totalLoadedComponents: components.length,
+        });
+      }
+
+      logger.component("Search completed", {
+        query: normalizedQuery,
+        resultCount: results.length,
+        totalComponents: components.length,
+        sampleResults: results.slice(0, 3).map(r => ({ name: r.name, package_id: r.package_id })),
+      });
+
+      searchCacheRef.current.set(normalizedQuery, {
+        generation: cacheGenerationRef.current,
+        results,
+      });
+      return results;
     },
     [components]
   );
@@ -330,6 +452,7 @@ export function useDatabaseComponents() {
   return {
     components,
     loading,
+    isLoadingMore,
     error,
     hasMore,
     searchComponents,
