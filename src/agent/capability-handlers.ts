@@ -1,6 +1,7 @@
 import { Capability } from "./capabilities";
 import { logger } from "@/lib/logger";
 import { AgentContext, AgentResult, CapabilityHandler } from "./types";
+import { addComponent } from "./handlers/priority1/addComponent";
 
 export const capabilityHandlers: Record<Capability, CapabilityHandler> = {
   CREATE_CIRCUIT: async (
@@ -27,24 +28,7 @@ export const capabilityHandlers: Record<Capability, CapabilityHandler> = {
     context.streamer.status("Deleting circuit...");
     return { status: "success", message: "Circuit deleted." };
   },
-  ADD_COMPONENT: async (
-    context: AgentContext,
-    prompt: string
-  ): Promise<AgentResult> => {
-    logger.component("ADD_COMPONENT called", { prompt });
-
-    context.streamer.think("Parsing component request...");
-    // TODO: Extract component name from prompt
-
-    context.streamer.status("Fetching component from library...");
-    // TODO: Fetch component from DatabaseService.getComponentDetailsByName()
-
-    context.streamer.status("Placing component on canvas...");
-    // TODO: Use canvasCommandManager to place component on canvas
-
-    context.streamer.success("Component added!");
-    return { status: "success", message: "Component added to canvas." };
-  },
+  ADD_COMPONENT: addComponent,
   CREATE_COMPONENT: async (
     context: AgentContext,
     prompt: string

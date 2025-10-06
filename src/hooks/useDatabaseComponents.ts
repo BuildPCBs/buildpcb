@@ -63,7 +63,7 @@ export function useDatabaseComponents() {
         PAGE_SIZE,
         currentComponentsCount: components.length,
       });
-      
+
       try {
         logger.api("Fetching components from database...", {
           loadMore,
@@ -253,7 +253,7 @@ export function useDatabaseComponents() {
       loading,
       hasMore,
     });
-    
+
     // Fetch immediately without delay
     fetchComponents(false).catch((err) => {
       logger.api("❌ Initial fetch failed:", err);
@@ -374,9 +374,9 @@ export function useDatabaseComponents() {
         const nameMatch = component.name
           .toLowerCase()
           .includes(normalizedQuery);
-        const packageIdMatch = component.package_id
-          ?.toLowerCase()
-          .includes(normalizedQuery) ?? false;
+        const packageIdMatch =
+          component.package_id?.toLowerCase().includes(normalizedQuery) ??
+          false;
         const categoryMatch = component.category
           .toLowerCase()
           .includes(normalizedQuery);
@@ -407,10 +407,14 @@ export function useDatabaseComponents() {
       // Debug: Show what components we're searching through
       if (normalizedQuery.includes("74au")) {
         const sample74Components = components
-          .filter(c => c.name.toLowerCase().includes("74") || c.package_id?.toLowerCase().includes("74"))
+          .filter(
+            (c) =>
+              c.name.toLowerCase().includes("74") ||
+              c.package_id?.toLowerCase().includes("74")
+          )
           .slice(0, 5)
-          .map(c => ({ name: c.name, package_id: c.package_id }));
-        
+          .map((c) => ({ name: c.name, package_id: c.package_id }));
+
         logger.component("Debug 74au search", {
           query: normalizedQuery,
           total74Components: sample74Components.length,
@@ -423,7 +427,9 @@ export function useDatabaseComponents() {
         query: normalizedQuery,
         resultCount: results.length,
         totalComponents: components.length,
-        sampleResults: results.slice(0, 3).map(r => ({ name: r.name, package_id: r.package_id })),
+        sampleResults: results
+          .slice(0, 3)
+          .map((r) => ({ name: r.name, package_id: r.package_id })),
       });
 
       searchCacheRef.current.set(normalizedQuery, {

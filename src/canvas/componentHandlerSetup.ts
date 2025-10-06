@@ -226,8 +226,19 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
           componentSandwich.set("componentType", "component");
           componentSandwich.set("id", componentId); // Set ID as direct property for reliable access
 
-          if (dbComponent) {
+          // Set databaseComponent metadata - prefer payload.componentMetadata if available (from agent),
+          // otherwise use the queried dbComponent (from manual component library)
+          if ((payload as any).componentMetadata) {
+            componentSandwich.set(
+              "databaseComponent",
+              (payload as any).componentMetadata
+            );
+            logger.canvas(
+              `📋 Using component metadata from payload (agent-added)`
+            );
+          } else if (dbComponent) {
             componentSandwich.set("databaseComponent", dbComponent);
+            logger.canvas(`📋 Using component metadata from database query`);
           }
 
           console.log(`➕ Adding component to canvas: ${componentId}`);

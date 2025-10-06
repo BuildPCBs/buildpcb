@@ -292,6 +292,20 @@ export function useCanvasAutoSave({
 
       // Get fresh canvas data immediately for manual save
       const data = await getCurrentCanvasData();
+
+      console.log("💬 Preparing chat data for save:", {
+        messageCount: messages.length,
+        messagesArray: messages,
+        firstMessage: messages[0]
+          ? {
+              id: messages[0].id,
+              type: messages[0].type,
+              contentLength: messages[0].content?.length || 0,
+              hasTimestamp: !!messages[0].timestamp,
+            }
+          : null,
+      });
+
       const chatData =
         messages.length > 0
           ? {
@@ -333,6 +347,10 @@ export function useCanvasAutoSave({
           (sum: number, net: any) => sum + (net.connections?.length || 0),
           0
         ),
+        hasChatData: !!chatData,
+        chatMessageCount: chatData?.messages?.length || 0,
+        extendedCanvasDataHasChatData: !!extendedCanvasData.chatData,
+        extendedCanvasDataKeys: Object.keys(extendedCanvasData),
       });
 
       await DatabaseService.createVersion(

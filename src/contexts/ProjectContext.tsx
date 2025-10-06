@@ -14,6 +14,7 @@ import { ProjectService, ProjectLoadResult } from "@/lib/project-service";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
 import { loadCanvasFromLogicalCircuit } from "@/canvas/utils/logicalSerializer";
+import { useProjectStore } from "@/store/projectStore";
 
 interface ProjectContextType {
   // Current project state
@@ -101,6 +102,20 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
         const latestVersion = await DatabaseService.getLatestVersion(
           project.id
         );
+
+        // 🔥 CRITICAL: Sync with projectStore for AgentService and auto-save
+        useProjectStore
+          .getState()
+          .setProject(
+            project.id,
+            latestVersion?.id || "",
+            project.name || "Untitled Project"
+          );
+        console.log("✅ Synced specific project to projectStore:", {
+          projectId: project.id,
+          versionId: latestVersion?.id,
+          projectName: project.name,
+        });
 
         console.log("🔄 Specific project loading details:", {
           projectId: project.id,
@@ -204,6 +219,20 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
       const latestVersion = await DatabaseService.getLatestVersion(
         result.project.id
       );
+
+      // 🔥 CRITICAL: Sync with projectStore for AgentService and auto-save
+      useProjectStore
+        .getState()
+        .setProject(
+          result.project.id,
+          latestVersion?.id || "",
+          result.project.name || "Untitled Project"
+        );
+      console.log("✅ Synced project to projectStore:", {
+        projectId: result.project.id,
+        versionId: latestVersion?.id,
+        projectName: result.project.name,
+      });
 
       console.log("🔄 Project loading details:", {
         projectId: result.project.id,
@@ -411,6 +440,19 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
 
         // Extract chat data before loading canvas
         const chatData = currentProject.canvas_settings.chatData;
+        console.log("💬 Extracted chatData from canvas_settings:", {
+          hasChatData: !!chatData,
+          chatDataType: typeof chatData,
+          messageCount: chatData?.messages?.length || 0,
+          chatDataKeys: chatData ? Object.keys(chatData) : [],
+          firstMessagePreview: chatData?.messages?.[0]
+            ? {
+                id: chatData.messages[0].id,
+                type: chatData.messages[0].type,
+                contentLength: chatData.messages[0].content?.length || 0,
+              }
+            : null,
+        });
         const canvasDataWithoutChat = { ...currentProject.canvas_settings };
         delete canvasDataWithoutChat.chatData;
 

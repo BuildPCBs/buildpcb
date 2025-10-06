@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ideCore } from "@/core";
 import { IDECanvas } from "@/components/layout/IDECanvas";
 import { useProject } from "@/contexts/ProjectContext";
+import { AgentServiceInit } from "@/agent/AgentServiceInit";
 
 interface ProjectPageProps {
   params: Promise<{
@@ -102,5 +103,10 @@ export default function ProjectPage({ params }: ProjectPageProps) {
   }
 
   // Render the IDE with the loaded project
-  return <IDECanvas />;
+  return (
+    <>
+      <AgentServiceInit />
+      <IDECanvas />
+    </>
+  );
 }

@@ -59,7 +59,7 @@ export function useServerSearch() {
 
         // Server-side search with Supabase - searches all 18k components instantly!
         const searchPattern = `%${normalizedQuery}%`;
-        
+
         logger.component("🔍 Executing Supabase query", {
           pattern: searchPattern,
         });
@@ -71,7 +71,7 @@ export function useServerSearch() {
           .ilike("name", searchPattern)
           .order("name")
           .limit(200);
-        
+
         logger.component("🔍 Query returned from Supabase", {
           dataCount: data?.length,
           errorExists: !!error,

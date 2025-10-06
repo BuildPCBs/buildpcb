@@ -1,6 +1,7 @@
 import { logger } from "@/lib/logger";
 import { canvasCommandManager } from "@/canvas/canvas-command-manager";
 import { useProjectStore } from "@/store/projectStore";
+import { authStorage } from "@/lib/auth-storage";
 import {
   AgentContext,
   AgentCanvasContext,
@@ -81,23 +82,34 @@ export class AgentService {
   }
 
   /**
+   * Get current user ID from auth storage
+   */
+  private getUserId(): string | undefined {
+    const user = authStorage.getUser();
+    return user?.id;
+  }
+
+  /**
    * Build complete agent context
    */
   private buildContext(userId?: string): AgentContext {
     const canvas = this.buildCanvasContext();
     const project = this.buildProjectContext();
 
+    // Use provided userId or get from auth storage
+    const resolvedUserId = userId || this.getUserId();
+
     logger.debug("🤖 Building agent context", {
       canvasReady: canvas.isCanvasReady,
       projectId: project.projectId,
-      userId,
+      userId: resolvedUserId,
     });
 
     return {
       canvas,
       project,
       streamer: this.streamingHandler,
-      userId,
+      userId: resolvedUserId,
     };
   }
 
@@ -221,6 +233,17 @@ export const agentService = new AgentService();
 
 // Development only: Expose to window for testing
 if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
+  // Main service interface
+  (window as any).agentService = {
+    executeCapability: async (capability: string, prompt: string) => {
+      return agentService.executeCapability(capability as Capability, prompt);
+    },
+    getStreamingHandler: () => agentService.getStreamingHandler(),
+    subscribe: (callback: any) =>
+      agentService.getStreamingHandler().subscribe(callback),
+  };
+
+  // Test utilities with more detailed access
   (window as any).agentServiceTest = {
     getCanvasContext: () => agentService.getCanvasContext(),
     getProjectContext: () => agentService.getProjectContext(),
@@ -237,5 +260,7 @@ if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
       return agentService.executeCapability(capability as Capability, prompt);
     },
   };
-  logger.debug("🧪 agentServiceTest exposed to window for testing");
+  logger.debug(
+    "🧪 agentService + agentServiceTest exposed to window for testing"
+  );
 }
