@@ -12,6 +12,7 @@ interface ChatRequest {
   canvasState?: any;
   conversationHistory?: any[];
   sessionId?: string;
+  projectContext?: any;
 }
 
 interface CircuitResponse {
@@ -162,6 +163,151 @@ An AI-generated response was created based on your input. The response type and 
 - Test any generated circuits thoroughly`;
 }
 
+const MAX_LIST_ITEMS = 12;
+
+function formatCanvasStateForPrompt(canvasState: any): string {
+  if (!canvasState) {
+    return "Canvas is currently empty.";
+  }
+
+  const components = Array.isArray(canvasState.components)
+    ? canvasState.components
+    : [];
+  const connections = Array.isArray(canvasState.connections)
+    ? canvasState.connections
+    : [];
+  const metadata = canvasState.metadata || {};
+
+  const componentLines = components
+    .slice(0, MAX_LIST_ITEMS)
+    .map((component: any, index: number) => {
+      const label =
+        component.name ||
+        component.type ||
+        component.componentType ||
+        `Component ${index + 1}`;
+      const value = component.value ? ` (${component.value})` : "";
+      const position = component.position
+        ? ` at (${Math.round(component.position.x || 0)}, ${Math.round(
+            component.position.y || 0
+          )})`
+        : "";
+      return `${index + 1}. ${label}${value}${position}`;
+    });
+
+  const connectionLines = connections
+    .slice(0, MAX_LIST_ITEMS)
+    .map((connection: any, index: number) => {
+      const fromId = connection.from?.componentId || connection.from?.id || "?";
+      const toId = connection.to?.componentId || connection.to?.id || "?";
+      const netId = connection.netId || connection.id || `net_${index + 1}`;
+      return `${index + 1}. ${fromId} → ${toId} (net: ${netId})`;
+    });
+
+  const summarySections = [
+    `Component count: ${components.length}`,
+    componentLines.length
+      ? `Component breakdown:\n${componentLines.join("\n")}${
+          components.length > componentLines.length
+            ? `\n...and ${components.length - componentLines.length} more`
+            : ""
+        }`
+      : null,
+    `Connection count: ${connections.length}`,
+    connectionLines.length
+      ? `Connections:\n${connectionLines.join("\n")}${
+          connections.length > connectionLines.length
+            ? `\n...and ${connections.length - connectionLines.length} more`
+            : ""
+        }`
+      : null,
+    metadata
+      ? `Metadata: zoom=${metadata.zoom ?? "n/a"}, selectedObjects=${
+          Array.isArray(metadata.selectedObjects)
+            ? metadata.selectedObjects.length
+            : 0
+        }, timestamp=${metadata.timestamp || "n/a"}`
+      : null,
+  ].filter(Boolean);
+
+  return summarySections.join("\n\n");
+}
+
+function formatProjectContextForPrompt(projectContext: any): string {
+  if (!projectContext) {
+    return "";
+  }
+
+  const {
+    projectId,
+    name,
+    description,
+    lastUpdated,
+    tags,
+    circuitSummary,
+    netlistSummary,
+  } = projectContext;
+
+  const tagList = Array.isArray(tags) && tags.length ? tags.join(", ") : "none";
+
+  const circuitLines = circuitSummary?.components
+    ? circuitSummary.components
+        .slice(0, MAX_LIST_ITEMS)
+        .map((component: any, index: number) => {
+          const value = component.value ? ` (${component.value})` : "";
+          const position = component.position
+            ? ` at (${Math.round(component.position.x || 0)}, ${Math.round(
+                component.position.y || 0
+              )})`
+            : "";
+          return `${index + 1}. ${
+            component.type || "component"
+          }${value}${position}`;
+        })
+    : [];
+
+  const netLines = netlistSummary?.topNets
+    ? netlistSummary.topNets
+        .slice(0, MAX_LIST_ITEMS)
+        .map(
+          (net: any, index: number) =>
+            `${index + 1}. ${net.netId || `net_${index + 1}`}: ${
+              net.connectionCount || 0
+            } connections`
+        )
+    : [];
+
+  const sections = [
+    `Project ID: ${projectId}`,
+    `Project name: ${name || "Untitled Project"}`,
+    description ? `Description: ${description}` : null,
+    `Last updated: ${lastUpdated || "unknown"}`,
+    `Tags: ${tagList}`,
+    circuitSummary
+      ? `Circuit summary: ${circuitSummary.componentCount || 0} components, ${
+          circuitSummary.connectionCount || 0
+        } connections${
+          circuitLines.length
+            ? `\nKey components:\n${circuitLines.join("\n")}${
+                (circuitSummary.componentCount || 0) > circuitLines.length
+                  ? `\n...and ${
+                      (circuitSummary.componentCount || 0) - circuitLines.length
+                    } more`
+                  : ""
+              }`
+            : ""
+        }`
+      : null,
+    netlistSummary
+      ? `Netlist summary: ${netlistSummary.netCount || 0} nets${
+          netLines.length ? `\nTop nets:\n${netLines.join("\n")}` : ""
+        }`
+      : null,
+  ].filter(Boolean);
+
+  return sections.join("\n\n");
+}
+
 export const POST = withAuth(
   async (request: NextRequest, user: AuthenticatedUser) => {
     try {
@@ -182,7 +328,12 @@ export const POST = withAuth(
       );
 
       const body: ChatRequest = await request.json();
-      const { message, canvasState, conversationHistory = [] } = body;
+      const {
+        message,
+        canvasState,
+        projectContext,
+        conversationHistory = [],
+      } = body;
 
       if (!message?.trim()) {
         return NextResponse.json(
@@ -193,10 +344,24 @@ export const POST = withAuth(
 
       console.log("📝 Processing message:", message.substring(0, 100) + "...");
 
+      const canvasSummary = formatCanvasStateForPrompt(canvasState);
+      const projectSummary = formatProjectContextForPrompt(projectContext);
+
+      const contextSections = [
+        projectSummary && `PROJECT CONTEXT\n${projectSummary}`,
+        canvasSummary && `CANVAS SNAPSHOT\n${canvasSummary}`,
+      ].filter(Boolean) as string[];
+
+      const contextBlock = contextSections.length
+        ? `CONTEXT SNAPSHOT\n----------------\n${contextSections.join("\n\n")}`
+        : "CONTEXT SNAPSHOT\n----------------\nNo project or canvas data provided.";
+
       // Build conversation context for OpenAI
       const systemPrompt = `You are BuildPCB, "The Figma + Cursor for Electronics Design."
 
 I can build circuits by adding components, connecting them with wires, explaining how circuits work, and helping you create exactly what you need.
+
+${contextBlock}
 
 CRITICAL: You MUST respond with VALID JSON that follows this exact schema:
 
@@ -250,8 +415,6 @@ INPUT CLASSIFICATION:
 - "Add a resistor" → mode: "full", create circuit with resistor
 - "What's a capacitor?" → mode: "text-only", explain capacitor
 - "Connect LED to battery" → mode: "full", create circuit with LED and battery connected
-
-Current canvas state: ${JSON.stringify(canvasState || "empty")}
 
 IMPORTANT: Your response must be PURE JSON with no additional text, markdown, or formatting.`;
 

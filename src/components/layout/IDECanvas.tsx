@@ -3,16 +3,15 @@
 import { useState, useCallback } from "react";
 import { SchemaPanel } from "./SchemaPanel";
 import { TopToolbar } from "./TopToolbar";
-import { AIPromptPanel } from "./AIPromptPanel";
+import { ChatUIContainer } from "../agent/ChatUIContainer";
 import { AIChatInterface } from "../ai/AIChatInterface";
 import { DeviceRestriction } from "./DeviceRestriction";
 import { IDEFabricCanvas } from "@/canvas";
 import { useOverrideBrowserControls } from "@/hooks/useOverrideBrowserControls";
 import { AIChatProvider } from "../../contexts/AIChatContext";
 import { CanvasProvider } from "../../contexts/CanvasContext";
-import { responsive } from "@/lib/responsive";
 import { logger } from "@/lib/logger";
-import * as fabric from "fabric";
+import { getChatUIStyles } from "../agent/ChatUIConfig";
 import { useProject } from "@/contexts/ProjectContext";
 import { useCanvasAutoSave } from "@/canvas/hooks/useCanvasAutoSave";
 import { canvasCommandManager } from "@/canvas/canvas-command-manager";
@@ -40,32 +39,37 @@ export function IDECanvas() {
   });
 
   // Shared save function that both Ctrl+S and Export button will use
-  const sharedSaveFunction = useCallback(async () => {
-    if (!currentProject) {
-      throw new Error("Cannot save: no project loaded");
-    }
+  const sharedSaveFunction = useCallback(
+    async (overrideMessages?: any[]) => {
+      if (!currentProject) {
+        throw new Error("Cannot save: no project loaded");
+      }
 
-    if (!fabricCanvas) {
-      throw new Error("Cannot save: canvas not initialized");
-    }
+      if (!fabricCanvas) {
+        throw new Error("Cannot save: canvas not initialized");
+      }
 
-    const currentNetlist = getNetlist ? getNetlist() : [];
-    console.log("💾 Shared save function called", {
-      hasProject: !!currentProject,
-      projectId: currentProject?.id,
-      canvasObjects: fabricCanvas.getObjects().length,
-      netlistNets: currentNetlist.length,
-      netlistConnections: currentNetlist.reduce(
-        (sum: number, net: any) => sum + (net.connections?.length || 0),
-        0
-      ),
-    });
+      const currentNetlist = getNetlist ? getNetlist() : [];
+      logger.api("Shared save function called", {
+        hasProject: !!currentProject,
+        projectId: currentProject?.id,
+        canvasObjects: fabricCanvas.getObjects().length,
+        netlistNets: currentNetlist.length,
+        netlistConnections: currentNetlist.reduce(
+          (sum: number, net: any) => sum + (net.connections?.length || 0),
+          0
+        ),
+        hasOverrideMessages: !!overrideMessages,
+        messageCount: overrideMessages?.length || 0,
+      });
 
-    // Call the auto-save mechanism
-    await autoSave.saveNow();
+      // Call the auto-save mechanism with optional messages
+      await autoSave.saveNow(overrideMessages);
 
-    console.log("✅ Shared save function completed");
-  }, [currentProject, fabricCanvas, autoSave]);
+      logger.api("Shared save function completed");
+    },
+    [currentProject, fabricCanvas, autoSave]
+  );
 
   const handleCanvasReady = (fabricCanvas: any) => {
     logger.canvas("Canvas is ready!", fabricCanvas);
@@ -77,6 +81,12 @@ export function IDECanvas() {
     logger.wire("Netlist access ready");
     setGetNetlist(() => getNetlistFn);
   };
+
+  const chatUIStyles = getChatUIStyles();
+  const chatUIBottomOffset = chatUIStyles.offsets.bottom;
+  const chatUIRightOffset = chatUIStyles.offsets.right;
+  const aiPanelBottomOffset = `calc(${chatUIBottomOffset} + ${chatUIStyles.promptEntry.height} + ${chatUIStyles.gap} + ${chatUIStyles.streamer.height} + ${chatUIStyles.gap})`;
+  const aiPanelRightOffset = chatUIRightOffset;
 
   return (
     <CanvasProvider canvas={canvas} isReady={isCanvasReady}>
@@ -111,9 +121,11 @@ export function IDECanvas() {
             <div
               className="absolute z-20"
               style={{
-                bottom: responsive(150), // 32 (prompt bottom) + 97 (prompt height) + 25 (thinking height) + 15 (spacing: 10 + 5)
-                right: responsive(32), // Match PromptEntry's responsive(32)
-                width: responsive(338), // Match PromptEntry's exact width
+                bottom: aiPanelBottomOffset,
+                right: aiPanelRightOffset,
+                width: chatUIStyles.content.width,
+                minWidth: chatUIStyles.content.minWidth,
+                maxWidth: chatUIStyles.content.maxWidth,
               }}
             >
               <AIChatInterface
@@ -125,10 +137,8 @@ export function IDECanvas() {
             </div>
           </div>
 
-          {/* AI Prompt Panel - Fixed at bottom, always visible */}
-          <div className="flex-shrink-0 relative">
-            <AIPromptPanel />
-          </div>
+          {/* Chat UI Container - Self-positioning at bottom right */}
+          <ChatUIContainer />
         </div>
       </AIChatProvider>
     </CanvasProvider>

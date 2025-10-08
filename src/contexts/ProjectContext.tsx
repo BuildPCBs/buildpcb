@@ -546,6 +546,18 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
               ) || 0,
           });
 
+          const safeChatData =
+            typeof structuredClone === "function"
+              ? structuredClone(chatData)
+              : JSON.parse(JSON.stringify(chatData));
+
+          if (typeof window !== "undefined") {
+            (window as any).__buildpcbPendingChatData = {
+              data: safeChatData,
+              timestamp: Date.now(),
+            };
+          }
+
           // Dispatch custom event to notify AIChatContext of restored data
           // Add a small delay to ensure AIChatContext is ready
           setTimeout(() => {
@@ -556,7 +568,7 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
             );
             window.dispatchEvent(
               new CustomEvent("chatDataRestored", {
-                detail: { chatData },
+                detail: { chatData: safeChatData },
               })
             );
           }, 100);

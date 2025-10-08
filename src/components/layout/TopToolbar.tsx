@@ -15,11 +15,12 @@ import { Circuit } from "@/lib/schemas/circuit";
 import { canvasCommandManager } from "@/canvas/canvas-command-manager";
 import { useAIChat } from "@/contexts/AIChatContext";
 import { useCanvasAutoSave } from "@/canvas/hooks/useCanvasAutoSave";
+import { useProjectStore } from "@/store/projectStore";
 
 interface TopToolbarProps {
   className?: string;
   getNetlist?: (() => any) | null;
-  onSave?: () => Promise<void>;
+  onSave?: (overrideMessages?: any[]) => Promise<void>;
 }
 
 export function TopToolbar({
@@ -36,6 +37,7 @@ export function TopToolbar({
   // Get project and canvas contexts
   const { currentProject, currentCircuit } = useProject();
   const { messages } = useAIChat();
+  const isProjectDirty = useProjectStore((state) => state.isDirty);
 
   // Get canvas instance for auto-save
   const canvas = canvasCommandManager.getCanvas();
@@ -73,7 +75,27 @@ export function TopToolbar({
         handleChatSave as EventListener
       );
     };
-  }, [currentProject, isSaving]);
+  }, [currentProject, isSaving, messages]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!isProjectDirty && !isSaving) {
+        return;
+      }
+
+      const warningMessage =
+        "Changes are still being saved. Leaving now may lose recent updates.";
+      event.preventDefault();
+      event.returnValue = warningMessage;
+      return warningMessage;
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [isProjectDirty, isSaving]);
 
   const handleExport = async (overrideMessages?: any[]) => {
     if (!currentProject) {
@@ -98,14 +120,16 @@ export function TopToolbar({
         hasProject: !!currentProject,
         projectId: currentProject?.id,
         canvasObjects: canvas.getObjects().length,
+        hasOverrideMessages: !!overrideMessages,
+        messageCount: overrideMessages?.length || 0,
       });
 
-      // Use the shared save function
+      // Use the shared save function with override messages
       if (onSave) {
-        await onSave();
+        await onSave(overrideMessages);
       } else {
         // Fallback to auto-save if no shared function provided
-        await autoSave.saveNow();
+        await autoSave.saveNow(overrideMessages);
       }
 
       // Update last save time

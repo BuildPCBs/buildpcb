@@ -7,6 +7,7 @@ import { useAIChat } from "../../contexts/AIChatContext";
 import { useCanvas } from "../../contexts/CanvasContext";
 import { useCanvasStateSnapshot } from "../../hooks/useCanvasState";
 import { logger } from "../../lib/logger";
+import { getChatUIStyles } from "../agent/ChatUIConfig";
 import { agentService } from "../../agent/AgentService";
 import { StreamMessage } from "../../agent/StreamingHandler";
 
@@ -21,7 +22,6 @@ export function AIPromptPanel({
   onPromptSubmit,
   isThinking = false,
 }: AIPromptPanelProps) {
-  const [localIsThinking, setLocalIsThinking] = useState(false);
   const [streamMessages, setStreamMessages] = useState<StreamMessage[]>([]);
 
   const {
@@ -34,7 +34,7 @@ export function AIPromptPanel({
   const canvasState = useCanvasStateSnapshot(canvas);
 
   // Use context isThinking, then external isThinking, then local state
-  const currentIsThinking = contextIsThinking || isThinking || localIsThinking;
+  const currentIsThinking = contextIsThinking || isThinking;
 
   // Subscribe to agent streaming messages
   useEffect(() => {
@@ -87,19 +87,40 @@ export function AIPromptPanel({
     // Send/process functionality here
   };
 
-  return (
-    <div className={`relative ${className}`}>
-      {/* Agent Stream Display - Replaces old ThinkingIndicator */}
-      <AgentStreamDisplay messages={streamMessages} />
+  const styles = getChatUIStyles();
 
-      {/* Prompt Entry */}
-      <PromptEntry
-        onSubmit={handlePromptSubmit}
-        onMicClick={handleMicClick}
-        onDotsClick={handleDotsClick}
-        onSendClick={handleSendClick}
-        isThinking={currentIsThinking}
-      />
+  return (
+    <div
+      className={`fixed ${className}`}
+      style={{
+        bottom: styles.container.padding,
+        right: styles.container.padding,
+        pointerEvents: "none",
+        zIndex: 10,
+      }}
+    >
+      <div
+        className="relative flex flex-col"
+        style={{
+          ...styles.content,
+          gap: styles.gap,
+          pointerEvents: "auto",
+        }}
+      >
+        {/* Agent Stream Display - Positioned above PromptEntry */}
+        {streamMessages.length > 0 && (
+          <AgentStreamDisplay messages={streamMessages} />
+        )}
+
+        {/* Prompt Entry */}
+        <PromptEntry
+          onSubmit={handlePromptSubmit}
+          onMicClick={handleMicClick}
+          onDotsClick={handleDotsClick}
+          onSendClick={handleSendClick}
+          isThinking={currentIsThinking}
+        />
+      </div>
     </div>
   );
 }

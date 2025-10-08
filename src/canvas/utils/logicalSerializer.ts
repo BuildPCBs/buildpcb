@@ -319,11 +319,36 @@ export async function loadCanvasFromLogicalCircuit(
                 }, type: ${typeof dbComponent.uid}`
               );
 
-              // Listen for completion with proper timeout and retry mechanism
-              setTimeout(() => {
-                clearTimeout(timeout);
-                resolve();
-              }, 1000); // Increased delay significantly to allow component creation to complete properly
+              // Poll for component to appear on canvas (Fabric.js async rendering)
+              let attempts = 0;
+              const maxAttempts = 20; // 2 seconds total (20 * 100ms)
+              const checkInterval = setInterval(() => {
+                attempts++;
+                const canvasObjects = canvas.getObjects();
+                const foundComponent = canvasObjects.find(
+                  (obj: any) => obj.data?.componentId === component.id
+                );
+
+                if (foundComponent) {
+                  console.log(
+                    `✅ Component ${component.id} found on canvas after ${
+                      attempts * 100
+                    }ms`
+                  );
+                  clearTimeout(timeout);
+                  clearInterval(checkInterval);
+                  resolve();
+                } else if (attempts >= maxAttempts) {
+                  console.warn(
+                    `⚠️ Component ${component.id} not found after ${
+                      attempts * 100
+                    }ms, continuing anyway`
+                  );
+                  clearTimeout(timeout);
+                  clearInterval(checkInterval);
+                  resolve(); // Resolve anyway to not block restoration
+                }
+              }, 100); // Check every 100ms
             });
 
             await addPromise;
@@ -356,17 +381,17 @@ export async function loadCanvasFromLogicalCircuit(
             );
 
             if (!justAddedComponent) {
-              console.error(
-                `❌ CRITICAL: Component ${component.id} was not found on canvas after being added!`
+              console.warn(
+                `⚠️ Component ${component.id} verification failed - may appear after render cycle completes`
               );
               // Extra debugging - show all objects on canvas
               console.log(
-                `🔍 All canvas objects:`,
+                `🔍 All canvas objects (${canvasObjects.length}):`,
                 canvasObjects.map((obj: any, idx) => ({
                   index: idx,
                   type: obj.type,
-                  data: obj.data,
-                  hasComponentId: !!obj.data?.componentId,
+                  componentId: obj.data?.componentId,
+                  hasData: !!obj.data,
                 }))
               );
             }

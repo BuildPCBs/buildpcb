@@ -558,16 +558,34 @@ export class DatabaseService {
         }
 
         return data;
-      } catch (error) {
+      } catch (error: any) {
         if (retries === 1) {
           // Last attempt failed
+          console.error("❌ Version creation failed after all retries:", error);
           throw error;
         }
-        retries--;
-        console.warn("⚠️ Version creation failed, retrying...", error);
-        await new Promise((resolve) =>
-          setTimeout(resolve, Math.random() * 1000)
-        );
+
+        // Check if it's a timeout error
+        const isTimeout =
+          error?.code === "57014" || error?.message?.includes("timeout");
+
+        if (isTimeout) {
+          console.warn("⏱️ Database timeout, retrying with longer delay...", {
+            retriesLeft: retries - 1,
+            errorCode: error?.code,
+          });
+          retries--;
+          // Longer delay for timeout errors
+          await new Promise((resolve) =>
+            setTimeout(resolve, 2000 + Math.random() * 1000)
+          );
+        } else {
+          retries--;
+          console.warn("⚠️ Version creation failed, retrying...", error);
+          await new Promise((resolve) =>
+            setTimeout(resolve, Math.random() * 1000)
+          );
+        }
       }
     }
 

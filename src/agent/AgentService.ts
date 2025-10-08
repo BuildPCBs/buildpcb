@@ -11,6 +11,7 @@ import {
 import { Capability } from "./capabilities";
 import { capabilityHandlers } from "./capability-handlers";
 import { StreamingHandler } from "./StreamingHandler";
+import { LLMOrchestrator } from "./LLMOrchestrator";
 import type * as fabric from "fabric";
 
 /**
@@ -19,9 +20,21 @@ import type * as fabric from "fabric";
  */
 export class AgentService {
   private streamingHandler: StreamingHandler;
+  private llmOrchestrator: LLMOrchestrator | null = null;
 
   constructor() {
     this.streamingHandler = new StreamingHandler();
+
+    // Initialize LLM orchestrator if API key is available
+    if (LLMOrchestrator.isConfigured()) {
+      this.llmOrchestrator = new LLMOrchestrator();
+      logger.debug("🧠 LLM Orchestrator enabled");
+    } else {
+      logger.warn(
+        "⚠️ LLM Orchestrator disabled - OPENAI_API_KEY not configured"
+      );
+    }
+
     logger.debug("🤖 AgentService initialized");
   }
 
@@ -114,7 +127,51 @@ export class AgentService {
   }
 
   /**
-   * Execute a capability handler
+   * Execute natural language command using LLM orchestrator
+   * This is the NEW way - understands complex, multi-step commands
+   */
+  async execute(prompt: string, userId?: string): Promise<AgentResult> {
+    logger.info(`🧠 Executing natural language command`, { prompt });
+
+    // Check if LLM orchestrator is available
+    if (!this.llmOrchestrator) {
+      const error =
+        "LLM Orchestrator not configured. Please set OPENAI_API_KEY environment variable.";
+      this.streamingHandler.error(error);
+      logger.error(error);
+
+      return {
+        status: "error",
+        message: error,
+      };
+    }
+
+    try {
+      // Build context
+      const context = this.buildContext(userId);
+
+      // Use LLM orchestrator for multi-step reasoning and tool calling
+      const result = await this.llmOrchestrator.execute(prompt, context);
+
+      return result;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      logger.error(`🤖 Error executing natural language command:`, error);
+
+      this.streamingHandler.error(`Failed to execute command`, error as Error);
+
+      return {
+        status: "error",
+        message: errorMessage,
+        error: error as Error,
+      };
+    }
+  }
+
+  /**
+   * Execute a capability handler (OLD way - direct capability execution)
+   * Still useful for testing and simple commands
    */
   async executeCapability(
     capability: Capability,
@@ -235,6 +292,11 @@ export const agentService = new AgentService();
 if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
   // Main service interface
   (window as any).agentService = {
+    // NEW: Natural language execute (uses LLM orchestrator)
+    execute: async (prompt: string) => {
+      return agentService.execute(prompt);
+    },
+    // OLD: Direct capability execution (still useful for testing)
     executeCapability: async (capability: string, prompt: string) => {
       return agentService.executeCapability(capability as Capability, prompt);
     },

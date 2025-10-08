@@ -22,3 +22,22 @@ Agent: "Placing the 390-ohm resistor on the canvas." (The resistor appears).
 Agent: "Wiring everything together: Battery positive to the resistor, resistor to the LED anode, and LED cathode back to the battery negative." (The wires visually appear on the canvas, connecting the components).
 
 Agent: "The circuit is complete! I've set up a basic indicator circuit. Is there anything you'd like to change?"
+
+
+
+
+
+So talking about how the agent will work
+
+So firstly, the user inputt is parsed , the exact tool needed is determined, also with a list of thought process and actionable process in a json
+
+a call to vectorizing if needed
+
+(FIrst call)
+
+
+then goes to quering database with vexctor,, or sending text or what ever of the capabilities
+
+then uses actionabkle process to each point in agent streamer, understand?
+
+then at end bunder vectors found, data and send back to LLM for deciding and then comes back with a fullk of what would be used, and then query db for exact in components_v2 and lay em down

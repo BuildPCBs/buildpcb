@@ -2,17 +2,24 @@
 
 import { useState } from "react";
 import { DotsIcon, MicIcon } from "@/components/icons";
-import { r, responsive, responsiveSquare } from "@/lib/responsive";
+import { responsive, responsiveSquare } from "@/lib/responsive";
 import { BRAND_COLORS } from "@/lib/constants";
+import { getChatUIStyles } from "../agent/ChatUIConfig";
 import { Send } from "lucide-react";
 
 interface PromptEntryProps {
   onSubmit?: (prompt: string) => void;
-  onMicClick?: () => void; // Previously onPlusClick, now microphone
+  onMicClick?: () => void;
   onDotsClick?: () => void;
-  onSendClick?: () => void; // Previously onMicClick, now send button
+  onSendClick?: () => void;
   isThinking?: boolean;
   className?: string;
+  // Optional dimension overrides from parent container
+  width?: string;
+  minWidth?: string;
+  maxWidth?: string;
+  minHeight?: string;
+  maxHeight?: string;
 }
 
 export function PromptEntry({
@@ -22,6 +29,11 @@ export function PromptEntry({
   onSendClick,
   isThinking = false,
   className = "",
+  width,
+  minWidth,
+  maxWidth,
+  minHeight,
+  maxHeight,
 }: PromptEntryProps) {
   const [prompt, setPrompt] = useState("");
 
@@ -49,40 +61,43 @@ export function PromptEntry({
     }
   };
 
+  const styles = getChatUIStyles();
+
   return (
     <div
-      className={`absolute ${className}`}
+      className={`relative flex-shrink-0 ${className}`}
       style={{
-        ...r({
-          width: 338,
-          height: 97,
-          borderRadius: 12,
-          bottom: 32, // Changed from top to bottom positioning
-        }),
-        right: responsive(32), // Same right margin as toolbar
-        zIndex: 10,
+        width: width || styles.content.width,
+        minWidth: minWidth || styles.content.minWidth,
+        maxWidth: maxWidth || styles.content.maxWidth,
+        minHeight: minHeight || styles.promptEntry.minHeight,
+        maxHeight: maxHeight || styles.promptEntry.maxHeight,
+        // Remove fixed height - let content determine size
+        zIndex: 1, // Below AgentStreamDisplay
       }}
     >
       {/* Main Prompt Box */}
       <div
-        className="relative h-full"
+        className="relative"
         style={{
-          borderRadius: responsive(12),
+          borderRadius: styles.promptEntry.borderRadius,
           borderWidth: responsive(1),
           borderColor: "#DDDDDD", // Border color
           borderStyle: "solid",
           backgroundColor: "#F5F5F5", // Light gray fill as requested
+          minHeight: "100%", // Grow to fill parent but don't force it
         }}
       >
         {/* Prompt Text Area */}
-        <form onSubmit={handleSubmit} className="h-full relative">
+        <form onSubmit={handleSubmit} className="relative">
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Build your circuit with AI..."
             disabled={isThinking}
-            className="w-full h-full resize-none border-none rounded-xl transition-all focus:outline-none focus:ring-0 focus:border-gray-400"
+            className="w-full resize-none border-none rounded-xl transition-all focus:outline-none focus:ring-0 focus:border-gray-400"
+            rows={2}
             style={{
               backgroundColor: "transparent",
               color: prompt.trim() ? "#000000" : "#999999", // Black when typing, gray placeholder
@@ -92,6 +107,7 @@ export function PromptEntry({
               )} ${responsive(12)}`, // Reduced right padding since mic moved to bottom
               borderRadius: responsive(12),
               border: "none",
+              minHeight: "60px", // Explicit minimum height for textarea
             }}
           />
         </form>

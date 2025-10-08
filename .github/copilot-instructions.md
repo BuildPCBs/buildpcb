@@ -28,11 +28,13 @@ AI-powered PCB design IDE using Next.js 15 + React 19 + TypeScript + Tailwind CS
 
 **Documentation & File Management Rules**
 
-- Markdown: Do not create/commit new .md files unless instructed; if so, place in `/dev`.
+- Markdown: Do not create/commit new .md files unless instructed; .
 - No test files.
 - remove all script you use while testing
 - No top-of-file comments; document in code.
 - Canvas-Specific: Ensure cleanup and event handling in Fabric.js.
+- Never create a visual demo document:
+- Never add html except specifically instructed.
 
 **Code Editing & Rewriting Standards**
 

@@ -247,144 +247,163 @@ export function useCanvasAutoSave({
   }, [canvas, enabled, autoSaveEnabled, handleCanvasChange]);
 
   // Manual save function
-  const saveNow = useCallback(async () => {
-    // Get the latest project store state to ensure we have current projectId
-    const currentStore = useProjectStore.getState();
-    const currentProjectId =
-      projectId || currentStore.projectId || currentProject?.id;
+  const saveNow = useCallback(
+    async (overrideMessages?: any[]) => {
+      // Prevent concurrent saves
+      if (saving) {
+        console.log("⏸️ Save already in progress, skipping duplicate request");
+        return;
+      }
 
-    console.log("💾 Manual save triggered - checking conditions:", {
-      hasProjectId: !!currentProjectId,
-      projectId: currentProjectId,
-      hasCanvas: !!canvas,
-      canvasObjectCount: canvas?.getObjects().length,
-      autoSaveEnabled,
-      enabled,
-      storeProjectId: currentStore.projectId,
-      hookProjectId: projectId,
-      contextProjectId: currentProject?.id,
-    });
+      // Get the latest project store state to ensure we have current projectId
+      const currentStore = useProjectStore.getState();
+      const currentProjectId =
+        projectId || currentStore.projectId || currentProject?.id;
 
-    if (!currentProjectId) {
-      const errorMessage =
-        "Cannot save: missing projectId - check if project is properly loaded";
-      console.warn("❌", errorMessage);
-      console.warn(
-        "💡 Make sure you have opened/created a project before trying to save"
-      );
-      throw new Error(errorMessage);
-    }
+      // Use override messages if provided, otherwise use messages from context
+      const messagesToSave = overrideMessages || messages;
 
-    if (!canvas) {
-      const errorMessage =
-        "Cannot save: missing canvas - check if canvas is properly initialized";
-      console.warn("❌", errorMessage);
-      throw new Error(errorMessage);
-    }
-
-    try {
-      setSaving(true);
-      setError(null);
-      console.log(
-        "💾 Manual save proceeding with projectId:",
-        currentProjectId
-      );
-
-      // Get fresh canvas data immediately for manual save
-      const data = await getCurrentCanvasData();
-
-      console.log("💬 Preparing chat data for save:", {
-        messageCount: messages.length,
-        messagesArray: messages,
-        firstMessage: messages[0]
-          ? {
-              id: messages[0].id,
-              type: messages[0].type,
-              contentLength: messages[0].content?.length || 0,
-              hasTimestamp: !!messages[0].timestamp,
-            }
-          : null,
-      });
-
-      const chatData =
-        messages.length > 0
-          ? {
-              messages: messages.map((msg) => ({
-                ...msg,
-                timestamp:
-                  msg.timestamp instanceof Date
-                    ? msg.timestamp.toISOString()
-                    : msg.timestamp,
-              })),
-            }
-          : null;
-      const extendedCanvasData = {
-        ...data.canvasData,
-        chatData: chatData,
-      };
-
-      // Update the current data state for consistency
-      setCurrentData({
-        circuit: data.circuit,
-        canvasData: extendedCanvasData,
-        chatData: chatData,
-      });
-
-      // Ensure we have valid circuit data with all required fields
-      const circuitData = {
-        mode: (data.circuit?.mode || "full") as "full" | "edit",
-        components: data.circuit?.components || [],
-        connections: data.circuit?.connections || [],
-        description: data.circuit?.description || "",
-      };
-
-      console.log("💾 Calling DatabaseService directly with fresh data", {
+      console.log("💾 Manual save triggered - checking conditions:", {
+        hasProjectId: !!currentProjectId,
         projectId: currentProjectId,
-        componentCount: circuitData.components.length,
-        connectionCount: circuitData.connections.length,
-        netlistNets: getCurrentNetlist().length,
-        netlistConnections: getCurrentNetlist().reduce(
-          (sum: number, net: any) => sum + (net.connections?.length || 0),
-          0
-        ),
-        hasChatData: !!chatData,
-        chatMessageCount: chatData?.messages?.length || 0,
-        extendedCanvasDataHasChatData: !!extendedCanvasData.chatData,
-        extendedCanvasDataKeys: Object.keys(extendedCanvasData),
+        hasCanvas: !!canvas,
+        canvasObjectCount: canvas?.getObjects().length,
+        autoSaveEnabled,
+        enabled,
+        storeProjectId: currentStore.projectId,
+        hookProjectId: projectId,
+        contextProjectId: currentProject?.id,
+        messageCount: messagesToSave.length,
+        hasOverrideMessages: !!overrideMessages,
       });
 
-      await DatabaseService.createVersion(
-        currentProjectId,
-        circuitData,
-        extendedCanvasData,
-        `Manual save ${new Date().toLocaleTimeString()}`,
-        "Manual save via Ctrl+S or Export button",
-        getCurrentNetlist() // NEW: Pass current netlist data
-      );
+      if (!currentProjectId) {
+        const errorMessage =
+          "Cannot save: missing projectId - check if project is properly loaded";
+        console.warn("❌", errorMessage);
+        console.warn(
+          "💡 Make sure you have opened/created a project before trying to save"
+        );
+        throw new Error(errorMessage);
+      }
 
-      markClean();
-      setLastSaved(new Date());
-      console.log("✅ Manual save completed successfully with fresh data");
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Manual save failed";
-      setError(errorMessage);
-      console.error("❌ Manual save failed:", error);
-    } finally {
-      setSaving(false);
-    }
-  }, [
-    projectId,
-    canvas,
-    markClean,
-    getCurrentCanvasData,
-    messages,
-    setCurrentData,
-    currentProject,
-    setSaving,
-    setError,
-    setLastSaved,
-  ]);
+      if (!canvas) {
+        const errorMessage =
+          "Cannot save: missing canvas - check if canvas is properly initialized";
+        console.warn("❌", errorMessage);
+        throw new Error(errorMessage);
+      }
+
+      try {
+        setSaving(true);
+        setError(null);
+        console.log(
+          "💾 Manual save proceeding with projectId:",
+          currentProjectId
+        );
+
+        // Get fresh canvas data immediately for manual save
+        const data = await getCurrentCanvasData();
+
+        console.log("💬 Preparing chat data for save:", {
+          messageCount: messagesToSave.length,
+          messagesArray: messagesToSave,
+          firstMessage: messagesToSave[0]
+            ? {
+                id: messagesToSave[0].id,
+                type: messagesToSave[0].type,
+                contentLength: messagesToSave[0].content?.length || 0,
+                hasTimestamp: !!messagesToSave[0].timestamp,
+              }
+            : null,
+        });
+
+        const chatData =
+          messagesToSave.length > 0
+            ? {
+                messages: messagesToSave.map((msg) => ({
+                  ...msg,
+                  timestamp:
+                    msg.timestamp instanceof Date
+                      ? msg.timestamp.toISOString()
+                      : msg.timestamp,
+                })),
+              }
+            : null;
+        const extendedCanvasData = {
+          ...data.canvasData,
+          chatData: chatData,
+        };
+
+        // Update the current data state for consistency
+        setCurrentData({
+          circuit: data.circuit,
+          canvasData: extendedCanvasData,
+          chatData: chatData,
+        });
+
+        // Ensure we have valid circuit data with all required fields
+        const circuitData = {
+          mode: (data.circuit?.mode || "full") as "full" | "edit",
+          components: data.circuit?.components || [],
+          connections: data.circuit?.connections || [],
+          description: data.circuit?.description || "",
+        };
+
+        console.log("💾 Calling DatabaseService directly with fresh data", {
+          projectId: currentProjectId,
+          componentCount: circuitData.components.length,
+          connectionCount: circuitData.connections.length,
+          netlistNets: getCurrentNetlist().length,
+          netlistConnections: getCurrentNetlist().reduce(
+            (sum: number, net: any) => sum + (net.connections?.length || 0),
+            0
+          ),
+          hasChatData: !!chatData,
+          chatMessageCount: chatData?.messages?.length || 0,
+          extendedCanvasDataHasChatData: !!extendedCanvasData.chatData,
+          extendedCanvasDataKeys: Object.keys(extendedCanvasData),
+        });
+
+        const saveStartTime = Date.now();
+        await DatabaseService.createVersion(
+          currentProjectId,
+          circuitData,
+          extendedCanvasData,
+          `Manual save ${new Date().toLocaleTimeString()}`,
+          "Manual save via Ctrl+S or Export button",
+          getCurrentNetlist() // NEW: Pass current netlist data
+        );
+        const saveDuration = Date.now() - saveStartTime;
+
+        markClean();
+        setLastSaved(new Date());
+        console.log("✅ Manual save completed successfully with fresh data", {
+          duration: `${saveDuration}ms`,
+          canvasDataSize: JSON.stringify(extendedCanvasData).length,
+        });
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Manual save failed";
+        setError(errorMessage);
+        console.error("❌ Manual save failed:", error);
+      } finally {
+        setSaving(false);
+      }
+    },
+    [
+      projectId,
+      canvas,
+      markClean,
+      getCurrentCanvasData,
+      messages,
+      setCurrentData,
+      currentProject,
+      setSaving,
+      setError,
+      setLastSaved,
+    ]
+  );
 
   // Implement auto-save interval using the same saveNow function
   useEffect(() => {

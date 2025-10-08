@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { r, responsive } from "@/lib/responsive";
+import { responsive } from "@/lib/responsive";
+import { getChatUIStyles } from "./ChatUIConfig";
 import { StreamMessage, StreamMessageType } from "@/agent/StreamingHandler";
 import {
   Loader2,
@@ -14,47 +15,60 @@ import {
 interface AgentStreamDisplayProps {
   messages: StreamMessage[];
   className?: string;
+  // Optional dimension overrides from parent container
+  width?: string;
+  minWidth?: string;
+  maxWidth?: string;
+  minHeight?: string;
+  maxHeight?: string;
 }
 
 export function AgentStreamDisplay({
   messages,
   className = "",
+  width,
+  minWidth,
+  maxWidth,
+  minHeight,
+  maxHeight,
 }: AgentStreamDisplayProps) {
   // Only show the most recent message
   const currentMessage = messages[messages.length - 1];
 
   if (!currentMessage) return null;
 
+  const styles = getChatUIStyles();
+
   return (
     <div
-      className={`absolute flex items-center ${className}`}
+      className={`relative flex items-center flex-shrink-0 ${className}`}
       style={{
-        ...r({
-          width: 338,
-          height: 25,
-          borderRadius: 6,
-          bottom: 137,
-          right: 32,
-          borderWidth: 1,
-        }),
-        minHeight: responsive(25),
-        maxHeight: responsive(60),
+        width: width || styles.content.width,
+        minWidth: minWidth || styles.content.minWidth,
+        maxWidth: maxWidth || styles.content.maxWidth,
+        minHeight: minHeight || styles.streamer.minHeight,
+        maxHeight: maxHeight || styles.streamer.maxHeight,
+        // Remove fixed height - let content determine size
+        borderRadius: styles.streamer.borderRadius,
+        borderWidth: responsive(1),
         ...getMessageStyles(currentMessage.type),
-        zIndex: 10,
-        paddingTop: responsive(6),
-        paddingBottom: responsive(6),
-        paddingLeft: responsive(12),
-        paddingRight: responsive(12),
+        paddingTop: responsive(3),
+        paddingBottom: responsive(3),
+        paddingLeft: responsive(8),
+        paddingRight: responsive(8),
+        zIndex: 2, // Ensure streamer appears above prompt entry
       }}
     >
       {/* Icon based on message type */}
-      <div className="flex-shrink-0 mr-2">{getIcon(currentMessage.type)}</div>
+      <div className="flex-shrink-0" style={{ marginRight: responsive(5) }}>
+        {getIcon(currentMessage.type)}
+      </div>
 
       {/* Message Content */}
       <div className="flex-1 overflow-hidden">
         <span
           style={{
-            fontSize: responsive(10),
+            fontSize: responsive(8.5),
             fontWeight: 400,
             lineHeight: 1.4,
           }}
@@ -65,8 +79,8 @@ export function AgentStreamDisplay({
         {/* Progress bar if applicable */}
         {currentMessage.progress && (
           <div
-            className="mt-1 bg-white bg-opacity-30 rounded-full overflow-hidden"
-            style={{ height: responsive(3) }}
+            className="mt-0.5 bg-white bg-opacity-30 rounded-full overflow-hidden"
+            style={{ height: responsive(1.5) }}
           >
             <div
               className="h-full transition-all duration-300"
@@ -130,7 +144,7 @@ function getMessageStyles(type: StreamMessageType): React.CSSProperties {
  * Get icon based on message type
  */
 function getIcon(type: StreamMessageType) {
-  const iconSize = responsive(14);
+  const iconSize = responsive(10);
   const iconProps = {
     size: iconSize,
     className: "animate-pulse",

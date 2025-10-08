@@ -32,7 +32,7 @@ interface IDEFabricCanvasProps {
   className?: string;
   onCanvasReady?: (canvas: any) => void;
   onNetlistReady?: (getNetlist: () => any) => void;
-  onSave?: () => Promise<void>;
+  onSave?: (overrideMessages?: any[]) => Promise<void>;
 }
 
 export function IDEFabricCanvas({
