@@ -98,7 +98,7 @@ export class LLMOrchestrator {
 
         const decoder = new TextDecoder();
         let accumulatedContent = "";
-        let toolCalls: any[] = [];
+        const toolCalls: any[] = [];
         let currentToolCall: any = null;
 
         while (true) {

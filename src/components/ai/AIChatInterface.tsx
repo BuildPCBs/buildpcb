@@ -455,71 +455,74 @@ export function AIChatInterface({
                               remarkPlugins={[remarkMath]}
                               rehypePlugins={[rehypeKatex]}
                               components={{
-                              // Custom styling for markdown elements
-                              p: ({ children }) => (
-                                <p className="mb-2 last:mb-0">{children}</p>
-                              ),
-                              strong: ({ children }) => (
-                                <strong className="font-semibold text-gray-900">
-                                  {children}
-                                </strong>
-                              ),
-                              em: ({ children }) => (
-                                <em className="italic text-gray-700">
-                                  {children}
-                                </em>
-                              ),
-                              code: ({ children }) => (
-                                <code className="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono text-gray-800">
-                                  {children}
-                                </code>
-                              ),
-                              pre: ({ children }) => (
-                                <pre className="bg-gray-100 p-2 rounded text-xs font-mono text-gray-800 overflow-x-auto">
-                                  {children}
-                                </pre>
-                              ),
-                              ul: ({ children }) => (
-                                <ul className="list-disc list-inside mb-2 space-y-1">
-                                  {children}
-                                </ul>
-                              ),
-                              ol: ({ children }) => (
-                                <ol className="list-decimal list-inside mb-2 space-y-1">
-                                  {children}
-                                </ol>
-                              ),
-                              li: ({ children }) => (
-                                <li className="text-gray-700">{children}</li>
-                              ),
-                              h1: ({ children }) => (
-                                <h1 className="text-sm font-bold text-gray-900 mb-2">
-                                  {children}
-                                </h1>
-                              ),
-                              h2: ({ children }) => (
-                                <h2 className="text-sm font-bold text-gray-900 mb-2">
-                                  {children}
-                                </h2>
-                              ),
-                              h3: ({ children }) => (
-                                <h3 className="text-sm font-bold text-gray-900 mb-2">
-                                  {children}
-                                </h3>
-                              ),
-                              blockquote: ({ children }) => (
-                                <blockquote className="border-l-4 border-gray-300 pl-4 italic text-gray-600 mb-2">
-                                  {children}
-                                </blockquote>
-                              ),
-                            }}
-                          >
-                            {message.content}
-                          </ReactMarkdown>
-                          {/* Streaming cursor at the end of content */}
-                          {message.isStreaming && (
-                            <span className="inline-block ml-1 w-1.5 h-4 bg-blue-600 animate-pulse" style={{ verticalAlign: 'middle' }} />
-                          )}
+                                // Custom styling for markdown elements
+                                p: ({ children }) => (
+                                  <p className="mb-2 last:mb-0">{children}</p>
+                                ),
+                                strong: ({ children }) => (
+                                  <strong className="font-semibold text-gray-900">
+                                    {children}
+                                  </strong>
+                                ),
+                                em: ({ children }) => (
+                                  <em className="italic text-gray-700">
+                                    {children}
+                                  </em>
+                                ),
+                                code: ({ children }) => (
+                                  <code className="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono text-gray-800">
+                                    {children}
+                                  </code>
+                                ),
+                                pre: ({ children }) => (
+                                  <pre className="bg-gray-100 p-2 rounded text-xs font-mono text-gray-800 overflow-x-auto">
+                                    {children}
+                                  </pre>
+                                ),
+                                ul: ({ children }) => (
+                                  <ul className="list-disc list-inside mb-2 space-y-1">
+                                    {children}
+                                  </ul>
+                                ),
+                                ol: ({ children }) => (
+                                  <ol className="list-decimal list-inside mb-2 space-y-1">
+                                    {children}
+                                  </ol>
+                                ),
+                                li: ({ children }) => (
+                                  <li className="text-gray-700">{children}</li>
+                                ),
+                                h1: ({ children }) => (
+                                  <h1 className="text-sm font-bold text-gray-900 mb-2">
+                                    {children}
+                                  </h1>
+                                ),
+                                h2: ({ children }) => (
+                                  <h2 className="text-sm font-bold text-gray-900 mb-2">
+                                    {children}
+                                  </h2>
+                                ),
+                                h3: ({ children }) => (
+                                  <h3 className="text-sm font-bold text-gray-900 mb-2">
+                                    {children}
+                                  </h3>
+                                ),
+                                blockquote: ({ children }) => (
+                                  <blockquote className="border-l-4 border-gray-300 pl-4 italic text-gray-600 mb-2">
+                                    {children}
+                                  </blockquote>
+                                ),
+                              }}
+                            >
+                              {message.content}
+                            </ReactMarkdown>
+                            {/* Streaming cursor at the end of content */}
+                            {message.isStreaming && (
+                              <span
+                                className="inline-block ml-1 w-1.5 h-4 bg-blue-600 animate-pulse"
+                                style={{ verticalAlign: "middle" }}
+                              />
+                            )}
                           </div>
                         )}
 

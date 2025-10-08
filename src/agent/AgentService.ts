@@ -158,7 +158,7 @@ export class AgentService {
     try {
       // Build context with streaming callback
       const context = this.buildContext(userId);
-      
+
       // Add content update callback to context
       if (onContentUpdate) {
         context.onContentUpdate = onContentUpdate;
