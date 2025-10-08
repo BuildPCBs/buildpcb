@@ -8,6 +8,7 @@ import { useCanvas } from "../../contexts/CanvasContext";
 import { useCanvasStateSnapshot } from "../../hooks/useCanvasState";
 import { logger } from "../../lib/logger";
 import { getChatUIStyles } from "../agent/ChatUIConfig";
+import { responsive } from "@/lib/responsive";
 import { agentService } from "../../agent/AgentService";
 import { StreamMessage } from "../../agent/StreamingHandler";
 
@@ -41,7 +42,13 @@ export function AIPromptPanel({
     const streamingHandler = agentService.getStreamingHandler();
 
     const unsubscribe = streamingHandler.subscribe((message) => {
-      setStreamMessages((prev) => [...prev, message]);
+      setStreamMessages((prev) => {
+        const deduped = [...prev, message];
+        if (deduped.length > 4) {
+          return deduped.slice(-4);
+        }
+        return deduped;
+      });
 
       // Auto-clear success/error messages after 3 seconds
       if (message.type === "success" || message.type === "error") {
@@ -103,14 +110,14 @@ export function AIPromptPanel({
         className="relative flex flex-col"
         style={{
           ...styles.content,
-          gap: styles.gap,
+          gap: streamMessages.length > 0 ? styles.gap : responsive(6),
           pointerEvents: "auto",
         }}
       >
         {/* Agent Stream Display - Positioned above PromptEntry */}
-        {streamMessages.length > 0 && (
+        {streamMessages.length > 0 ? (
           <AgentStreamDisplay messages={streamMessages} />
-        )}
+        ) : null}
 
         {/* Prompt Entry */}
         <PromptEntry

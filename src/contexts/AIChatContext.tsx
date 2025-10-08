@@ -10,7 +10,6 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
-import { useAuth } from "../hooks/useAuth";
 import { logger } from "@/lib/logger";
 import { useCanvas } from "./CanvasContext";
 import { useCanvasState } from "@/hooks/useCanvasState";
@@ -69,9 +68,8 @@ export function AIChatProvider({
   const pendingRestoreConsumedRef = useRef(false);
 
   // Get auth token for API calls
-  const { getToken, isAuthenticated } = useAuth();
   const { canvas } = useCanvas();
-  const { currentProject, currentCircuit, currentNetlist } = useProject();
+  const { currentProject } = useProject();
   const { getCurrentState } = useCanvasState({
     canvas,
     enableLiveUpdates: false,
@@ -320,158 +318,63 @@ export function AIChatProvider({
     const aiMessageId = `ai-${Date.now()}`;
     let messageCreated = false;
 
+    const conversationHistory = messages
+      .filter(
+        (msg) =>
+          (msg.type === "user" || msg.type === "assistant") &&
+          typeof msg.content === "string" &&
+          msg.content.trim().length > 0
+      )
+      .slice(-10)
+      .map((msg) => ({
+        role: msg.type,
+        content: msg.content,
+      }));
+
     try {
       // Import agent service (already initialized globally)
       const { agentService } = await import("../agent/AgentService");
 
       console.log("🚀 Executing agent command:", prompt);
 
-      // Show initial thinking message in Agent Streamer
       const streamingHandler = agentService.getStreamingHandler();
       streamingHandler.think("Understanding your request...");
 
-      const canvasStateSnapshot =
-        providedCanvasState || getCurrentState?.() || null;
-
-      const projectContextPayload = currentProject
-        ? {
-            projectId: currentProject.id,
-            name: currentProject.name || "Untitled Project",
-            description: currentProject.description || "",
-            lastUpdated: currentProject.updated_at,
-            tags: Array.isArray(currentProject.tags)
-              ? currentProject.tags.slice(0, 8)
-              : [],
-            circuitSummary: currentCircuit
-              ? {
-                  componentCount: currentCircuit.components?.length || 0,
-                  connectionCount: currentCircuit.connections?.length || 0,
-                  components: (currentCircuit.components || [])
-                    .slice(0, 12)
-                    .map((component) => ({
-                      id: component.id,
-                      type: component.type,
-                      value: (component as any).value,
-                      position: component.position,
-                    })),
-                }
-              : null,
-            netlistSummary: Array.isArray(currentNetlist)
-              ? {
-                  netCount: currentNetlist.length,
-                  topNets: currentNetlist.slice(0, 10).map((net: any) => ({
-                    netId: net.netId,
-                    connectionCount: net.connections?.length || 0,
-                  })),
-                }
-              : null,
-          }
-        : null;
-
-      // Call backend API with streaming enabled
-      const response = await fetch("/api/agent/execute", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: [
-            {
-              role: "system",
-              content: "You are a helpful PCB design assistant.",
-            },
-            { role: "user", content: prompt },
-          ],
-          tools: [],
-          canvasState: canvasStateSnapshot,
-          projectContext: projectContextPayload,
-          stream: true, // Enable streaming!
-        }),
+      const result = await agentService.execute(prompt, {
+        history: conversationHistory,
       });
 
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+      const finalContent =
+        (result.message && result.message.trim().length > 0
+          ? result.message.trim()
+          : result.status === "success"
+          ? "Done."
+          : "The agent could not complete the request.") || "";
+
+      const aiMessage: ChatMessage = {
+        id: aiMessageId,
+        type: "assistant",
+        content: finalContent,
+        timestamp: new Date(),
+        status: result.status === "success" ? "complete" : "error",
+      };
+
+      addMessage(aiMessage);
+      messageCreated = true;
+
+      if (result.status !== "success") {
+        streamingHandler.error(finalContent);
       }
 
-      // Read the streaming response
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let accumulatedContent = "";
-
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split("\n\n");
-
-          for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              try {
-                const data = JSON.parse(line.slice(6));
-
-                if (data.type === "content") {
-                  // Append new content character by character
-                  accumulatedContent += data.content;
-
-                  // Create message on first content chunk (not before!)
-                  if (!messageCreated) {
-                    const streamingMessage: ChatMessage = {
-                      id: aiMessageId,
-                      type: "assistant",
-                      content: accumulatedContent,
-                      timestamp: new Date(),
-                      status: "receiving",
-                    };
-                    addMessage(streamingMessage);
-                    messageCreated = true;
-
-                    // Update Agent Streamer
-                    streamingHandler.status("Generating response...");
-                  } else {
-                    // Update existing message (smooth streaming!)
-                    setMessages((prev) =>
-                      prev.map((msg) =>
-                        msg.id === aiMessageId
-                          ? { ...msg, content: accumulatedContent }
-                          : msg
-                      )
-                    );
-                  }
-                } else if (data.type === "done") {
-                  // Mark as complete
-                  setMessages((prev) =>
-                    prev.map((msg) =>
-                      msg.id === aiMessageId
-                        ? { ...msg, status: "complete" as const }
-                        : msg
-                    )
-                  );
-
-                  // Success message in Agent Streamer
-                  streamingHandler.success("Response complete!");
-                }
-              } catch (e) {
-                // Skip invalid JSON
-              }
-            }
-          }
-        }
-      }
-
-      console.log("✅ Streaming complete");
-
-      // Trigger a save after chat completion
       if (messageCreated) {
         console.log("💬 Chat message completed, triggering save in 3 seconds");
         setTimeout(() => {
-          // Get current messages from state, then dispatch in next tick
           setMessages((currentMessages) => {
             console.log(
               "🚀 Preparing to dispatch chat save event with",
               currentMessages.length,
               "messages"
             );
-            // Dispatch in a microtask to avoid React render phase issues
             queueMicrotask(() => {
               window.dispatchEvent(
                 new CustomEvent("triggerChatSave", {
@@ -482,7 +385,7 @@ export function AIChatProvider({
                 })
               );
             });
-            return currentMessages; // Return unchanged
+            return currentMessages;
           });
         }, 3000);
       }

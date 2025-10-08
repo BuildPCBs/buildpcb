@@ -101,10 +101,11 @@ export function PromptEntry({
             style={{
               backgroundColor: "transparent",
               color: prompt.trim() ? "#000000" : "#999999", // Black when typing, gray placeholder
-              fontSize: responsive(12),
-              padding: `${responsive(12)} ${responsive(12)} ${responsive(
-                45
-              )} ${responsive(12)}`, // Reduced right padding since mic moved to bottom
+              fontSize: responsive(9),
+              lineHeight: 1.4,
+              padding: `${responsive(10)} ${responsive(10)} ${responsive(
+                40
+              )} ${responsive(10)}`,
               borderRadius: responsive(12),
               border: "none",
               minHeight: "60px", // Explicit minimum height for textarea
@@ -116,10 +117,10 @@ export function PromptEntry({
         <div
           className="absolute flex items-center justify-between"
           style={{
-            bottom: responsive(13),
-            left: responsive(13),
-            right: responsive(13),
-            width: `calc(100% - ${responsive(26)})`, // Account for left and right padding
+            bottom: responsive(10),
+            left: responsive(10),
+            right: responsive(10),
+            width: `calc(100% - ${responsive(20)})`, // Account for left and right padding
           }}
         >
           {/* Left side buttons */}
@@ -136,7 +137,7 @@ export function PromptEntry({
               disabled={isThinking}
               className="flex items-center justify-center bg-white border hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
-                ...responsiveSquare(32),
+                ...responsiveSquare(26),
                 borderRadius: responsive(99), // Fully circular
                 borderColor: "#DDDDDD",
                 borderWidth: responsive(1),
@@ -152,7 +153,7 @@ export function PromptEntry({
                 }
               }}
             >
-              <MicIcon size={16} className="text-gray-600" />
+              <MicIcon size={13} className="text-gray-600" />
             </button>
 
             {/* Dots Button */}
@@ -162,7 +163,7 @@ export function PromptEntry({
               disabled={isThinking}
               className="flex items-center justify-center bg-white border hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
-                ...responsiveSquare(32),
+                ...responsiveSquare(26),
                 borderRadius: responsive(99), // Fully circular
                 borderColor: "#DDDDDD",
                 borderWidth: responsive(1),
@@ -178,7 +179,7 @@ export function PromptEntry({
                 }
               }}
             >
-              <DotsIcon size={16} className="text-gray-600" />
+              <DotsIcon size={13} className="text-gray-600" />
             </button>
           </div>
 
@@ -189,7 +190,7 @@ export function PromptEntry({
             disabled={isThinking || !prompt.trim()}
             className="flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
-              ...responsiveSquare(32),
+              ...responsiveSquare(28),
               borderRadius: responsive(99), // Fully circular
               backgroundColor:
                 prompt.trim() && !isThinking ? BRAND_COLORS.primary : "#CCCCCC", // Blue when enabled, gray when disabled
@@ -208,7 +209,7 @@ export function PromptEntry({
               }
             }}
           >
-            <Send size={16} className="text-white" />
+            <Send size={14} className="text-white" />
           </button>
         </div>
       </div>

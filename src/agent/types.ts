@@ -72,6 +72,11 @@ export interface AgentResult {
   error?: Error;
 }
 
+export interface AgentChatHistoryMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
 /**
  * Type for capability handler functions
  */

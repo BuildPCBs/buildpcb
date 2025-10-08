@@ -1,309 +1,103 @@
-# AI Agent Architecture for BuildPCBs
+# AI Agent Architecture (Current BuildPCB Stack)
 
-## Overview
+> Last updated: October 2025 — mirrors the workflow described in `agent.md` and the implementation under `src/agent/`.
 
-The BuildPCBs AI Agent is an intelligent assistant that powers advanced PCB design capabilities within the IDE. It provides engineers with AI-powered tools spanning from basic component manipulation to advanced circuit analysis and manufacturing preparation.
-User
+## 1. High-Level Flow
 
-## Core Architecture
+```
+User intent → AgentService.execute → (LLM Orchestrator ⇄ Tools) → Capability handlers → Canvas & project state
+```
 
-### Agent Context
+1. **AgentService** receives the natural-language command, builds the `AgentContext`, and hands the request to the orchestrator (or a direct capability in the legacy path).
+2. **LLMOrchestrator** runs the thought/action loop: packaging messages, streaming “think/status” updates, calling tools, and emitting the final response.
+3. **Agent tools** (component search, add component, get canvas state, draw wire, etc.) execute against real project data and return observations to the loop.
+4. **Capability handlers** mutate the canvas/project via Fabric.js + Zustand stores while publishing streamer events for the UI.
+5. **Final explanation + TL;DR** are streamed through the `summary` channel and persisted in the chat transcript.
 
-```typescript
+## 2. Core Modules
+
+| Module                | Location                                                   | Responsibility                                                                             |
+| --------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `AgentService`        | `src/agent/AgentService.ts`                                | Builds `AgentContext`, validates canvas state, routes to orchestrator or direct handlers.  |
+| `LLMOrchestrator`     | `src/agent/LLMOrchestrator.ts`                             | Thought/action loop with OpenAI; manages conversation state and tool invocation.           |
+| `StreamingHandler`    | `src/agent/StreamingHandler.ts`                            | Typed channels (`status`, `think`, `component`, `wire`, `summary`, etc.) that feed the UI. |
+| `capability-handlers` | `src/agent/capability-handlers.ts` & `src/agent/handlers/` | Dispatch table + implementation for each capability priority tier.                         |
+| `tools`               | `src/agent/tools/index.ts`                                 | Tooling surface exposed to the LLM (search, placement, canvas inspection, wiring).         |
+| `types`               | `src/agent/types.ts`                                       | Contracts for `AgentContext`, canvas/project snapshots, streamer API, and handler results. |
+
+## 3. AgentContext (Runtime Snapshot)
+
+```ts
 export interface AgentContext {
-  // Current canvas state
-  canvas: fabric.Canvas;
-  circuit: Circuit;
-  netlist: any[];
-
-  // Project context
-  project: Project;
-
-  // User context
-  selectedComponents: string[];
-  viewportBounds: { x: number; y: number; width: number; height: number };
+  canvas: AgentCanvasContext; // Fabric.js handle + helpers
+  project: AgentProjectContext; // Zustand-sourced project metadata & circuit graph
+  streamer: AgentStreamer; // Structured channels for UI feedback
+  userId?: string; // Injected when auth is active
 }
 ```
 
-### Agent Capabilities Framework
+- **Canvas context**: Built via `canvasCommandManager`; exposes `isCanvasReady`, `getObjects`, `getActiveObjects`, and `requestRenderAll` so handlers can reason about current selections and repaint safely.
+- **Project context**: Derived from `useProjectStore`; includes `projectId`, `versionId`, `projectName`, `circuit`, `isDirty`, and `lastSaved` timestamp.
+- **Streamer**: The same `StreamingHandler` instance that the UI subscribes to; replaces `console.log` with structured updates.
+- **User identity**: Pulled from `authStorage` when available, allowing handlers to scope operations per user.
 
-```typescript
-export interface AgentCapability {
-  id: string;
-  category: AgentCategory;
-  description: string;
-  execute: (context: AgentContext, params: any) => Promise<any>;
-  validate?: (context: AgentContext, params: any) => boolean;
-}
+Every call to `AgentService.execute` rebuilds this snapshot. The API layer further enriches the prompt with:
 
-export type AgentCategory =
-  | "component-management"
-  | "wiring-connectivity"
-  | "design-analysis"
-  | "knowledge-rag"
-  | "circuit-scaffolding"
-  | "schematic-review"
-  | "pcb-manufacturing"
-  | "canvas-management";
-```
+- A **canvas summary** (`formatCanvasStateForPrompt`) listing component counts, key placements, connection totals, zoom level, and selection details.
+- A **project summary** (`formatProjectContextForPrompt`) capturing metadata, tags, highlighted components, and top nets.
+- A **conversation window** (`conversationHistory`) trimmed on the client (latest 200 turns) to keep the LLM grounded in recent context.
 
-## Agent Capabilities
+## 4. Request Lifecycle
 
-### 1. Component Management
+1. **Input + capability catalog** enter the agent. The LLM is restricted to the enums in `capabilities.ts`.
+2. **Intent classification (LLM call #1)** returns the primary capability, complexity, vectorization/subtask flags, and a process plan. Streamer announces intake and intent lock.
+3. **Vectorization (conditional)** embeds the user request and queries the component vector DB. Matches populate `vectorContext` for downstream handlers.
+4. **Subtask expansion (LLM call #2)** emits `CapabilityInvocation` envelopes when multi-step execution is required.
+5. **Subtask execution** iterates through envelopes, invoking capability handlers and streaming `status`/`component`/`wire` updates. Tool calls may interleave for additional data.
+6. **Finalization (LLM call #3)** blends vector matches, subtasks, and project state into the finished component/wire plan or analytic output.
+7. **Rendering & optional explain/review/export** dispatch dedicated capabilities (`GENERATE_NETLIST`, `REVIEW_CIRCUIT`, etc.) when requested.
+8. **Comprehensive explanation + TL;DR** stream via the `summary` channel and are persisted so chat history mirrors the UI.
 
-Core CRUD operations for parts on the canvas with intelligent search and placement.
+See the “User Feedback Touchpoints” and “Capability Payload Reference” sections of `agent.md` for the granular streaming map and JSON contracts.
 
-#### Capabilities:
+## 5. Capability Taxonomy (Current)
 
-- `searchComponentDatabase(query, filters)` - Search component library with fuzzy matching
-- `addComponentToCanvas(componentId, position)` - Add component with optimal placement
-- `removeComponentFromCanvas(componentIds)` - Remove components and clean up connections
-- `moveComponent(componentId, newPosition)` - Move with connection preservation
-- `createComponentSymbol(specifications)` - Generate custom symbols from specs
+The planner dispatches to the capabilities documented in `agent.md`:
 
-#### Integration Points:
+- **Circuit**: `CREATE_CIRCUIT`, `EDIT_CIRCUIT`, `DELETE_CIRCUIT`
+- **Component**: `ADD_COMPONENT`, `READ_COMPONENT`, `UPDATE_COMPONENT`, `DELETE_COMPONENT`, `HIGHLIGHT_COMPONENT`, `CREATE_COMPONENT`
+- **Wiring**: `CREATE_WIRE`, `DELETE_WIRE`, `UPDATE_WIRE`
+- **Analysis**: `RUN_DRC`, `CALCULATE_POWER_CONSUMPTION`, `CALCULATE_LED_RESISTOR`
+- **Knowledge**: `ASK_KNOWLEDGE_BASE`, `EXPLAIN_COMPONENT`, `EXPLAIN_CIRCUIT`
+- **Scaffolding**: `SCAFFOLD_CIRCUIT`
+- **Review**: `REVIEW_CIRCUIT`, `SUGGEST_OPTIMIZATIONS`
+- **Netlist & Manufacturing**: `GENERATE_NETLIST`, `GENERATE_BOM`, `PREPARE_FOR_MANUFACTURING`
+- **Project Utilities**: `ZOOM_IN`, `ZOOM_OUT`, `PAN_CANVAS`, `SAVE_PROJECT`, `GROUP_COMPONENTS`
 
-- `useComponentStore` from Zustand
-- Canvas object management
-- Component library database
+Vectorization defaults, payload schemas, and streaming hints for each capability live in `agent.md` and the per-capability guides in `dev/capability-intents/`.
 
-### 2. Wiring & Connectivity
+## 6. Tooling Layer
 
-Intelligent net creation and management that transforms individual parts into functional circuits.
+Tools exposed to the orchestrator (defined in `tools/index.ts`):
 
-#### Capabilities:
+1. `component_search` — Semantic + fuzzy lookup in `components_v2`, returning pin metadata for placement.
+2. `add_component` — Places components via `canvasCommandManager`, including auto-positioning heuristics.
+3. `get_canvas_state` — Serialises the live canvas for reasoning and validation.
+4. `draw_wire`, `delete_component`, `highlight_component`, etc. — Mutate the canvas while preserving undo/redo history.
 
-- `createNetConnection(fromPin, toPin)` - Create electrical connections
-- `removeNetConnection(netId)` - Remove connections with validation
-- `autoWirePowerNets(powerRails)` - Auto-connect power/ground rails
-- `validateConnections()` - Check for floating pins and shorts
+All tool executions send `status`/`think` updates through the streamer so the UI reflects work-in-progress even before a handler resolves.
 
-#### Integration Points:
+## 7. Extending the Architecture
 
-- Current netlist state from `ProjectContext`
-- Wiring tool system
-- Canvas connection rendering
+- **Adding a capability**: Create the enum entry in `capabilities.ts`, document the payload/streaming expectations (`agent.md` + `dev/capability-intents`), and implement the handler under `handlers/`.
+- **Adding a tool**: Implement the function in `tools/index.ts`, export its schema via `getToolDefinitions`, and update `agent.md` if planner behavior changes.
+- **Modifying context**: Adjust `AgentService.buildContext`, extend types in `types.ts`, and refresh the “Context Snapshot” section of `agent.md` plus this file.
+- **Streaming conventions**: Always prefer `StreamingHandler` channels over `console`; follow the touchpoints table to keep UX consistent.
 
-### 3. Design Checks & Calculations
+## 8. Related Documents
 
-Basic circuit reasoning and validation for design correctness.
+- [`agent.md`](./agent.md) — Day-to-day operational narrative, streaming map, capability payload reference.
+- [`README.md`](./README.md) — Documentation index and maintenance checklist.
+- `dev/capability-intents/*.md` — Planner guidance per capability (utterances, vectorization strategy, example JSON).
 
-#### Capabilities:
-
-- `runDesignCheck(checkTypes)` - Comprehensive design validation
-- `calculateLedResistor(ledSpec, supplyVoltage)` - LED resistor calculations
-- `calculateCircuitParameter(calculation)` - General circuit calculations
-- `validatePowerBudget()` - Power supply capacity validation
-
-#### Integration Points:
-
-- Circuit analysis utilities
-- Component specifications
-- Real-time validation system
-
-### 4. Knowledge & Explanation (RAG)
-
-AI-powered learning and explanation system for circuit understanding.
-
-#### Capabilities:
-
-- `askKnowledgeBase(question, context)` - Query circuit knowledge
-- `explainComponentFunction(componentId)` - Component behavior explanation
-- `summarizeSchematic(includeCalculations)` - Circuit summary generation
-- `suggestSimilarDesigns(currentCircuit)` - Pattern-based recommendations
-
-#### Integration Points:
-
-- RAG (Retrieval-Augmented Generation) system
-- Component documentation
-- Circuit pattern database
-
-### 5. High-Level Circuit Scaffolding
-
-Natural language to functional circuit generation.
-
-#### Capabilities:
-
-- `scaffoldProject(description, requirements)` - Full project generation
-- `scaffoldSubCircuit(blockType, specifications)` - Sub-circuit creation
-- `optimizeLayout()` - Component placement optimization
-
-#### Integration Points:
-
-- Natural language processing
-- Circuit template library
-- Layout optimization algorithms
-
-### 6. Analysis & Review
-
-Senior engineer-level circuit review and optimization suggestions.
-
-#### Capabilities:
-
-- `reviewSchematic(focusAreas)` - Comprehensive schematic review
-- `suggestOptimizations(optimizationType)` - Performance improvements
-- `estimateCurrentDraw(operatingConditions)` - Power consumption analysis
-- `checkNetIntegrity()` - Electrical connectivity validation
-- `identifyPotentialIssues()` - Proactive problem detection
-
-#### Integration Points:
-
-- Circuit analysis algorithms
-- Design rule checking
-- Performance simulation
-
-### 7. PCB & Manufacturing Prep
-
-Bridge between schematic design and physical board manufacturing.
-
-#### Capabilities:
-
-- `generateNetlist(format)` - Export in various formats
-- `exportBOM(includeAlternatives)` - Bill of Materials generation
-- `assignFootprints(preferredManufacturers)` - Footprint assignment
-- `checkPowerTraceWidths(currentRequirements)` - Trace width validation
-- `estimateManufacturingCost()` - Cost estimation
-
-#### Integration Points:
-
-- Netlist generation system
-- Component database with footprints
-- Manufacturing specifications
-
-### 8. Project & Canvas Management
-
-Tool-level interaction and canvas manipulation capabilities.
-
-#### Capabilities:
-
-- `renameProject(newName)` - Project management
-- `highlightComponent(componentIds, highlightStyle)` - Visual feedback
-- `annotateCanvas(annotation)` - Canvas annotations
-- `groupIntoBlock(componentIds, blockName)` - Component grouping
-- `cleanUpWiring(strategy)` - Wiring optimization
-
-#### Integration Points:
-
-- `ProjectContext` for project operations
-- Fabric.js canvas manipulation
-- Visual feedback system
-
-## Integration with Existing Codebase
-
-### ProjectContext Integration
-
-```typescript
-import { useProject } from "@/contexts/ProjectContext";
-import { canvasCommandManager } from "@/canvas/canvas-command-manager";
-
-export class AIAgentService {
-  private context: AgentContext;
-
-  constructor() {
-    this.context = this.buildContext();
-  }
-
-  private buildContext(): AgentContext {
-    const { currentProject, currentCircuit, currentNetlist } = useProject();
-    const canvas = canvasCommandManager.getCanvas();
-
-    return {
-      canvas,
-      circuit: currentCircuit!,
-      netlist: currentNetlist || [],
-      project: currentProject!,
-      selectedComponents: this.getSelectedComponents(),
-      viewportBounds: this.getViewportBounds(),
-    };
-  }
-
-  async executeCapability(capabilityId: string, params: any): Promise<any> {
-    const capability = this.getCapability(capabilityId);
-    return capability.execute(this.context, params);
-  }
-}
-```
-
-### State Management Integration
-
-- **Zustand Stores**: Component state, canvas state, UI state
-- **Project Context**: Project lifecycle, data persistence
-- **Canvas Command Manager**: Canvas operations, undo/redo
-
-## Implementation Roadmap
-
-### Phase 1: Foundation (Week 1-2)
-
-1. Component Management capabilities
-2. Canvas Management capabilities
-3. Basic agent service infrastructure
-
-### Phase 2: Core Functionality (Week 3-4)
-
-1. Wiring & Connectivity capabilities
-2. Design Checks & Calculations
-3. Knowledge base integration
-
-### Phase 3: Intelligence (Week 5-6)
-
-1. Circuit Scaffolding (natural language)
-2. Analysis & Review capabilities
-3. RAG system for explanations
-
-### Phase 4: Manufacturing (Week 7-8)
-
-1. PCB Manufacturing Prep
-2. Netlist generation
-3. BOM export capabilities
-
-## Technical Specifications
-
-### Dependencies
-
-- OpenAI GPT-4 for natural language processing
-- Vector database for RAG (Pinecone/Chroma)
-- Circuit simulation libraries
-- Component database integration
-
-### Performance Requirements
-
-- Response time < 2 seconds for basic operations
-- < 5 seconds for complex analysis
-- Real-time validation during design
-- Background processing for heavy computations
-
-### Security Considerations
-
-- Input validation for all user queries
-- Safe execution environment for code generation
-- Component library access controls
-- Project data privacy
-
-### Testing Strategy
-
-- Unit tests for individual capabilities
-- Integration tests with canvas operations
-- End-to-end tests for complete workflows
-- Performance benchmarks for AI operations
-
-## Future Enhancements
-
-### Advanced Features
-
-- Multi-language support for component libraries
-- Collaborative design review
-- Integration with SPICE simulation
-- 3D visualization of PCB layouts
-- Automated design optimization
-- Machine learning for design pattern recognition
-
-### Scalability
-
-- Distributed processing for heavy computations
-- Caching layer for frequently accessed data
-- Progressive enhancement for large circuits
-- Cloud-based processing for complex analysis
-
----
-
-_This architecture provides a solid foundation for an intelligent PCB design assistant that grows with the needs of professional engineers._
+This architecture note stays high-level; treat `agent.md` as the authoritative spec and the source files above as the executable truth.

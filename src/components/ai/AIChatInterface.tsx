@@ -229,7 +229,10 @@ export function AIChatInterface({
                           className="rounded-2xl rounded-br-md px-4 py-2 text-white mb-1"
                           style={{ backgroundColor: BRAND_COLORS.primary }}
                         >
-                          <div className="text-sm leading-relaxed prose prose-xs prose-invert max-w-none">
+                          <div
+                            className="leading-relaxed prose prose-xs prose-invert max-w-none"
+                            style={{ fontSize: responsive(8), lineHeight: 1.5 }}
+                          >
                             <ReactMarkdown
                               remarkPlugins={[remarkMath]}
                               rehypePlugins={[rehypeKatex]}
@@ -358,7 +361,10 @@ export function AIChatInterface({
                   <div className="w-full">
                     <div className="w-full p-2.5 bg-gray-50 rounded-lg border border-gray-100">
                       {/* Response Content */}
-                      <div className="text-xs leading-relaxed text-gray-800 mb-2 prose prose-xs max-w-none">
+                      <div
+                        className="leading-relaxed text-gray-800 mb-2 prose prose-xs max-w-none"
+                        style={{ fontSize: responsive(8), lineHeight: 1.5 }}
+                      >
                         <ReactMarkdown
                           remarkPlugins={[remarkMath]}
                           rehypePlugins={[rehypeKatex]}

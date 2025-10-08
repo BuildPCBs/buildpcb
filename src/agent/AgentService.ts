@@ -7,6 +7,7 @@ import {
   AgentCanvasContext,
   AgentProjectContext,
   AgentResult,
+  AgentChatHistoryMessage,
 } from "./types";
 import { Capability } from "./capabilities";
 import { capabilityHandlers } from "./capability-handlers";
@@ -130,7 +131,14 @@ export class AgentService {
    * Execute natural language command using LLM orchestrator
    * This is the NEW way - understands complex, multi-step commands
    */
-  async execute(prompt: string, userId?: string): Promise<AgentResult> {
+  async execute(
+    prompt: string,
+    options: {
+      userId?: string;
+      history?: AgentChatHistoryMessage[];
+    } = {}
+  ): Promise<AgentResult> {
+    const { userId, history } = options;
     logger.info(`🧠 Executing natural language command`, { prompt });
 
     // Check if LLM orchestrator is available
@@ -151,7 +159,11 @@ export class AgentService {
       const context = this.buildContext(userId);
 
       // Use LLM orchestrator for multi-step reasoning and tool calling
-      const result = await this.llmOrchestrator.execute(prompt, context);
+      const result = await this.llmOrchestrator.execute(
+        prompt,
+        context,
+        history
+      );
 
       return result;
     } catch (error) {
@@ -293,8 +305,11 @@ if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
   // Main service interface
   (window as any).agentService = {
     // NEW: Natural language execute (uses LLM orchestrator)
-    execute: async (prompt: string) => {
-      return agentService.execute(prompt);
+    execute: async (
+      prompt: string,
+      options: { userId?: string; history?: AgentChatHistoryMessage[] } = {}
+    ) => {
+      return agentService.execute(prompt, options);
     },
     // OLD: Direct capability execution (still useful for testing)
     executeCapability: async (capability: string, prompt: string) => {

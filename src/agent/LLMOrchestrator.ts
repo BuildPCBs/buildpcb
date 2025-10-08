@@ -8,7 +8,11 @@
  * 4. Repeat: Until task is complete
  */
 
-import type { AgentContext, AgentResult } from "./types";
+import type {
+  AgentContext,
+  AgentResult,
+  AgentChatHistoryMessage,
+} from "./types";
 import { logger } from "@/lib/logger";
 import { getToolDefinitions, executeTool } from "./tools";
 
@@ -23,7 +27,11 @@ export class LLMOrchestrator {
   /**
    * Execute a natural language command using the thought-action loop
    */
-  async execute(prompt: string, context: AgentContext): Promise<AgentResult> {
+  async execute(
+    prompt: string,
+    context: AgentContext,
+    history: AgentChatHistoryMessage[] = []
+  ): Promise<AgentResult> {
     logger.info("🧠 LLM Orchestrator starting", { prompt });
     context.streamer.think("Understanding your request...");
 
@@ -34,11 +42,25 @@ export class LLMOrchestrator {
           role: "system",
           content: this.getSystemPrompt(),
         },
-        {
-          role: "user",
-          content: prompt,
-        },
       ];
+
+      if (history?.length) {
+        const trimmedHistory = history
+          .slice(-10)
+          .filter((entry) => entry.content && entry.content.trim().length > 0);
+
+        for (const entry of trimmedHistory) {
+          messages.push({
+            role: entry.role,
+            content: entry.content,
+          });
+        }
+      }
+
+      messages.push({
+        role: "user",
+        content: prompt,
+      });
 
       let iteration = 0;
       let finalResponse = "";
@@ -110,7 +132,8 @@ export class LLMOrchestrator {
         // No tool calls - LLM has finished
         if (message.content) {
           finalResponse = message.content;
-          context.streamer.success(finalResponse);
+          const summary = this.getActionableSummary(finalResponse);
+          context.streamer.success(summary);
           break;
         }
 
@@ -147,6 +170,38 @@ export class LLMOrchestrator {
         error: error as Error,
       };
     }
+  }
+
+  private getActionableSummary(response: string): string {
+    if (!response || response.trim().length === 0) {
+      return "Response ready";
+    }
+
+    const lines = response
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    const actionableItems = lines
+      .filter((line) => /^(?:\d+[).\s]|[-*•])/.test(line))
+      .map((line) => line.replace(/^(?:\d+[).\s]|[-*•])\s*/, ""))
+      .slice(0, 3);
+
+    if (actionableItems.length > 0) {
+      const joined = actionableItems.join(" • ");
+      return joined.length > 160 ? `${joined.slice(0, 157)}…` : joined;
+    }
+
+    const normalized = response.replace(/\s+/g, " ").trim();
+    const firstSentence = normalized.split(/(?<=[.!?])\s+/)[0] ?? "";
+
+    if (firstSentence) {
+      return firstSentence.length > 160
+        ? `${firstSentence.slice(0, 157)}…`
+        : firstSentence;
+    }
+
+    return "Response ready";
   }
 
   /**
