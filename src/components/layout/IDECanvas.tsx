@@ -85,7 +85,8 @@ export function IDECanvas() {
   const chatUIStyles = getChatUIStyles();
   const chatUIBottomOffset = chatUIStyles.offsets.bottom;
   const chatUIRightOffset = chatUIStyles.offsets.right;
-  const aiPanelBottomOffset = `calc(${chatUIBottomOffset} + ${chatUIStyles.promptEntry.height} + ${chatUIStyles.gap} + ${chatUIStyles.streamer.height} + ${chatUIStyles.gap})`;
+  // Chat interface sits directly above prompt entry with minimal gap (8px)
+  const aiPanelBottomOffset = `calc(${chatUIBottomOffset} + ${chatUIStyles.promptEntry.height} + 8px)`;
   const aiPanelRightOffset = chatUIRightOffset;
 
   return (

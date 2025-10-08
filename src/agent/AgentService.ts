@@ -136,9 +136,10 @@ export class AgentService {
     options: {
       userId?: string;
       history?: AgentChatHistoryMessage[];
+      onContentUpdate?: (content: string) => void;
     } = {}
   ): Promise<AgentResult> {
-    const { userId, history } = options;
+    const { userId, history, onContentUpdate } = options;
     logger.info(`🧠 Executing natural language command`, { prompt });
 
     // Check if LLM orchestrator is available
@@ -155,8 +156,13 @@ export class AgentService {
     }
 
     try {
-      // Build context
+      // Build context with streaming callback
       const context = this.buildContext(userId);
+      
+      // Add content update callback to context
+      if (onContentUpdate) {
+        context.onContentUpdate = onContentUpdate;
+      }
 
       // Use LLM orchestrator for multi-step reasoning and tool calling
       const result = await this.llmOrchestrator.execute(

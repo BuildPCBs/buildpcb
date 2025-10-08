@@ -41,7 +41,6 @@ export function PromptEntry({
     e.preventDefault();
     if (prompt.trim() && !isThinking) {
       onSubmit?.(prompt.trim());
-      onSendClick?.(); // Also trigger send button click
       setPrompt(""); // Clear after submit
     }
   };
@@ -49,7 +48,6 @@ export function PromptEntry({
   const handleSendClick = () => {
     if (prompt.trim() && !isThinking) {
       onSubmit?.(prompt.trim());
-      onSendClick?.();
       setPrompt(""); // Clear after submit
     }
   };

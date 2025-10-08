@@ -60,6 +60,8 @@ export interface AgentContext {
   streamer: AgentStreamer;
   /** User ID if authenticated */
   userId?: string;
+  /** Callback for streaming LLM content updates */
+  onContentUpdate?: (content: string) => void;
 }
 
 /**

@@ -1,16 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { AgentStreamDisplay } from "../agent/AgentStreamDisplay";
 import { PromptEntry } from "./PromptEntry";
 import { useAIChat } from "../../contexts/AIChatContext";
 import { useCanvas } from "../../contexts/CanvasContext";
 import { useCanvasStateSnapshot } from "../../hooks/useCanvasState";
 import { logger } from "../../lib/logger";
 import { getChatUIStyles } from "../agent/ChatUIConfig";
-import { responsive } from "@/lib/responsive";
-import { agentService } from "../../agent/AgentService";
-import { StreamMessage } from "../../agent/StreamingHandler";
 
 interface AIPromptPanelProps {
   className?: string;
@@ -23,8 +18,6 @@ export function AIPromptPanel({
   onPromptSubmit,
   isThinking = false,
 }: AIPromptPanelProps) {
-  const [streamMessages, setStreamMessages] = useState<StreamMessage[]>([]);
-
   const {
     isThinking: contextIsThinking,
     handlePromptSubmit: contextHandlePromptSubmit,
@@ -36,32 +29,6 @@ export function AIPromptPanel({
 
   // Use context isThinking, then external isThinking, then local state
   const currentIsThinking = contextIsThinking || isThinking;
-
-  // Subscribe to agent streaming messages
-  useEffect(() => {
-    const streamingHandler = agentService.getStreamingHandler();
-
-    const unsubscribe = streamingHandler.subscribe((message) => {
-      setStreamMessages((prev) => {
-        const deduped = [...prev, message];
-        if (deduped.length > 4) {
-          return deduped.slice(-4);
-        }
-        return deduped;
-      });
-
-      // Auto-clear success/error messages after 3 seconds
-      if (message.type === "success" || message.type === "error") {
-        setTimeout(() => {
-          setStreamMessages((prev) => prev.filter((m) => m.id !== message.id));
-        }, 3000);
-      }
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, []);
 
   const handlePromptSubmit = async (prompt: string) => {
     logger.api("AI Prompt submitted:", prompt);
@@ -110,15 +77,10 @@ export function AIPromptPanel({
         className="relative flex flex-col"
         style={{
           ...styles.content,
-          gap: streamMessages.length > 0 ? styles.gap : responsive(6),
+          gap: 0,
           pointerEvents: "auto",
         }}
       >
-        {/* Agent Stream Display - Positioned above PromptEntry */}
-        {streamMessages.length > 0 ? (
-          <AgentStreamDisplay messages={streamMessages} />
-        ) : null}
-
         {/* Prompt Entry */}
         <PromptEntry
           onSubmit={handlePromptSubmit}

@@ -23,6 +23,8 @@ export interface ChatMessage {
   circuitChanges?: any[];
   status?: "sending" | "receiving" | "parsing" | "complete" | "error";
   isEditing?: boolean;
+  isStreaming?: boolean; // NEW: indicates active streaming
+  streamingStatus?: string; // NEW: current status message while streaming
 }
 
 interface AIChatContextType {
@@ -337,12 +339,57 @@ export function AIChatProvider({
 
       console.log("🚀 Executing agent command:", prompt);
 
-      const streamingHandler = agentService.getStreamingHandler();
-      streamingHandler.think("Understanding your request...");
+      // Add initial message with streaming indicator
+      const aiMessage: ChatMessage = {
+        id: aiMessageId,
+        type: "assistant",
+        content: "",
+        timestamp: new Date(),
+        status: "complete",
+        isStreaming: true,
+        streamingStatus: "Working...",
+      };
 
+      addMessage(aiMessage);
+      messageCreated = true;
+
+      const streamingHandler = agentService.getStreamingHandler();
+
+      // Subscribe to streaming status updates for the status indicator
+      const unsubscribe = streamingHandler.subscribe((message) => {
+        // Update just the status indicator (shown above content)
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === aiMessageId
+              ? { ...msg, streamingStatus: message.message }
+              : msg
+          )
+        );
+      });
+
+      // Execute with streaming content callback
       const result = await agentService.execute(prompt, {
         history: conversationHistory,
+        onContentUpdate: (content: string) => {
+          // The LLM streams its full narrative response including all steps
+          // We just display it as it comes in - character by character
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === aiMessageId
+                ? {
+                    ...msg,
+                    content: content, // This already includes the full narrative
+                    isStreaming: true,
+                    status: "complete",
+                  }
+                : msg
+            )
+          );
+        },
       });
+
+      // Unsubscribe from streaming handler
+      unsubscribe();
 
       const finalContent =
         (result.message && result.message.trim().length > 0
@@ -351,20 +398,20 @@ export function AIChatProvider({
           ? "Done."
           : "The agent could not complete the request.") || "";
 
-      const aiMessage: ChatMessage = {
-        id: aiMessageId,
-        type: "assistant",
-        content: finalContent,
-        timestamp: new Date(),
-        status: result.status === "success" ? "complete" : "error",
-      };
-
-      addMessage(aiMessage);
-      messageCreated = true;
-
-      if (result.status !== "success") {
-        streamingHandler.error(finalContent);
-      }
+      // Mark streaming as complete
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === aiMessageId
+            ? {
+                ...msg,
+                content: finalContent,
+                status: result.status === "success" ? "complete" : "error",
+                isStreaming: false, // Stop streaming indicator
+                streamingStatus: undefined,
+              }
+            : msg
+        )
+      );
 
       if (messageCreated) {
         console.log("💬 Chat message completed, triggering save in 3 seconds");
