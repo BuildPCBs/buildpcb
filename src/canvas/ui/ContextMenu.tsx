@@ -10,8 +10,7 @@ interface ContextMenuProps {
   canPaste: boolean;
   onClose: () => void;
   // PART 2: Direct function props for debugging
-  onGroup: () => void;
-  onUngroup: () => void;
+  // NOTE: Group/Ungroup removed - not applicable in PCB schematic context
   onDelete: () => void;
   onCopy: () => void;
   onPaste: () => void;
@@ -28,8 +27,6 @@ export function ContextMenu({
   menuType,
   canPaste,
   onClose,
-  onGroup,
-  onUngroup,
   onDelete,
   onCopy,
   onPaste,
@@ -84,32 +81,6 @@ export function ContextMenu({
             >
               <span className="text-gray-500">⌘C</span>
               Copy
-            </button>
-
-            <button
-              className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                console.log('TRIGGER: Context Menu "Group" button clicked.');
-                onGroup();
-                onClose();
-              }}
-            >
-              <span className="text-gray-500">⌘G</span>
-              Group
-            </button>
-
-            <button
-              className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                console.log('TRIGGER: Context Menu "Ungroup" button clicked.');
-                onUngroup();
-                onClose();
-              }}
-            >
-              <span className="text-gray-500">⌘⇧G</span>
-              Ungroup
             </button>
 
             <hr className="my-1 border-gray-200" />

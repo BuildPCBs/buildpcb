@@ -16,16 +16,40 @@ export function useServerSearch() {
   const getComponentImage = (component: DatabaseComponent): string => {
     if (component.symbol_svg) {
       try {
-        return `data:image/svg+xml;base64,${btoa(component.symbol_svg)}`;
+        // Remove fixed width/height and ensure viewBox for proper scaling
+        let processedSvg = component.symbol_svg;
+        
+        // Remove width and height attributes to allow CSS scaling
+        processedSvg = processedSvg.replace(/\s*width\s*=\s*["'][^"']*["']/gi, '');
+        processedSvg = processedSvg.replace(/\s*height\s*=\s*["'][^"']*["']/gi, '');
+        
+        // If there's no viewBox, try to add one based on removed dimensions
+        if (!processedSvg.includes('viewBox')) {
+          const widthMatch = component.symbol_svg.match(/width\s*=\s*["']([^"']*)["']/i);
+          const heightMatch = component.symbol_svg.match(/height\s*=\s*["']([^"']*)["']/i);
+          
+          if (widthMatch && heightMatch) {
+            const width = parseFloat(widthMatch[1]);
+            const height = parseFloat(heightMatch[1]);
+            if (!isNaN(width) && !isNaN(height)) {
+              processedSvg = processedSvg.replace(
+                /<svg/,
+                `<svg viewBox="0 0 ${width} ${height}"`
+              );
+            }
+          }
+        }
+        
+        return `data:image/svg+xml;base64,${btoa(processedSvg)}`;
       } catch (error) {
         logger.component("Failed to encode SVG for component", component.name);
       }
     }
 
-    // Fallback placeholder
+    // Fallback placeholder  
     const icon = component.package_id?.charAt(0) || "C";
     return `data:image/svg+xml;base64,${btoa(
-      `<svg width="60" height="30" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="30" fill="#e8e8e8"/><text x="30" y="20" text-anchor="middle" font-size="12" fill="#666" font-family="monospace">${icon}</text></svg>`
+      `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" fill="#e8e8e8"/><text x="50" y="55" text-anchor="middle" font-size="16" fill="#666" font-family="monospace">${icon}</text></svg>`
     )}`;
   };
 

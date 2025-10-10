@@ -6,7 +6,15 @@ import { useAuth } from "@/hooks/useAuth";
 import { UserIcon, NotificationIcon, SearchIcon } from "@/components/icons";
 import { ResponsiveContainer } from "@/components/layout/ResponsiveContainer";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
-import { r, responsive, responsiveFontSize } from "@/lib/responsive";
+import {
+  r,
+  responsive,
+  responsiveFontSize,
+  spacing,
+  container,
+  fontSize,
+  fixed,
+} from "@/lib/responsive";
 import { DatabaseService, Project } from "@/lib/database";
 
 const DashboardContent = () => {
@@ -69,15 +77,20 @@ const DashboardContent = () => {
     router.push(`/project/${projectId}`);
   };
 
-  // Format date helper - now context-aware
+  // Format date helper - now context-aware with granular time units
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
-    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
+    const diffInMs = now.getTime() - date.getTime();
+    const diffInSeconds = Math.floor(diffInMs / 1000);
+    const diffInMinutes = Math.floor(diffInSeconds / 60);
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    const diffInDays = Math.floor(diffInHours / 24);
 
-    if (diffInHours < 1) return "just now";
-    if (diffInHours < 24) return `${Math.floor(diffInHours)} hours ago`;
-    if (diffInHours < 168) return `${Math.floor(diffInHours / 24)} days ago`;
+    if (diffInSeconds < 60) return `${diffInSeconds} seconds ago`;
+    if (diffInMinutes < 60) return `${diffInMinutes} minute${diffInMinutes !== 1 ? 's' : ''} ago`;
+    if (diffInHours < 24) return `${diffInHours} hour${diffInHours !== 1 ? 's' : ''} ago`;
+    if (diffInDays < 7) return `${diffInDays} day${diffInDays !== 1 ? 's' : ''} ago`;
     return date.toLocaleDateString();
   };
 
@@ -99,283 +112,436 @@ const DashboardContent = () => {
 
   return (
     <ResponsiveContainer>
-      <div className="min-h-full bg-white relative w-full pb-20">
-        {/* Header Box */}
+      {/* Center wrapper for entire dashboard at small zoom levels */}
+      <div className="min-h-screen bg-white flex justify-center">
         <div
-          className="absolute bg-[#f5f5f5] border border-[#a6a6a6]"
-          style={r({
-            top: 18,
-            left: 19,
-            width: 230,
-            height: 213,
-            borderRadius: 24,
-            padding: 16,
-          })}
+          className="min-h-full bg-white relative w-full pb-20"
+          style={{ maxWidth: "1920px" }}
         >
-          {/* Inner container with 2px spacing from header box edges */}
-          <div style={{ padding: responsive(2) }}>
-            {/* User Icon and Name with Notification */}
+          {/* Header Box */}
+          <div
+            className="absolute bg-[#f5f5f5] border border-[#a6a6a6]"
+            style={r({
+              top: 18,
+              left: 19,
+              width: 230,
+              height: 213,
+              borderRadius: 24,
+              padding: 16,
+            })}
+          >
+            {/* Inner container with 2px spacing from header box edges */}
+            <div style={{ padding: spacing(2) }}>
+              {/* User Icon and Name with Notification */}
+              <div
+                className="flex items-center justify-between"
+                style={{ marginBottom: spacing(12) }}
+              >
+                <div className="flex items-center" style={{ gap: spacing(8) }}>
+                  <UserIcon size={14} className="text-[#969696]" />
+                  <span
+                    className="font-medium text-gray-900"
+                    style={{ fontSize: fontSize(12) }} // Smaller text
+                  >
+                    User Name
+                  </span>
+                </div>
+                <NotificationIcon size={14} className="text-[#969696]" />
+              </div>
+
+              {/* Search Box */}
+              <div className="relative">
+                <div
+                  className="absolute top-1/2 transform -translate-y-1/2"
+                  style={{ left: spacing(10) }}
+                >
+                  <SearchIcon size={14} className="text-[#e3e3e3]" />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search"
+                  className="w-full bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  style={{
+                    paddingLeft: spacing(32),
+                    paddingRight: spacing(12),
+                    paddingTop: spacing(6),
+                    paddingBottom: spacing(6),
+                    fontSize: fontSize(11), // Smaller text
+                    borderWidth: "1px",
+                    borderRadius: spacing(10),
+                  }}
+                />
+              </div>
+            </div>{" "}
+            {/* Close inner container with 4px spacing */}
+          </div>
+
+          {/* Main Content Area */}
+          <div
+            className="absolute min-h-0"
+            style={{
+              ...r({
+                top: 74,
+                left: 310,
+              }),
+              right: "32px", // Add right margin
+              paddingBottom: responsive(80),
+              minHeight: "calc(100vh - 74px)",
+              maxWidth: "1600px", // Max width for content
+            }}
+          >
+            {/* Header row with tabs and button */}
             <div
               className="flex items-center justify-between"
-              style={{ marginBottom: responsive(16) }}
-            >
-              <div
-                className="flex items-center"
-                style={{ gap: responsive(12) }}
-              >
-                <UserIcon size={16} className="text-[#969696]" />
-                <span
-                  className="font-medium text-gray-900"
-                  style={{ fontSize: responsiveFontSize(14) }}
-                >
-                  User Name
-                </span>
-              </div>
-              <NotificationIcon size={16} className="text-[#969696]" />
-            </div>
-
-            {/* Search Box */}
-            <div className="relative">
-              <div
-                className="absolute top-1/2 transform -translate-y-1/2"
-                style={{ left: responsive(12) }}
-              >
-                <SearchIcon size={16} className="text-[#e3e3e3]" />
-              </div>
-              <input
-                type="text"
-                placeholder="Search"
-                className="w-full bg-white border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                style={{
-                  paddingLeft: responsive(40),
-                  paddingRight: responsive(16),
-                  paddingTop: responsive(8),
-                  paddingBottom: responsive(8),
-                  fontSize: responsiveFontSize(14),
-                  ...r({
-                    borderWidth: 0.3,
-                    borderRadius: 12,
-                  }),
-                }}
-              />
-            </div>
-          </div>{" "}
-          {/* Close inner container with 4px spacing */}
-        </div>
-
-        {/* Main Content Area */}
-        <div
-          className="absolute min-h-0"
-          style={{
-            ...r({
-              top: 74,
-              left: 310,
-            }),
-            paddingBottom: responsive(80), // Increased bottom padding to ensure full background coverage
-            minHeight: "calc(100vh - 74px)", // Ensure content area fills remaining viewport
-          }}
-        >
-          {/* Tabs */}
-          <div
-            className="flex items-center justify-between"
-            style={{ marginBottom: responsive(24) }}
-          >
-            <div className="flex" style={{ gap: responsive(8) }}>
-              <button
-                onClick={() => setActiveTab("recently-viewed")}
-                className={`transition-colors ${
-                  activeTab === "recently-viewed"
-                    ? "bg-[#ebebeb] border border-[#dddddd] text-[#999999]"
-                    : "text-[#c0bfbf] hover:text-[#999999]"
-                }`}
-                style={{
-                  padding: `${responsive(8)} ${responsive(16)}`,
-                  fontSize: responsiveFontSize(14),
-                  borderRadius: responsive(6),
-                  ...r({
-                    borderWidth: activeTab === "recently-viewed" ? 0.5 : 0,
-                  }),
-                }}
-              >
-                Recently Viewed
-              </button>
-              <button
-                onClick={() => setActiveTab("shared")}
-                className={`transition-colors ${
-                  activeTab === "shared"
-                    ? "bg-[#ebebeb] border border-[#dddddd] text-[#999999]"
-                    : "text-[#c0bfbf] hover:text-[#999999]"
-                }`}
-                style={{
-                  padding: `${responsive(8)} ${responsive(16)}`,
-                  fontSize: responsiveFontSize(14),
-                  borderRadius: responsive(6),
-                  ...r({
-                    borderWidth: activeTab === "shared" ? 0.5 : 0,
-                  }),
-                }}
-              >
-                Shared
-              </button>
-            </div>
-
-            {/* New Project Button */}
-            <button
-              onClick={() => router.push("/project/new")}
-              className="bg-blue-600 hover:bg-blue-700 text-white transition-colors flex items-center"
               style={{
-                padding: `${responsive(8)} ${responsive(16)}`,
-                fontSize: responsiveFontSize(14),
-                borderRadius: responsive(6),
-                gap: responsive(8),
+                marginBottom: spacing(20),
+                width: "1080px", // Exact width of 3-card grid
+                minWidth: "1080px", // Force the width
               }}
             >
-              <span>+</span>
-              <span>New Project</span>
-            </button>
-          </div>{" "}
-          {/* Project Cards */}
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                <p className="text-gray-600">Loading your projects...</p>
-              </div>
-            </div>
-          ) : error ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="text-center">
-                <div className="text-red-500 text-4xl mb-4">⚠️</div>
-                <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                  Failed to load projects
-                </h3>
-                <p className="text-gray-600 mb-4">{error}</p>
+              {/* Tabs on left - pill style (shadcn-like) */}
+              <div
+                className="inline-flex items-center"
+                style={{
+                  backgroundColor: "#f5f5f5",
+                  padding: spacing(4),
+                  borderRadius: spacing(8),
+                  gap: spacing(4),
+                }}
+              >
                 <button
-                  onClick={() => window.location.reload()}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                  onClick={() => setActiveTab("recently-viewed")}
+                  className="transition-all"
+                  style={{
+                    padding: `${spacing(6)} ${spacing(14)}`,
+                    fontSize: fontSize(12),
+                    fontWeight: 500,
+                    borderRadius: spacing(6),
+                    backgroundColor:
+                      activeTab === "recently-viewed"
+                        ? "#ffffff"
+                        : "transparent",
+                    color:
+                      activeTab === "recently-viewed" ? "#1a1a1a" : "#737373",
+                    border: "none",
+                    cursor: "pointer",
+                    boxShadow:
+                      activeTab === "recently-viewed"
+                        ? "0 1px 3px rgba(0,0,0,0.1)"
+                        : "none",
+                  }}
                 >
-                  Try Again
+                  Recently Viewed
+                </button>
+                <button
+                  onClick={() => setActiveTab("shared")}
+                  className="transition-all"
+                  style={{
+                    padding: `${spacing(6)} ${spacing(14)}`,
+                    fontSize: fontSize(12),
+                    fontWeight: 500,
+                    borderRadius: spacing(6),
+                    backgroundColor:
+                      activeTab === "shared" ? "#ffffff" : "transparent",
+                    color: activeTab === "shared" ? "#1a1a1a" : "#737373",
+                    border: "none",
+                    cursor: "pointer",
+                    boxShadow:
+                      activeTab === "shared"
+                        ? "0 1px 3px rgba(0,0,0,0.1)"
+                        : "none",
+                  }}
+                >
+                  Shared
                 </button>
               </div>
+
+              {/* New Project Button on far right */}
+              <button
+                onClick={() => router.push("/project/new")}
+                className="bg-blue-600 hover:bg-blue-700 text-white transition-colors flex items-center"
+                style={{
+                  padding: `${spacing(6)} ${spacing(12)}`,
+                  fontSize: fontSize(12),
+                  borderRadius: spacing(6),
+                  gap: spacing(6),
+                }}
+              >
+                <span>+</span>
+                <span>New Project</span>
+              </button>
             </div>
-          ) : projects.length === 0 ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="text-center">
-                <div className="text-gray-300 text-4xl mb-4">📁</div>
-                <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                  No projects yet
-                </h3>
-                <p className="text-gray-600 mb-4">
-                  Create your first PCB design project to get started
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div
-              className="grid grid-cols-1 xl:grid-cols-2"
-              style={{
-                gap: responsive(24),
-                maxWidth: responsive(850), // Constrains to 2 cards max
-              }}
-            >
-              {filteredProjects.map((project) => {
-                const { date, label } = getProjectDateInfo(project);
-                return (
+            {/* Project Cards */}
+            {isLoading ? (
+              <div
+                className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3"
+                style={{
+                  gap: spacing(24),
+                  width: "fit-content",
+                  justifyItems: "start",
+                }}
+              >
+                {/* Shimmer skeleton cards */}
+                {[1, 2, 3].map((i) => (
                   <div
-                    key={project.id}
-                    onClick={() => handleOpenProject(project.id)}
-                    className="bg-[#f5f5f5] border border-[#a6a6a6] hover:shadow-md transition-shadow cursor-pointer"
+                    key={i}
+                    className="bg-[#f5f5f5] border border-[#a6a6a6] relative overflow-hidden"
                     style={{
                       ...r({
                         borderRadius: 24,
-                        padding: 20,
+                        padding: 12,
                       }),
-                      width: responsive(400),
-                      // Remove fixed height - let content determine height naturally
+                      width: "340px",
+                      flexShrink: 0,
                     }}
                   >
-                    {/* Inner container with 2px spacing from card edges */}
-                    <div style={{ padding: responsive(2) }}>
-                      {/* Project Image/Thumbnail */}
+                    <div>
+                      {/* Shimmer thumbnail */}
                       <div
-                        className="w-full bg-white border border-[#a6a6a6]"
+                        className="w-full bg-white border border-[#a6a6a6] relative overflow-hidden"
                         style={{
                           ...r({
                             borderRadius: 20,
                             borderWidth: 0.3,
                           }),
-                          height: responsive(180),
-                          marginBottom: responsive(5), // Consistent 5px spacing
+                          height: container(180, 200),
+                          marginBottom: spacing(5),
                         }}
                       >
-                        {/* Placeholder for project preview */}
+                        {/* Shimmer animation */}
+                        <div
+                          className="absolute inset-0 animate-shimmer"
+                          style={{
+                            background:
+                              "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)",
+                            backgroundSize: "200% 100%",
+                            animation: "shimmer 1.5s infinite",
+                          }}
+                        />
                       </div>
 
-                      {/* Project Info - Fixed alignment */}
+                      {/* Shimmer project info */}
                       <div
-                        className="flex items-center" // Changed to items-center for proper alignment
+                        className="flex items-center"
                         style={{
-                          gap: responsive(12),
-                          height: responsive(50), // Fixed height container
-                          marginTop: responsive(5), // Positive spacing from image
+                          gap: spacing(12),
+                          height: container(46, 50),
+                          marginTop: spacing(5),
                         }}
                       >
-                        {/* User Icons - Fixed size container */}
+                        {/* Avatar skeleton */}
                         <div
-                          className="flex items-center"
+                          className="bg-[#e0e0e0] rounded-full relative overflow-hidden"
                           style={{
-                            marginLeft: responsive(-4), // Slight negative margin for better alignment
-                            height: responsive(50), // Match text container height
+                            width: "24px",
+                            height: "24px",
                           }}
                         >
                           <div
-                            className="bg-[#d0d0d0] border border-[#969696] rounded-full flex items-center justify-center"
+                            className="absolute inset-0"
                             style={{
-                              width: responsive(24),
-                              height: responsive(24),
-                              ...r({ borderWidth: 0.68 }),
+                              background:
+                                "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)",
+                              backgroundSize: "200% 100%",
+                              animation: "shimmer 1.5s infinite",
                             }}
-                          >
-                            <UserIcon size={12} className="text-[#969696]" />
-                          </div>
-                          {/* For now, showing single user - will add collaborators later */}
+                          />
                         </div>
 
-                        {/* Text Content - Fixed height container */}
+                        {/* Text skeletons */}
                         <div
                           className="flex-1 flex flex-col justify-center"
-                          style={{ height: responsive(50) }} // Match avatar height
+                          style={{ gap: spacing(4) }}
                         >
-                          <h3
-                            className="font-medium text-[#666666] leading-tight"
+                          {/* Project name skeleton */}
+                          <div
+                            className="bg-[#e0e0e0] relative overflow-hidden"
                             style={{
-                              fontSize: responsiveFontSize(14),
-                              marginBottom: responsive(2), // Minimal spacing
-                              lineHeight: 1.2,
+                              height: "12px",
+                              width: "60%",
+                              borderRadius: "4px",
                             }}
                           >
-                            {project.name}
-                          </h3>
-                          <p
-                            className="text-[#999999] leading-tight"
+                            <div
+                              className="absolute inset-0"
+                              style={{
+                                background:
+                                  "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)",
+                                backgroundSize: "200% 100%",
+                                animation: "shimmer 1.5s infinite",
+                              }}
+                            />
+                          </div>
+                          {/* Date skeleton */}
+                          <div
+                            className="bg-[#e0e0e0] relative overflow-hidden"
                             style={{
-                              fontSize: responsiveFontSize(12),
-                              lineHeight: 1.2,
+                              height: "10px",
+                              width: "40%",
+                              borderRadius: "4px",
                             }}
                           >
-                            {label} {formatDate(date)}
-                          </p>
+                            <div
+                              className="absolute inset-0"
+                              style={{
+                                background:
+                                  "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%)",
+                                backgroundSize: "200% 100%",
+                                animation: "shimmer 1.5s infinite",
+                              }}
+                            />
+                          </div>
                         </div>
                       </div>
-                    </div>{" "}
-                    {/* Close inner container with 4px spacing */}
+                    </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
+                ))}
+              </div>
+            ) : error ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <div className="text-red-500 text-4xl mb-4">⚠️</div>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                    Failed to load projects
+                  </h3>
+                  <p className="text-gray-600 mb-4">{error}</p>
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Try Again
+                  </button>
+                </div>
+              </div>
+            ) : filteredProjects.length === 0 ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <div className="text-gray-300 text-4xl mb-4">
+                    {activeTab === "shared" ? "🤝" : "📁"}
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                    {activeTab === "shared"
+                      ? "No shared projects yet"
+                      : "No projects yet"}
+                  </h3>
+                  <p className="text-gray-600 mb-4">
+                    {activeTab === "shared"
+                      ? "Projects you share with others will appear here"
+                      : "Create your first PCB design project to get started"}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div
+                className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3"
+                style={{
+                  gap: spacing(24),
+                  width: "fit-content", // Only take up space needed for cards
+                  justifyItems: "start", // Align cards to left, space stays on right
+                }}
+              >
+                {filteredProjects.map((project) => {
+                  const { date, label } = getProjectDateInfo(project);
+                  return (
+                    <div
+                      key={project.id}
+                      onClick={() => handleOpenProject(project.id)}
+                      className="bg-[#f5f5f5] border border-[#a6a6a6] hover:shadow-md transition-shadow cursor-pointer"
+                      style={{
+                        ...r({
+                          borderRadius: 24,
+                          padding: 10,
+                        }),
+                        // Fixed card width - doesn't stretch to fill grid
+                        width: "340px", // Fixed width for consistency
+                        flexShrink: 0, // Prevent shrinking
+                      }}
+                    >
+                      {/* Inner container - removed extra padding for tighter spacing */}
+                      <div>
+                        {/* Project Image/Thumbnail */}
+                        <div
+                          className="w-full bg-white border border-[#a6a6a6]"
+                          style={{
+                            ...r({
+                              borderRadius: 20,
+                              borderWidth: 0.3,
+                            }),
+                            height: container(180, 200), // Bounded height
+                            marginBottom: spacing(5),
+                          }}
+                        >
+                          {/* Placeholder for project preview */}
+                        </div>
+
+                        {/* Project Info - Fixed alignment */}
+                        <div
+                          className="flex items-center"
+                          style={{
+                            gap: spacing(12),
+                            height: container(50, 56), // Bounded height
+                            marginTop: spacing(5),
+                          }}
+                        >
+                          {/* User Icons - Fixed size container */}
+                          <div
+                            className="flex items-center"
+                            style={{
+                              marginLeft: spacing(-4),
+                              height: container(50, 56),
+                            }}
+                          >
+                            <div
+                              className="bg-[#d0d0d0] border border-[#969696] rounded-full flex items-center justify-center"
+                              style={{
+                                width: "24px", // Fixed icon size
+                                height: "24px", // Fixed icon size
+                                ...r({ borderWidth: 0.3 }),
+                              }}
+                            >
+                              <UserIcon size={12} className="text-[#969696]" />
+                            </div>
+                            {/* For now, showing single user - will add collaborators later */}
+                          </div>
+
+                          {/* Text Content - Fixed height container */}
+                          <div
+                            className="flex-1 flex flex-col justify-center"
+                            style={{ height: container(46, 50) }}
+                          >
+                            <h3
+                              className="font-medium text-[#666666] leading-tight"
+                              style={{
+                                fontSize: fontSize(12), // Smaller project name
+                                marginBottom: spacing(2),
+                                lineHeight: 1.2,
+                              }}
+                            >
+                              {project.name}
+                            </h3>
+                            <p
+                              className="text-[#999999] leading-tight"
+                              style={{
+                                fontSize: fontSize(10), // Smaller label text
+                                lineHeight: 1.2,
+                              }}
+                            >
+                              {label} {formatDate(date)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>{" "}
+                      {/* Close inner container with 4px spacing */}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>{" "}
+        {/* Close inner wrapper */}
+      </div>{" "}
+      {/* Close center wrapper */}
     </ResponsiveContainer>
   );
 };

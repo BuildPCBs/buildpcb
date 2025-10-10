@@ -1,101 +1,129 @@
 /**
- * Responsive utility functions for BuildPCBs
- * All values should be relative to the design dimensions (1280x832)
- * These utilities convert design values to truly responsive CSS units
+ * Responsive utility functions for BuildPCBs - FIXED VERSION
+ *
+ * KEY INSIGHT: Stop using vw/vh for EVERYTHING!
+ * - Containers → max-width + center
+ * - Spacing → tight bounds
+ * - Icons → fixed px
+ * - Text → rem
  */
 
-// Design constants
 export const DESIGN_WIDTH = 1280;
 export const DESIGN_HEIGHT = 832;
 
-/**
- * Convert design pixel values to responsive units
- */
+export const BREAKPOINTS = {
+  mobile: 640,
+  tablet: 768,
+  desktop: 1280,
+  large: 1600,
+  xlarge: 1920,
+};
+
+// Basic converters
+export const toRem = (px: number) => `${px / 16}rem`;
 export const toVW = (value: number) => `${(value / DESIGN_WIDTH) * 100}vw`;
 export const toVH = (value: number) => `${(value / DESIGN_HEIGHT) * 100}vh`;
-export const toRem = (value: number) => `${value / 16}rem`;
 
 /**
- * Smart responsive conversion based on value size and context
- * Small values (borders, small spacing) -> rem for accessibility
- * Medium values (spacing, small dimensions) -> clamp() for fluid scaling
- * Large values (widths, heights) -> vw/vh with sensible limits
+ * FIXED - things that should NEVER scale
+ * Use for: icons, icon containers, small buttons
+ */
+export const fixed = (px: number) => `${px}px`;
+
+/**
+ * SPACING - scales slightly, tight bounds (±20% max)
+ * Use for: gaps, padding, margins
+ */
+export const spacing = (designPx: number) => {
+  const min = Math.floor(designPx * 0.8);
+  const max = Math.ceil(designPx * 1.2);
+  return `clamp(${min}px, ${(designPx / DESIGN_WIDTH) * 100}vw, ${max}px)`;
+};
+
+/**
+ * CONTAINER - for panels, cards (±15% max, absolute cap)
+ * Use for: SchemaPanel, PromptPanel, etc.
+ */
+export const container = (designPx: number, absoluteMaxPx?: number) => {
+  const min = Math.floor(designPx * 0.85);
+  const max = absoluteMaxPx || Math.ceil(designPx * 1.15);
+  return `clamp(${min}px, ${(designPx / DESIGN_WIDTH) * 100}vw, ${max}px)`;
+};
+
+/**
+ * FONT SIZE - minimal scaling (±10%)
+ */
+export const fontSize = (designPx: number) => {
+  const min = Math.max(12, Math.floor(designPx * 0.9));
+  const max = Math.ceil(designPx * 1.1);
+  return `clamp(${min}px, ${(designPx / DESIGN_WIDTH) * 100}vw, ${max}px)`;
+};
+
+/**
+ * RADIUS - same as spacing
+ */
+export const radius = (designPx: number) => spacing(designPx);
+
+/**
+ * LEGACY responsive() - kept for backward compat
+ * BUT you should migrate to specific functions above!
  */
 export const responsive = (value: number) => {
-  if (value <= 2) return toRem(value); // Very small values (borders) stay in rem
-  if (value <= 8)
-    return `clamp(${toRem(value * 0.8)}, ${toVW(value)}, ${toRem(
-      value * 1.2
-    )})`; // Small spacing
-  if (value <= 32)
-    return `clamp(${toRem(value * 0.75)}, ${toVW(value)}, ${toRem(
-      value * 1.5
-    )})`; // Medium spacing
-  return `clamp(${toRem(value * 0.6)}, ${toVW(value)}, ${toVW(value * 1.3)})`; // Large dimensions
+  if (value <= 2) return fixed(value);
+  if (value <= 64) return spacing(value);
+  return container(value);
 };
 
-/**
- * Responsive size conversion with min/max constraints
- */
 export const responsiveSize = (
   value: number,
-  minRem?: number,
-  maxVw?: number
+  _minRem?: number,
+  maxPx?: number
 ) => {
-  const vwValue = toVW(value);
-  const remValue = toRem(value);
-
-  if (minRem && maxVw) {
-    return `clamp(${toRem(minRem)}, ${vwValue}, ${toVW(maxVw)})`;
-  }
-  if (minRem) {
-    return `max(${toRem(minRem)}, ${vwValue})`;
-  }
-  return vwValue;
+  return container(value, maxPx);
 };
 
-/**
- * Creates responsive style objects with fluid scaling
- */
+export const responsiveFontSize = fontSize;
+
+export const responsiveSquare = (size: number) => {
+  const val = size <= 48 ? fixed(size) : spacing(size);
+  return { width: val, height: val };
+};
+
 export const createResponsiveStyles = (
   styles: Record<string, number | string>
 ) => {
-  const responsiveStyles: Record<string, string> = {};
-
+  const result: Record<string, string> = {};
   for (const [key, value] of Object.entries(styles)) {
     if (typeof value === "number") {
-      // Handle different CSS properties appropriately
-      if (key.includes("Width") || key === "width") {
-        responsiveStyles[key] = responsiveSize(value, 2); // Min 2rem width
-      } else if (key.includes("Height") || key === "height") {
-        responsiveStyles[key] =
-          key === "height"
-            ? responsiveSize(value, 2) // Use same scaling as width for proportional elements
-            : responsive(value);
-      } else if (key.includes("padding") || key.includes("margin")) {
-        responsiveStyles[key] = responsive(value);
-      } else if (key.includes("border") && key.includes("Radius")) {
-        responsiveStyles[key] = `max(${toRem(value)}, ${toVW(value)})`;
-      } else if (key.includes("border") && key.includes("Width")) {
-        responsiveStyles[key] = toRem(value); // Border widths stay in rem
-      } else if (key === "top" || key === "bottom") {
-        responsiveStyles[key] = `max(${toRem(value)}, ${toVH(value)})`;
-      } else if (key === "left" || key === "right") {
-        responsiveStyles[key] = `max(${toRem(value)}, ${toVW(value)})`;
+      if (
+        key.includes("Width") ||
+        key === "width" ||
+        key.includes("Height") ||
+        key === "height"
+      ) {
+        result[key] = container(value);
+      } else if (
+        key.includes("padding") ||
+        key.includes("margin") ||
+        key.includes("gap")
+      ) {
+        result[key] = spacing(value);
+      } else if (key.includes("borderRadius")) {
+        result[key] = radius(value);
+      } else if (key.includes("borderWidth")) {
+        result[key] = fixed(value);
+      } else if (key.includes("fontSize")) {
+        result[key] = fontSize(value);
       } else {
-        responsiveStyles[key] = responsive(value);
+        result[key] = spacing(value);
       }
     } else {
-      responsiveStyles[key] = value;
+      result[key] = value;
     }
   }
-
-  return responsiveStyles;
+  return result;
 };
 
-/**
- * Type-safe responsive style builder
- */
 export interface ResponsiveStyleConfig {
   top?: number;
   left?: number;
@@ -112,36 +140,47 @@ export interface ResponsiveStyleConfig {
 export const r = (config: ResponsiveStyleConfig) =>
   createResponsiveStyles(config as Record<string, number | string>);
 
-/**
- * Font size responsive utilities with better scaling
- */
-export const responsiveFontSize = (designPx: number) => {
-  return `clamp(${toRem(designPx * 0.85)}, ${toVW(designPx)}, ${toRem(
-    designPx * 1.15
-  )})`;
+export const spacingScale = {
+  xxs: spacing(2),
+  xs: spacing(4),
+  sm: spacing(8),
+  md: spacing(16),
+  lg: spacing(24),
+  xl: spacing(32),
+  "2xl": spacing(48),
+  "3xl": spacing(64),
+};
+
+export const breakpoints = BREAKPOINTS;
+
+export const calculateResponsiveValue = (
+  designValue: number,
+  viewportWidth: number = typeof window !== "undefined"
+    ? window.innerWidth
+    : DESIGN_WIDTH
+): number => {
+  const clampedViewport = Math.min(
+    Math.max(viewportWidth, BREAKPOINTS.tablet),
+    BREAKPOINTS.xlarge
+  );
+  const scaleFactor = clampedViewport / DESIGN_WIDTH;
+  const boundedScale = Math.max(0.85, Math.min(1.15, scaleFactor));
+  return Math.round(designValue * boundedScale);
+};
+
+export const containerRelative = (value: number) => {
+  const min = Math.floor(value * 0.85);
+  const max = Math.ceil(value * 1.15);
+  return `clamp(${min}px, ${(value / DESIGN_WIDTH) * 100}cqw, ${max}px)`;
 };
 
 /**
- * Square/circular element responsive utility
- * Ensures width and height scale proportionally to maintain aspect ratio
+ * MAX WIDTH WRAPPER - wrap panels in this!
+ * Prevents growing forever on huge screens
  */
-export const responsiveSquare = (size: number) => {
-  const responsiveValue = responsiveSize(size, 2);
-  return {
-    width: responsiveValue,
-    height: responsiveValue,
-  };
-};
-
-/**
- * Responsive spacing system based on design values
- */
-export const spacing = {
-  xs: responsive(4),
-  sm: responsive(8),
-  md: responsive(16),
-  lg: responsive(24),
-  xl: responsive(32),
-  "2xl": responsive(48),
-  "3xl": responsive(64),
-};
+export const maxWidthWrapper = (maxPx: number = BREAKPOINTS.desktop) => ({
+  maxWidth: `${maxPx}px`,
+  marginLeft: "auto",
+  marginRight: "auto",
+  width: "100%",
+});

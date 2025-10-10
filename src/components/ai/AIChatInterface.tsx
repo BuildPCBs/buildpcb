@@ -197,7 +197,18 @@ export function AIChatInterface({
             </div>
           ) : (
             <>
-              {messages.map((message, index) => (
+              {messages.map((message, index) => {
+                // Debug: Log message with selectedComponents
+                if (message.type === "user" && message.selectedComponents) {
+                  logger.component("Rendering user message with components", {
+                    messageId: message.id,
+                    hasSelectedComponents: !!message.selectedComponents,
+                    componentCount: message.selectedComponents?.length || 0,
+                    components: message.selectedComponents
+                  });
+                }
+                
+                return (
                 <div
                   key={message.id}
                   data-message-index={index}
@@ -268,80 +279,102 @@ export function AIChatInterface({
                           </div>
                         ) : (
                           /* Normal Display Mode */
-                          <div
-                            className="rounded-2xl rounded-br-md px-4 py-2 text-white mb-1"
-                            style={{ backgroundColor: BRAND_COLORS.primary }}
-                          >
+                          <>
                             <div
-                              className="leading-relaxed prose prose-xs prose-invert max-w-none"
-                              style={{
-                                fontSize: responsive(8),
-                                lineHeight: 1.5,
-                              }}
+                              className="rounded-2xl rounded-br-md px-4 py-2 text-white mb-1"
+                              style={{ backgroundColor: BRAND_COLORS.primary }}
                             >
-                              <ReactMarkdown
-                                remarkPlugins={[remarkMath]}
-                                rehypePlugins={[rehypeKatex]}
-                                components={{
-                                  // Custom styling for user messages (light theme)
-                                  p: ({ children }) => (
-                                    <p className="mb-2 last:mb-0">{children}</p>
-                                  ),
-                                  strong: ({ children }) => (
-                                    <strong className="font-semibold">
-                                      {children}
-                                    </strong>
-                                  ),
-                                  em: ({ children }) => (
-                                    <em className="opacity-90">{children}</em>
-                                  ),
-                                  code: ({ children }) => (
-                                    <code className="bg-white bg-opacity-20 px-1 py-0.5 rounded text-xs font-mono">
-                                      {children}
-                                    </code>
-                                  ),
-                                  pre: ({ children }) => (
-                                    <pre className="bg-white bg-opacity-20 p-2 rounded text-xs font-mono overflow-x-auto">
-                                      {children}
-                                    </pre>
-                                  ),
-                                  ul: ({ children }) => (
-                                    <ul className="list-disc list-inside mb-2 space-y-1">
-                                      {children}
-                                    </ul>
-                                  ),
-                                  ol: ({ children }) => (
-                                    <ol className="list-decimal list-inside mb-2 space-y-1">
-                                      {children}
-                                    </ol>
-                                  ),
-                                  li: ({ children }) => <li>{children}</li>,
-                                  h1: ({ children }) => (
-                                    <h1 className="text-sm font-bold mb-2">
-                                      {children}
-                                    </h1>
-                                  ),
-                                  h2: ({ children }) => (
-                                    <h2 className="text-sm font-bold mb-2">
-                                      {children}
-                                    </h2>
-                                  ),
-                                  h3: ({ children }) => (
-                                    <h3 className="text-sm font-bold mb-2">
-                                      {children}
-                                    </h3>
-                                  ),
-                                  blockquote: ({ children }) => (
-                                    <blockquote className="border-l-4 border-white border-opacity-30 pl-4 italic mb-2">
-                                      {children}
-                                    </blockquote>
-                                  ),
+                              <div
+                                className="leading-relaxed prose prose-xs prose-invert max-w-none"
+                                style={{
+                                  fontSize: responsive(8),
+                                  lineHeight: 1.5,
                                 }}
                               >
-                                {message.content}
-                              </ReactMarkdown>
+                                <ReactMarkdown
+                                  remarkPlugins={[remarkMath]}
+                                  rehypePlugins={[rehypeKatex]}
+                                  components={{
+                                    // Custom styling for user messages (light theme)
+                                    p: ({ children }) => (
+                                      <p className="mb-2 last:mb-0">{children}</p>
+                                    ),
+                                    strong: ({ children }) => (
+                                      <strong className="font-semibold">
+                                        {children}
+                                      </strong>
+                                    ),
+                                    em: ({ children }) => (
+                                      <em className="opacity-90">{children}</em>
+                                    ),
+                                    code: ({ children }) => (
+                                      <code className="bg-white bg-opacity-20 px-1 py-0.5 rounded text-xs font-mono">
+                                        {children}
+                                      </code>
+                                    ),
+                                    pre: ({ children }) => (
+                                      <pre className="bg-white bg-opacity-20 p-2 rounded text-xs font-mono overflow-x-auto">
+                                        {children}
+                                      </pre>
+                                    ),
+                                    ul: ({ children }) => (
+                                      <ul className="list-disc list-inside mb-2 space-y-1">
+                                        {children}
+                                      </ul>
+                                    ),
+                                    ol: ({ children }) => (
+                                      <ol className="list-decimal list-inside mb-2 space-y-1">
+                                        {children}
+                                      </ol>
+                                    ),
+                                    li: ({ children }) => <li>{children}</li>,
+                                    h1: ({ children }) => (
+                                      <h1 className="text-sm font-bold mb-2">
+                                        {children}
+                                      </h1>
+                                    ),
+                                    h2: ({ children }) => (
+                                      <h2 className="text-sm font-bold mb-2">
+                                        {children}
+                                      </h2>
+                                    ),
+                                    h3: ({ children }) => (
+                                      <h3 className="text-sm font-bold mb-2">
+                                        {children}
+                                      </h3>
+                                    ),
+                                    blockquote: ({ children }) => (
+                                      <blockquote className="border-l-4 border-white border-opacity-30 pl-4 italic mb-2">
+                                        {children}
+                                      </blockquote>
+                                    ),
+                                  }}
+                                >
+                                  {message.content}
+                                </ReactMarkdown>
+                              </div>
                             </div>
-                          </div>
+                            
+                            {/* Selected Components Context - Show below user message */}
+                            {message.selectedComponents && message.selectedComponents.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 mb-1 justify-end">
+                                {message.selectedComponents.map((comp, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 border border-blue-300 rounded-md"
+                                    style={{
+                                      fontSize: "10px",
+                                    }}
+                                  >
+                                    <span className="text-blue-700">📦</span>
+                                    <span className="text-blue-900 font-medium">
+                                      {comp.name}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </>
                         )}
                         {/* User Message Action Buttons - Only show when not editing */}
                         {!message.isEditing && (
@@ -664,7 +697,8 @@ export function AIChatInterface({
                     </div>
                   )}
                 </div>
-              ))}
+              );
+              })}
               {streamMessages.length > 0 && (
                 <div className="mb-4">
                   <AgentStreamDisplay

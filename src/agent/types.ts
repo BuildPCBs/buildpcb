@@ -1,5 +1,6 @@
 import * as fabric from "fabric";
 import { Circuit } from "@/types";
+import { SelectedComponent } from "@/contexts/CanvasContext";
 
 /**
  * Streamer interface for real-time AI feedback to users
@@ -60,6 +61,8 @@ export interface AgentContext {
   streamer: AgentStreamer;
   /** User ID if authenticated */
   userId?: string;
+  /** Selected components from canvas */
+  selectedComponents?: SelectedComponent[];
   /** Callback for streaming LLM content updates */
   onContentUpdate?: (content: string) => void;
 }

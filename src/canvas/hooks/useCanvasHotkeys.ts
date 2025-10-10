@@ -7,8 +7,8 @@ interface UseCanvasHotkeysProps {
   canvas?: fabric.Canvas | null;
   enabled?: boolean;
   // PART 2: Direct function props for debugging
-  onGroup: () => void;
-  onUngroup: () => void;
+  // NOTE: Group/Ungroup removed - doesn't make sense for PCB schematics
+  // Components must maintain individual identity for pin connectivity and metadata
   onDelete: () => void;
   onCopy: () => void;
   onPaste: () => void;
@@ -28,20 +28,18 @@ interface UseCanvasHotkeysProps {
  * Keyboard Shortcuts:
  * - Ctrl/Cmd + C: Copy selected objects
  * - Ctrl/Cmd + V: Paste copied objects
- * - Ctrl/Cmd + G: Group selected objects
- * - Ctrl/Cmd + Shift + G: Ungroup selected objects
  * - Delete/Backspace: Delete selected objects
  * - Ctrl/Cmd + Z: Undo
  * - Ctrl/Cmd + Y or Ctrl/Cmd + Shift + Z: Redo
  * - Ctrl/Cmd + S: Save project
  * - R: Rotate selected component 90°
  * - G: Toggle grid visibility
+ * 
+ * NOTE: Group/Ungroup removed - not applicable in PCB schematic context
  */
 export function useCanvasHotkeys({
   canvas,
   enabled = true,
-  onGroup,
-  onUngroup,
   onDelete,
   onCopy,
   onPaste,
@@ -59,7 +57,7 @@ export function useCanvasHotkeys({
     const handleKeyDown = (e: KeyboardEvent) => {
       // Enhanced input field detection - don't trigger shortcuts when typing
       const activeElement = document.activeElement;
-      if (
+      const isTyping =
         activeElement &&
         (activeElement.tagName === "INPUT" ||
           activeElement.tagName === "TEXTAREA" ||
@@ -68,10 +66,25 @@ export function useCanvasHotkeys({
           (activeElement as HTMLElement).isContentEditable ||
           activeElement.closest('[contenteditable="true"]') ||
           activeElement.closest("input") ||
-          activeElement.closest("textarea"))
-      ) {
+          activeElement.closest("textarea"));
+
+      // If user is typing in an input field, ONLY allow Cmd+S (save)
+      // All other shortcuts should work normally in inputs (Cmd+A, Cmd+Z, Cmd+C, Cmd+V, etc.)
+      if (isTyping) {
+        // Cross-platform modifier key detection
+        const isModifierPressed = e.ctrlKey || e.metaKey;
+
+        // Only intercept Cmd+S to save the project
+        if (isModifierPressed && e.key.toLowerCase() === "s" && onSave) {
+          e.preventDefault();
+          console.log("TRIGGER: Ctrl/Cmd+S shortcut pressed (in input field).");
+          onSave();
+          return;
+        }
+
+        // Let all other shortcuts work normally in input fields
         console.log(
-          "🔇 Hotkeys disabled - user is typing in:",
+          "🔇 Canvas hotkeys disabled - user is typing in:",
           activeElement.tagName
         );
         return;
@@ -102,31 +115,26 @@ export function useCanvasHotkeys({
             }
             break;
 
-          case "g":
-            e.preventDefault();
-            if (e.shiftKey) {
-              console.log("TRIGGER: Ctrl/Cmd+Shift+G shortcut pressed.");
-              onUngroup();
-            } else {
-              console.log("TRIGGER: Ctrl/Cmd+G shortcut pressed.");
-              onGroup();
-            }
-            break;
-
           case "z":
             e.preventDefault();
             if (e.shiftKey) {
-              console.log("🔍 DEBUG: Ctrl/Cmd+Shift+Z shortcut pressed - calling onRedo");
+              console.log(
+                "🔍 DEBUG: Ctrl/Cmd+Shift+Z shortcut pressed - calling onRedo"
+              );
               onRedo();
             } else {
-              console.log("🔍 DEBUG: Ctrl/Cmd+Z shortcut pressed - calling onUndo");
+              console.log(
+                "🔍 DEBUG: Ctrl/Cmd+Z shortcut pressed - calling onUndo"
+              );
               onUndo();
             }
             break;
 
           case "y":
             e.preventDefault();
-            console.log("🔍 DEBUG: Ctrl/Cmd+Y shortcut pressed - calling onRedo");
+            console.log(
+              "🔍 DEBUG: Ctrl/Cmd+Y shortcut pressed - calling onRedo"
+            );
             onRedo();
             break;
 
@@ -193,8 +201,6 @@ export function useCanvasHotkeys({
   }, [
     canvas,
     enabled,
-    onGroup,
-    onUngroup,
     onDelete,
     onCopy,
     onPaste,

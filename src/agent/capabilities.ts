@@ -55,7 +55,8 @@ export const capabilities = {
     ZOOM_OUT: "ZOOM_OUT",
     PAN_CANVAS: "PAN_CANVAS",
     SAVE_PROJECT: "SAVE_PROJECT",
-    GROUP_COMPONENTS: "GROUP_COMPONENTS",
+    // NOTE: GROUP_COMPONENTS removed - grouping doesn't make sense for PCB schematics
+    // Components must maintain individual identity for pin connectivity and metadata
   },
 } as const;
 

@@ -6,6 +6,7 @@ import { responsive, responsiveSquare } from "@/lib/responsive";
 import { BRAND_COLORS } from "@/lib/constants";
 import { getChatUIStyles } from "../agent/ChatUIConfig";
 import { Send } from "lucide-react";
+import { SelectedComponent } from "@/contexts/CanvasContext";
 
 interface PromptEntryProps {
   onSubmit?: (prompt: string) => void;
@@ -14,6 +15,7 @@ interface PromptEntryProps {
   onSendClick?: () => void;
   isThinking?: boolean;
   className?: string;
+  selectedComponents?: SelectedComponent[];
   // Optional dimension overrides from parent container
   width?: string;
   minWidth?: string;
@@ -29,6 +31,7 @@ export function PromptEntry({
   onSendClick,
   isThinking = false,
   className = "",
+  selectedComponents = [],
   width,
   minWidth,
   maxWidth,
@@ -36,6 +39,9 @@ export function PromptEntry({
   maxHeight,
 }: PromptEntryProps) {
   const [prompt, setPrompt] = useState("");
+
+  // Debug logging
+  console.log("📦 PromptEntry selectedComponents:", selectedComponents);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,27 +94,62 @@ export function PromptEntry({
       >
         {/* Prompt Text Area */}
         <form onSubmit={handleSubmit} className="relative">
-          <textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Build your circuit with AI..."
-            disabled={isThinking}
-            className="w-full resize-none border-none rounded-xl transition-all focus:outline-none focus:ring-0 focus:border-gray-400"
-            rows={2}
-            style={{
-              backgroundColor: "transparent",
-              color: prompt.trim() ? "#000000" : "#999999", // Black when typing, gray placeholder
-              fontSize: responsive(9),
-              lineHeight: 1.4,
-              padding: `${responsive(10)} ${responsive(10)} ${responsive(
-                40
-              )} ${responsive(10)}`,
-              borderRadius: responsive(12),
-              border: "none",
-              minHeight: "60px", // Explicit minimum height for textarea
-            }}
-          />
+          {/* Container for tags and textarea */}
+          <div className="relative">
+            {/* Selected Components Tags - Above the textarea input */}
+            {selectedComponents.length > 0 && (
+              <div
+                className="absolute flex flex-wrap gap-1.5 pointer-events-none"
+                style={{
+                  top: responsive(10),
+                  left: responsive(10),
+                  right: responsive(10),
+                  zIndex: 2,
+                }}
+              >
+                {selectedComponents.map((comp, idx) => (
+                  <div
+                    key={idx}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 border border-blue-300 rounded-md pointer-events-auto"
+                    style={{
+                      fontSize: "11px",
+                    }}
+                  >
+                    <span className="text-blue-700">📦</span>
+                    <span className="text-blue-900 font-medium">
+                      {comp.name}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Build your circuit with AI..."
+              disabled={isThinking}
+              className="w-full resize-none border-none rounded-xl transition-all focus:outline-none focus:ring-0 focus:border-gray-400"
+              rows={2}
+              style={{
+                backgroundColor: "transparent",
+                color: prompt.trim() ? "#000000" : "#999999",
+                fontSize: responsive(9),
+                lineHeight: 1.4,
+                paddingTop:
+                  selectedComponents.length > 0
+                    ? responsive(35)
+                    : responsive(10),
+                paddingBottom: responsive(40),
+                paddingLeft: responsive(10),
+                paddingRight: responsive(10),
+                borderRadius: responsive(12),
+                border: "none",
+                minHeight: "60px",
+              }}
+            />
+          </div>
         </form>
 
         {/* Action Buttons - Positioned at bottom with microphone on the right */}

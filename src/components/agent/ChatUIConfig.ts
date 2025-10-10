@@ -3,7 +3,7 @@
  * Ensures consistent dimensions across PromptEntry, AgentStreamDisplay, and AIPromptPanel
  */
 
-import { responsive } from "@/lib/responsive";
+import { container, spacing, radius } from "@/lib/responsive";
 
 /**
  * Design constants (at 1280px screen width)
@@ -29,32 +29,36 @@ export const CHAT_UI_OFFSETS = {
 /**
  * Calculated responsive dimensions
  * All components should use these for consistency
+ * 
+ * FIXED: Using container() for widths (max 380px), spacing() for gaps
  */
 export const getChatUIStyles = () => {
-  const contentWidth = responsive(CHAT_UI_DESIGN.CONTENT_WIDTH);
-  const padding = responsive(CHAT_UI_DESIGN.PADDING);
-  const gap = responsive(CHAT_UI_DESIGN.GAP);
+  // Use container() with absolute max to prevent growing on huge screens
+  const contentWidth = container(CHAT_UI_DESIGN.CONTENT_WIDTH, 380); // Max 380px
+  const padding = spacing(CHAT_UI_DESIGN.PADDING);
+  const gap = spacing(CHAT_UI_DESIGN.GAP);
 
   return {
     // Container (AIPromptPanel)
     container: {
       padding,
-      maxWidth: responsive(
-        CHAT_UI_DESIGN.CONTENT_WIDTH + CHAT_UI_DESIGN.PADDING
+      maxWidth: container(
+        CHAT_UI_DESIGN.CONTENT_WIDTH + CHAT_UI_DESIGN.PADDING,
+        420 // Absolute max: 380 + 40 padding
       ),
       minWidth: "312px", // 280 + 32 padding minimum
     },
 
     offsets: {
-      bottom: responsive(CHAT_UI_DESIGN.BOTTOM_OFFSET),
-      right: responsive(CHAT_UI_DESIGN.RIGHT_OFFSET),
+      bottom: spacing(CHAT_UI_DESIGN.BOTTOM_OFFSET),
+      right: spacing(CHAT_UI_DESIGN.RIGHT_OFFSET),
     },
 
     // Content dimensions (shared by all child components)
     content: {
       width: contentWidth,
       minWidth: "280px",
-      maxWidth: "400px",
+      maxWidth: "380px", // Hard cap - never exceed this
     },
 
     // Spacing
@@ -62,18 +66,18 @@ export const getChatUIStyles = () => {
 
     // PromptEntry
     promptEntry: {
-      height: responsive(CHAT_UI_DESIGN.PROMPT_HEIGHT),
+      height: container(CHAT_UI_DESIGN.PROMPT_HEIGHT, 110),
       minHeight: "80px",
-      maxHeight: "120px",
-      borderRadius: responsive(12),
+      maxHeight: "110px", // Prevent growing over toolbar
+      borderRadius: radius(12),
     },
 
     // AgentStreamDisplay
     streamer: {
-      height: responsive(CHAT_UI_DESIGN.STREAMER_HEIGHT),
+      height: container(CHAT_UI_DESIGN.STREAMER_HEIGHT, 32),
       minHeight: "12px",
-      maxHeight: "36px",
-      borderRadius: responsive(4),
+      maxHeight: "32px",
+      borderRadius: radius(4),
       marginBottom: gap,
     },
   };
@@ -81,5 +85,6 @@ export const getChatUIStyles = () => {
 
 /**
  * Get consistent responsive value for chat UI
+ * @deprecated Use container(), spacing(), or radius() directly
  */
-export const chatUIResponsive = responsive;
+export const chatUIResponsive = container;

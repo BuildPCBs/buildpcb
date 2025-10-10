@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { PromptEntry } from "./PromptEntry";
 import { useAIChat } from "../../contexts/AIChatContext";
 import { useCanvas } from "../../contexts/CanvasContext";
@@ -24,8 +25,13 @@ export function AIPromptPanel({
   } = useAIChat();
 
   // Get canvas state for AI context
-  const { canvas } = useCanvas();
+  const { canvas, selectedComponents } = useCanvas();
   const canvasState = useCanvasStateSnapshot(canvas);
+
+  // Debug logging
+  useEffect(() => {
+    console.log("🔍 AIPromptPanel - Selected components:", selectedComponents);
+  }, [selectedComponents]);
 
   // Use context isThinking, then external isThinking, then local state
   const currentIsThinking = contextIsThinking || isThinking;
@@ -35,14 +41,15 @@ export function AIPromptPanel({
     logger.api("Canvas available:", !!canvas);
     logger.api("Canvas state:", canvasState);
     logger.api("Canvas type:", canvas?.constructor?.name);
+    logger.api("Selected components:", selectedComponents);
 
     if (onPromptSubmit) {
       // Use external handler if provided
       await onPromptSubmit(prompt);
     } else {
-      // Use context handler with canvas state and canvas
+      // Use context handler with canvas state, canvas, and selected components
       logger.api("Calling context handlePromptSubmit with canvas:", !!canvas);
-      await contextHandlePromptSubmit(prompt, canvasState, canvas);
+      await contextHandlePromptSubmit(prompt, canvasState, canvas, selectedComponents);
     }
   };
 
@@ -81,13 +88,14 @@ export function AIPromptPanel({
           pointerEvents: "auto",
         }}
       >
-        {/* Prompt Entry */}
+        {/* Prompt Entry with inline selected components */}
         <PromptEntry
           onSubmit={handlePromptSubmit}
           onMicClick={handleMicClick}
           onDotsClick={handleDotsClick}
           onSendClick={handleSendClick}
           isThinking={currentIsThinking}
+          selectedComponents={selectedComponents}
         />
       </div>
     </div>

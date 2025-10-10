@@ -13,6 +13,7 @@ import { serializeCanvasToCircuit } from "@/canvas/utils/canvasSerializer";
 import { useAIChat } from "@/contexts/AIChatContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { logger } from "@/lib/logger";
+import { refDesService } from "@/lib/refdes-service";
 
 interface UseCanvasAutoSaveOptions {
   canvas: fabric.Canvas | null;
@@ -113,9 +114,14 @@ export function useCanvasAutoSave({
                   })),
                 }
               : null;
+          
+          // Include RefDes assignments for persistence
+          const refDesAssignments = refDesService.getAllAssignments();
+          
           const extendedCanvasData = {
             ...data.canvasData,
             chatData: chatData,
+            refDesAssignments: refDesAssignments.length > 0 ? refDesAssignments : null,
           };
 
           setCurrentData({
@@ -330,9 +336,14 @@ export function useCanvasAutoSave({
                 })),
               }
             : null;
+        
+        // Include RefDes assignments for persistence
+        const refDesAssignments = refDesService.getAllAssignments();
+        
         const extendedCanvasData = {
           ...data.canvasData,
           chatData: chatData,
+          refDesAssignments: refDesAssignments.length > 0 ? refDesAssignments : null,
         };
 
         // Update the current data state for consistency

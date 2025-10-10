@@ -45,16 +45,17 @@ function EmailEntryForm({ onSuccess }: Pick<AuthFormProps, "onSuccess">) {
 
   return (
     <div
-      className="bg-white border border-[#A6A6A6] relative"
+      className="bg-white border border-[#A6A6A6] relative w-[90vw] sm:w-auto mx-4"
       style={{
         ...r({
           width: 331,
           height: 289,
           borderRadius: 20,
         }),
+        maxWidth: "90vw",
       }}
     >
-      <div className="absolute inset-0 flex flex-col items-center justify-center p-6">
+      <div className="absolute inset-0 flex flex-col items-center justify-center p-4 sm:p-6">
         {/* Title */}
         <h2
           className="text-center font-medium mb-2"
@@ -85,13 +86,14 @@ function EmailEntryForm({ onSuccess }: Pick<AuthFormProps, "onSuccess">) {
           {/* Email Input */}
           <input
             type="email"
+            name="email"
+            autoComplete="email"
             placeholder="enter your mail"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="border border-[#DDDDDD] rounded-lg focus:outline-none focus:border-[#0038DF] focus:ring-1 focus:ring-[#0038DF]/20 transition-colors"
+            className="border border-[#DDDDDD] rounded-lg focus:outline-none focus:border-[#0038DF] focus:ring-1 focus:ring-[#0038DF]/20 transition-colors w-full max-w-[289px]"
             style={{
               ...r({
-                width: 289,
                 height: 34,
                 borderRadius: 8,
                 padding: 10,
@@ -120,10 +122,9 @@ function EmailEntryForm({ onSuccess }: Pick<AuthFormProps, "onSuccess">) {
           <button
             type="submit"
             disabled={!email.trim() || isLoading}
-            className="mt-4 bg-[#0038DF] text-white rounded-lg hover:bg-[#002BB5] disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            className="mt-4 bg-[#0038DF] text-white rounded-lg hover:bg-[#002BB5] disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors w-full max-w-[289px]"
             style={{
               ...r({
-                width: 289,
                 height: 34,
                 borderRadius: 8,
               }),
@@ -176,6 +177,19 @@ function CodeVerificationForm({ onBack, onSuccess, email }: AuthFormProps) {
     }
   };
 
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData("text").replace(/\D/g, ""); // Remove non-digits
+    
+    if (pastedData.length === 6) {
+      // Split the 6-digit code across all inputs
+      const newCode = pastedData.split("").slice(0, 6);
+      setCode(newCode);
+      // Focus the last input
+      inputRefs.current[5]?.focus();
+    }
+  };
+
   const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
     if (e.key === "Backspace" && !code[index] && index > 0) {
       // Focus previous input on backspace
@@ -209,16 +223,17 @@ function CodeVerificationForm({ onBack, onSuccess, email }: AuthFormProps) {
 
   return (
     <div
-      className="bg-white border border-[#A6A6A6] relative"
+      className="bg-white border border-[#A6A6A6] relative w-[90vw] sm:w-auto mx-4"
       style={{
         ...r({
           width: 331,
           height: 346,
           borderRadius: 20,
         }),
+        maxWidth: "90vw",
       }}
     >
-      <div className="absolute inset-0 flex flex-col items-center justify-center p-6">
+      <div className="absolute inset-0 flex flex-col items-center justify-center p-4 sm:p-6">
         {/* Title */}
         <h2
           className="text-center font-medium mb-2"
@@ -247,12 +262,9 @@ function CodeVerificationForm({ onBack, onSuccess, email }: AuthFormProps) {
           className="w-full flex flex-col items-center"
         >
           {/* 6 Separate Code Input Boxes - Grouped Layout */}
-          <div
-            className="flex justify-center mb-4"
-            style={{ gap: responsive(24) }}
-          >
+          <div className="flex justify-center mb-4 gap-4 sm:gap-6">
             {/* First group of 3 boxes */}
-            <div className="flex" style={{ gap: responsive(8) }}>
+            <div className="flex gap-1.5 sm:gap-2">
               {code.slice(0, 3).map((digit, index) => (
                 <input
                   key={index}
@@ -267,12 +279,11 @@ function CodeVerificationForm({ onBack, onSuccess, email }: AuthFormProps) {
                   onChange={(e) =>
                     handleCodeChange(index, e.target.value.replace(/\D/g, ""))
                   }
+                  onPaste={handlePaste}
                   onKeyDown={(e) => handleKeyDown(index, e)}
-                  className="text-center border focus:outline-none focus:border-[#0038DF] focus:ring-1 focus:ring-[#0038DF]/20 text-gray-900 transition-colors"
+                  className="text-center border focus:outline-none focus:border-[#0038DF] focus:ring-1 focus:ring-[#0038DF]/20 text-gray-900 transition-colors w-8 h-8 sm:w-9 sm:h-9"
                   style={{
                     fontSize: responsive(16),
-                    width: responsive(36),
-                    height: responsive(36),
                     borderRadius: responsive(8),
                     border: `${responsive(1)} solid #dddddd`,
                     background: "#F9F9F9F2",
@@ -283,7 +294,7 @@ function CodeVerificationForm({ onBack, onSuccess, email }: AuthFormProps) {
             </div>
 
             {/* Second group of 3 boxes */}
-            <div className="flex" style={{ gap: responsive(8) }}>
+            <div className="flex gap-1.5 sm:gap-2">
               {code.slice(3, 6).map((digit, index) => (
                 <input
                   key={index + 3}
@@ -301,12 +312,11 @@ function CodeVerificationForm({ onBack, onSuccess, email }: AuthFormProps) {
                       e.target.value.replace(/\D/g, "")
                     )
                   }
+                  onPaste={handlePaste}
                   onKeyDown={(e) => handleKeyDown(index + 3, e)}
-                  className="text-center border focus:outline-none focus:border-[#0038DF] focus:ring-1 focus:ring-[#0038DF]/20 text-gray-900 transition-colors"
+                  className="text-center border focus:outline-none focus:border-[#0038DF] focus:ring-1 focus:ring-[#0038DF]/20 text-gray-900 transition-colors w-8 h-8 sm:w-9 sm:h-9"
                   style={{
                     fontSize: responsive(16),
-                    width: responsive(36),
-                    height: responsive(36),
                     borderRadius: responsive(8),
                     border: `${responsive(1)} solid #dddddd`,
                     background: "#F9F9F9F2",
@@ -334,10 +344,9 @@ function CodeVerificationForm({ onBack, onSuccess, email }: AuthFormProps) {
           <button
             type="submit"
             disabled={code.join("").length !== 6 || isLoading}
-            className="mt-4 bg-[#0038DF] text-white rounded-lg hover:bg-[#002BB5] disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            className="mt-4 bg-[#0038DF] text-white rounded-lg hover:bg-[#002BB5] disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors w-full max-w-[272px]"
             style={{
               ...r({
-                width: 272,
                 height: 34,
                 borderRadius: 8,
               }),

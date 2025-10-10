@@ -17,6 +17,11 @@ import { useServerSearch } from "@/hooks/useServerSearch";
 import { canvasCommandManager } from "@/canvas/canvas-command-manager";
 import { logger } from "@/lib/logger";
 
+// Clean component names by removing _unit1, _unit2, etc. suffixes
+function cleanComponentName(name: string): string {
+  return name.replace(/_unit\d+$/i, '').replace(/_\d+$/i, '');
+}
+
 // Custom debounce hook
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
@@ -182,8 +187,8 @@ function ComponentPreview({ component, onClose }: ComponentPreviewProps) {
   if (!component) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-6 text-gray-400">
-        <div className="w-24 h-24 bg-gray-100 rounded-lg flex items-center justify-center mb-4">
-          <SearchIcon size={32} className="text-gray-300" />
+        <div className="w-24 h-24 bg-gray-100 rounded-lg flex items-center justify-center mb-3">
+          <SearchIcon size={36} className="text-gray-300" />
         </div>
         <p className="text-sm text-center">Select a component to preview</p>
       </div>
@@ -194,12 +199,18 @@ function ComponentPreview({ component, onClose }: ComponentPreviewProps) {
     <div className="h-full flex flex-col">
       {/* Enhanced Image Preview Section */}
       <div className="flex flex-col items-center mb-4 p-4 bg-white rounded-lg border border-gray-200">
-        <div className="w-8 h-8 mb-3 flex items-center justify-center">
+        <div className="w-40 h-40 mb-3 flex items-center justify-center">
           {component.image ? (
             <img
               src={component.image}
               alt={component.package_id}
-              className="max-w-full max-h-full object-contain"
+              className="object-contain"
+              style={{
+                width: "100%",
+                height: "100%",
+                minWidth: "160px",
+                minHeight: "160px",
+              }}
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 target.style.display = "none";
@@ -216,8 +227,8 @@ function ComponentPreview({ component, onClose }: ComponentPreviewProps) {
         </div>
 
         <div className="text-center">
-          <h3 className="font-semibold text-gray-900 text-lg mb-1">
-            {component.package_id}
+          <h3 className="font-semibold text-gray-900 text-base mb-1">
+            {cleanComponentName(component.package_id)}
           </h3>
           <p className="text-sm text-gray-500">{component.category}</p>
         </div>
@@ -228,17 +239,19 @@ function ComponentPreview({ component, onClose }: ComponentPreviewProps) {
         <div className="grid grid-cols-1 gap-3">
           {component.description && (
             <div>
-              <h4 className="text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">
+              <h4 className="text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">
                 Description
               </h4>
-              <p className="text-sm text-gray-600">{component.description}</p>
+              <p className="text-sm text-gray-600 leading-relaxed">
+                {component.description}
+              </p>
             </div>
           )}
 
           <div className="grid grid-cols-2 gap-3">
             {component.manufacturer && (
               <div>
-                <h4 className="text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">
+                <h4 className="text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">
                   Manufacturer
                 </h4>
                 <p className="text-sm text-gray-600">
@@ -249,7 +262,7 @@ function ComponentPreview({ component, onClose }: ComponentPreviewProps) {
 
             {component.partNumber && (
               <div>
-                <h4 className="text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">
+                <h4 className="text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">
                   Part Number
                 </h4>
                 <p className="text-sm text-gray-600">{component.partNumber}</p>
@@ -257,7 +270,7 @@ function ComponentPreview({ component, onClose }: ComponentPreviewProps) {
             )}
 
             <div>
-              <h4 className="text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">
+              <h4 className="text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">
                 Pins
               </h4>
               <p className="text-sm text-gray-600">
@@ -266,7 +279,7 @@ function ComponentPreview({ component, onClose }: ComponentPreviewProps) {
             </div>
 
             <div>
-              <h4 className="text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">
+              <h4 className="text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">
                 Type
               </h4>
               <p className="text-sm text-gray-600">{component.type}</p>
@@ -333,7 +346,7 @@ function ComponentPreview({ component, onClose }: ComponentPreviewProps) {
             console.error("❌ Error executing component:add command:", error);
           }
         }}
-        className="w-full mt-4 px-4 py-2.5 bg-[#0038DF] text-white rounded-lg hover:bg-[#0038DF]/90 transition-colors focus:outline-none focus:ring-2 focus:ring-[#0038DF]/50 font-medium"
+        className="w-full mt-4 px-4 py-2.5 bg-[#0038DF] text-white rounded-lg hover:bg-[#0038DF]/90 transition-colors focus:outline-none focus:ring-2 focus:ring-[#0038DF]/50 font-medium text-sm"
       >
         Add to Canvas
       </button>
@@ -890,7 +903,7 @@ export function ComponentPickerOverlay({
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div
-        className="bg-white rounded-xl shadow-2xl max-w-5xl w-full max-h-[80vh] overflow-hidden flex flex-col"
+        className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[85vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
@@ -906,7 +919,7 @@ export function ComponentPickerOverlay({
         </div>
 
         <div className="p-4 border-b border-gray-200">
-          <div className="relative mb-3">
+          <div className="relative mb-2">
             <SearchIcon
               size={18}
               className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
@@ -917,7 +930,7 @@ export function ComponentPickerOverlay({
               placeholder="Search components by name, category, or part number..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0038DF]/50 focus:border-[#0038DF]"
+              className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0038DF]/50 focus:border-[#0038DF]"
             />
           </div>
           <div className="flex items-center justify-between">
@@ -997,14 +1010,14 @@ export function ComponentPickerOverlay({
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-gray-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <div className="w-14 h-14 bg-gray-50 rounded-lg flex items-center justify-center flex-shrink-0">
                           <LazyImage
                             src={component.image}
-                            alt={component.name}
-                            className="w-10 h-10 object-contain"
+                            alt={cleanComponentName(component.name)}
+                            className="w-12 h-12 object-contain"
                             placeholder={
-                              <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center text-sm font-medium text-gray-600">
-                                {(component.name ?? component.package_id ?? "?")
+                              <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center text-sm font-medium text-gray-600">
+                                {cleanComponentName(component.name ?? component.package_id ?? "?")
                                   .charAt(0)
                                   .toUpperCase()}
                               </div>
@@ -1012,12 +1025,12 @@ export function ComponentPickerOverlay({
                           />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-gray-900 truncate">
-                            {component.name}
+                          <div className="font-medium text-sm text-gray-900 truncate">
+                            {cleanComponentName(component.name)}
                           </div>
-                          <div className="text-xs text-gray-500 flex flex-wrap gap-2 mt-1">
+                          <div className="text-xs text-gray-500 flex flex-wrap gap-1.5 mt-1">
                             {component.package_id && (
-                              <span className="bg-gray-100 px-2 py-0.5 rounded">
+                              <span className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">
                                 {component.package_id}
                               </span>
                             )}

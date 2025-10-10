@@ -4,6 +4,7 @@ import * as fabric from "fabric";
 import { supabase } from "@/lib/supabase";
 import { canvasCommandManager } from "./canvas-command-manager";
 import { logger } from "@/lib/logger";
+import { refDesService } from "@/lib/refdes-service";
 
 // Define a type for the payload for better code quality and clarity
 interface ComponentPayload {
@@ -94,6 +95,21 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
           );
           const svgLoadResult = await fabric.loadSVGFromString(svgString);
           const allSvgObjects = svgLoadResult.objects;
+
+          // Disable image smoothing on all SVG objects for crisp rendering at all zoom levels
+          allSvgObjects.forEach((obj: any) => {
+            if (obj) {
+              obj.imageSmoothing = false;
+              // If it's an image, ensure crisp rendering
+              if (obj.type === "image") {
+                obj.set({
+                  imageSmoothing: false,
+                  objectCaching: true,
+                });
+              }
+            }
+          });
+
           console.log(`📦 SVG loaded: ${allSvgObjects.length} objects created`);
 
           // 3. Get Pin Metadata (name, type) from the database JSON
@@ -214,10 +230,32 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
           console.log(
             `🏷️ Setting component data: componentId=${componentId}, componentName=${payload.name}`
           );
+          
+          // Assign RefDes (e.g., U1, R5, etc.)
+          const refDes = refDesService.assignRefDes(componentId, payload.name);
+          logger.component(`RefDes assigned: ${refDes} for ${payload.name}`, { componentId });
+          
+          // Update any text elements in the symbol with the numbered RefDes
+          // Find text objects and replace U? with U1, R? with R5, etc.
+          symbolParts.forEach((obj) => {
+            if (obj.type === 'text') {
+              const textObj = obj as fabric.Text;
+              const currentText = textObj.text || '';
+              
+              // Replace ? with the number (e.g., "U?" → "U1")
+              if (currentText.includes('?')) {
+                const updatedText = currentText.replace('?', refDes.replace(/\D+/g, ''));
+                textObj.set('text', updatedText);
+                logger.canvas(`Updated RefDes text: ${currentText} → ${updatedText}`);
+              }
+            }
+          });
+          
           componentSandwich.set("data", {
             type: "component",
             componentId: componentId,
             componentName: payload.name,
+            refDes: refDes, // Store assigned RefDes
             isComponentSandwich: true,
             originalDatabaseId: payload.id, // Store the original database ID for serialization
           });

@@ -272,14 +272,39 @@ export function useDatabaseComponents() {
       if (component.symbol_svg.length > 10000) {
         // For very large SVGs, use a placeholder and lazy load
         return `data:image/svg+xml;base64,${btoa(
-          '<svg width="60" height="30" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="30" fill="#e8e8e8"/><text x="30" y="18" text-anchor="middle" font-size="10" fill="#666">SVG</text></svg>'
+          '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" fill="#e8e8e8"/><text x="50" y="55" text-anchor="middle" font-size="16" fill="#666">SVG</text></svg>'
         )}`;
       }
 
       // For smaller SVGs, still use memory-efficient encoding
       try {
+        // Remove fixed width/height and ensure viewBox for proper scaling
+        let processedSvg = component.symbol_svg;
+        
+        // Remove width and height attributes to allow CSS scaling
+        processedSvg = processedSvg.replace(/\s*width\s*=\s*["'][^"']*["']/gi, '');
+        processedSvg = processedSvg.replace(/\s*height\s*=\s*["'][^"']*["']/gi, '');
+        
+        // If there's no viewBox, try to add one based on removed dimensions
+        if (!processedSvg.includes('viewBox')) {
+          // Try to extract original dimensions to create viewBox
+          const widthMatch = component.symbol_svg.match(/width\s*=\s*["']([^"']*)["']/i);
+          const heightMatch = component.symbol_svg.match(/height\s*=\s*["']([^"']*)["']/i);
+          
+          if (widthMatch && heightMatch) {
+            const width = parseFloat(widthMatch[1]);
+            const height = parseFloat(heightMatch[1]);
+            if (!isNaN(width) && !isNaN(height)) {
+              processedSvg = processedSvg.replace(
+                /<svg/,
+                `<svg viewBox="0 0 ${width} ${height}"`
+              );
+            }
+          }
+        }
+        
         // Use more memory-efficient base64 encoding
-        const svgBytes = new TextEncoder().encode(component.symbol_svg);
+        const svgBytes = new TextEncoder().encode(processedSvg);
         let binaryString = "";
         const chunkSize = 1024;
 
@@ -339,7 +364,7 @@ export function useDatabaseComponents() {
 
     const icon = icons[category] || category.charAt(0).toUpperCase();
     return `data:image/svg+xml;base64,${btoa(
-      `<svg width="60" height="30" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="30" fill="#e8e8e8"/><text x="30" y="20" text-anchor="middle" font-size="12" fill="#666" font-family="monospace">${icon}</text></svg>`
+      `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" fill="#e8e8e8"/><text x="50" y="55" text-anchor="middle" font-size="16" fill="#666" font-family="monospace">${icon}</text></svg>`
     )}`;
   };
 

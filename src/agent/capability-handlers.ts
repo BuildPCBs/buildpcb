@@ -221,12 +221,6 @@ export const capabilityHandlers: Record<Capability, CapabilityHandler> = {
     context.streamer.status("Saving project...");
     return { status: "success", message: "Project saved." };
   },
-  GROUP_COMPONENTS: async (
-    context: AgentContext,
-    prompt: string
-  ): Promise<AgentResult> => {
-    logger.component("GROUP_COMPONENTS called", { prompt });
-    context.streamer.status("Grouping components...");
-    return { status: "success", message: "Components grouped." };
-  },
+  // NOTE: GROUP_COMPONENTS removed - grouping doesn't make sense for PCB schematics
+  // Components must maintain individual identity for pin connectivity and metadata
 };

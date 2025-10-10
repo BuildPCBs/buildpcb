@@ -15,6 +15,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
 import { loadCanvasFromLogicalCircuit } from "@/canvas/utils/logicalSerializer";
 import { useProjectStore } from "@/store/projectStore";
+import { refDesService } from "@/lib/refdes-service";
 
 interface ProjectContextType {
   // Current project state

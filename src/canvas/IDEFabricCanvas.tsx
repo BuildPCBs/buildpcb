@@ -27,6 +27,7 @@ import { CanvasProvider } from "../contexts/CanvasContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { supabase } from "@/lib/supabase";
 import { EditableProjectName } from "@/components/project/EditableProjectName";
+import { refDesService } from "@/lib/refdes-service";
 
 interface IDEFabricCanvasProps {
   className?: string;
@@ -954,10 +955,27 @@ export function IDEFabricCanvas({
       width: canvasWidth,
       height: canvasHeight,
       backgroundColor: "#FFFFFF", // White background for better grid visibility
+      enableRetinaScaling: true, // Enable high-DPI rendering
+      imageSmoothingEnabled: false, // Disable image smoothing for crisp rendering
+      renderOnAddRemove: true,
     });
 
     // Initialize wire mode flag on canvas
     (canvas as any).wireMode = false;
+
+    // Set canvas context to disable image smoothing for crisp rendering at all zoom levels
+    const ctx = canvas.getContext();
+    if (ctx) {
+      ctx.imageSmoothingEnabled = false;
+      // @ts-expect-error - browser prefixes
+      ctx.webkitImageSmoothingEnabled = false;
+      // @ts-expect-error - browser prefixes
+      ctx.mozImageSmoothingEnabled = false;
+      // @ts-expect-error - browser prefixes
+      ctx.msImageSmoothingEnabled = false;
+      // @ts-expect-error - browser prefixes
+      ctx.oImageSmoothingEnabled = false;
+    }
 
     // Create and apply grid pattern immediately
     const gridPattern = createGridPattern(canvas, gridSize, 1); // Start with zoom = 1
@@ -1810,6 +1828,10 @@ export function IDEFabricCanvas({
         logger.canvas(`🗑️ Deleting component: ${componentId}`);
 
         if (componentId) {
+          // Remove RefDes assignment (preserves gaps like KiCad)
+          refDesService.removeAssignment(componentId);
+          logger.canvas(`🏷️ RefDes removed for: ${componentId}`);
+
           // Find and remove all wires connected to this component
           const connectedWires = fabricCanvas
             .getObjects()
@@ -2292,8 +2314,6 @@ export function IDEFabricCanvas({
   useCanvasHotkeys({
     canvas: fabricCanvas,
     enabled: !!fabricCanvas,
-    onGroup: handleGroup,
-    onUngroup: handleUngroup,
     onDelete: handleDelete,
     onCopy: handleCopy,
     onPaste: handlePaste,
@@ -2477,8 +2497,6 @@ export function IDEFabricCanvas({
         menuType={menuState.type}
         canPaste={clipboard !== null}
         onClose={() => setMenuState((prev) => ({ ...prev, visible: false }))}
-        onGroup={handleGroup}
-        onUngroup={handleUngroup}
         onDelete={handleDelete}
         onCopy={handleCopy}
         onPaste={handleContextPaste}

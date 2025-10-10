@@ -11,7 +11,7 @@ import React, {
   useMemo,
 } from "react";
 import { logger } from "@/lib/logger";
-import { useCanvas } from "./CanvasContext";
+import { useCanvas, SelectedComponent } from "./CanvasContext";
 import { useCanvasState } from "@/hooks/useCanvasState";
 import { useProject } from "./ProjectContext";
 
@@ -25,6 +25,7 @@ export interface ChatMessage {
   isEditing?: boolean;
   isStreaming?: boolean; // NEW: indicates active streaming
   streamingStatus?: string; // NEW: current status message while streaming
+  selectedComponents?: SelectedComponent[]; // Components that were selected when this message was sent
 }
 
 interface AIChatContextType {
@@ -38,7 +39,8 @@ interface AIChatContextType {
   handlePromptSubmit: (
     prompt: string,
     canvasState?: any,
-    canvas?: any
+    canvas?: any,
+    selectedComponents?: SelectedComponent[]
   ) => Promise<void>;
   startEditingMessage: (messageId: string) => void;
   saveEditedMessage: (messageId: string, newContent: string) => void;
@@ -99,6 +101,7 @@ export function AIChatProvider({
         circuitChanges: msg.circuitChanges || undefined,
         status: msg.status || "complete",
         isEditing: false,
+        selectedComponents: msg.selectedComponents || undefined, // Restore selected components
       }));
 
       logger.component("Restoring chat messages", {
@@ -110,6 +113,13 @@ export function AIChatProvider({
             0,
             50
           ) || "",
+        messagesWithComponents: restoredMessages.filter(msg => msg.selectedComponents?.length > 0).length,
+        componentDetails: restoredMessages
+          .filter(msg => msg.selectedComponents?.length > 0)
+          .map(msg => ({
+            id: msg.id,
+            selectedComponents: msg.selectedComponents
+          }))
       });
 
       setMessages(restoredMessages);
@@ -161,6 +171,19 @@ export function AIChatProvider({
             ? msg.timestamp.toISOString()
             : msg.timestamp,
       }));
+
+      // Debug: Log messages with selectedComponents
+      const msgsWithComponents = serializedMessages.filter(m => m.selectedComponents && m.selectedComponents.length > 0);
+      if (msgsWithComponents.length > 0) {
+        logger.component("Saving messages with selectedComponents to localStorage", {
+          count: msgsWithComponents.length,
+          details: msgsWithComponents.map(m => ({
+            id: m.id,
+            type: m.type,
+            selectedComponents: m.selectedComponents
+          }))
+        });
+      }
 
       const payload = {
         chatData: { messages: serializedMessages },
@@ -293,7 +316,8 @@ export function AIChatProvider({
   const handlePromptSubmit = async (
     prompt: string,
     providedCanvasState?: any,
-    providedCanvas?: any
+    providedCanvas?: any,
+    selectedComponents?: SelectedComponent[]
   ) => {
     if (!prompt.trim()) return;
 
@@ -302,15 +326,25 @@ export function AIChatProvider({
       hasProvidedCanvasState: !!providedCanvasState,
       hasProvidedCanvas: !!providedCanvas,
       contextCanvasReady: !!canvas,
+      selectedComponentsCount: selectedComponents?.length || 0,
+      selectedComponentsDetails: selectedComponents,
     });
 
-    // Add user message
+    // Log selected components for debugging
+    if (selectedComponents && selectedComponents.length > 0) {
+      console.log("🎯 Selected components being passed to AI:", selectedComponents);
+    } else {
+      console.log("⚠️ No selected components to pass to AI");
+    }
+
+    // Add user message with selected components context
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
       type: "user",
       content: prompt,
       timestamp: new Date(),
       status: "complete",
+      selectedComponents: selectedComponents && selectedComponents.length > 0 ? selectedComponents : undefined,
     };
 
     addMessage(userMessage);
@@ -370,6 +404,7 @@ export function AIChatProvider({
       // Execute with streaming content callback
       const result = await agentService.execute(prompt, {
         history: conversationHistory,
+        selectedComponents: selectedComponents || [],
         onContentUpdate: (content: string) => {
           // The LLM streams its full narrative response including all steps
           // We just display it as it comes in - character by character

@@ -29,11 +29,14 @@ export function ChatUIContainer({
   } = useAIChat();
 
   // Get canvas state for AI context
-  const { canvas } = useCanvas();
+  const { canvas, selectedComponents } = useCanvas();
   const { getCurrentState } = useCanvasState({
     canvas,
     enableLiveUpdates: false,
   });
+
+  // Debug log for selected components
+  console.log("🔍 ChatUIContainer selectedComponents:", selectedComponents);
 
   // Use context isThinking, then external isThinking, then local state
   const currentIsThinking = contextIsThinking || isThinking;
@@ -41,6 +44,7 @@ export function ChatUIContainer({
   const handlePromptSubmit = async (prompt: string) => {
     logger.api("AI Prompt submitted:", prompt);
     logger.api("Canvas available:", !!canvas);
+    logger.api("Selected components:", selectedComponents);
     const canvasSnapshot = getCurrentState();
 
     logger.api("Canvas state snapshot captured:", !!canvasSnapshot);
@@ -50,9 +54,10 @@ export function ChatUIContainer({
       // Use external handler if provided
       await onPromptSubmit(prompt);
     } else {
-      // Use context handler with canvas state and canvas
+      // Use context handler with canvas state, canvas, and selected components
       logger.api("Calling context handlePromptSubmit with canvas:", !!canvas);
-      await contextHandlePromptSubmit(prompt, canvasSnapshot, canvas);
+      logger.api("Passing selected components:", selectedComponents);
+      await contextHandlePromptSubmit(prompt, canvasSnapshot, canvas, selectedComponents);
     }
   };
 
@@ -102,6 +107,7 @@ export function ChatUIContainer({
           onDotsClick={handleDotsClick}
           onSendClick={handleSendClick}
           isThinking={currentIsThinking}
+          selectedComponents={selectedComponents}
           width={styles.content.width}
           minWidth={styles.content.minWidth}
           maxWidth={styles.content.maxWidth}

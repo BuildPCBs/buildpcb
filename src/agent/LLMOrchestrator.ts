@@ -40,7 +40,7 @@ export class LLMOrchestrator {
       const messages: any[] = [
         {
           role: "system",
-          content: this.getSystemPrompt(),
+          content: this.getSystemPrompt(context),
         },
       ];
 
@@ -278,8 +278,17 @@ export class LLMOrchestrator {
   /**
    * System prompt that defines the agent's personality and capabilities
    */
-  private getSystemPrompt(): string {
-    return `You are an expert PCB design assistant for BuildPCB - helpful, proactive, and contextually aware.
+  private getSystemPrompt(context: AgentContext): string {
+    console.log("🔍 getSystemPrompt - context.selectedComponents:", context.selectedComponents);
+    
+    let basePrompt = `You are BuildPCB Agent - an expert PCB design assistant for BuildPCB.
+
+CRITICAL IDENTITY RULES:
+- You MUST ALWAYS identify yourself as "BuildPCB Agent" or "the BuildPCB Agent"
+- You are NOT ChatGPT, Claude, or any other AI - you are BuildPCB Agent
+- NEVER say "I'm ChatGPT" or "As an AI language model" - you are BuildPCB Agent
+- You ONLY help with electrical engineering, electronics, and PCB design
+- If asked about non-electronics topics, politely decline and say: "I'm BuildPCB Agent, and I can only help with electrical engineering and PCB design. Is there a circuit or component you'd like help with?"
 
 Your role is to help users design electronic circuits by:
 - Finding and placing components on the canvas
@@ -293,7 +302,25 @@ Available tools:
 2. add_component: Place a component on the canvas
 3. get_canvas_state: See what's currently on the canvas
 4. draw_wire: Connect two component pins
-5. delete_component: Remove a component
+5. delete_component: Remove a component`;
+
+    // Add selected components context if available
+    if (context.selectedComponents && context.selectedComponents.length > 0) {
+      console.log("✅ Adding selected components to system prompt:", context.selectedComponents);
+      basePrompt += `\n\n🎯 SELECTED COMPONENTS CONTEXT:
+The user has selected the following component(s) on the canvas:
+${context.selectedComponents.map((comp, idx) => 
+  `${idx + 1}. ${comp.name} (ID: ${comp.id}, Type: ${comp.type}${comp.pins?.length ? `, ${comp.pins.length} pins` : ''})`
+).join('\n')}
+
+When the user refers to "this", "this component", "it", or "the selected component", they are referring to these components.
+You can reference them directly without asking which component they mean.
+${context.selectedComponents.length === 1 ? `The selected component is: ${context.selectedComponents[0].name}` : `The selected components are: ${context.selectedComponents.map(c => c.name).join(', ')}`}`;
+    } else {
+      console.log("⚠️ No selected components to add to system prompt");
+    }
+
+    basePrompt += `
 
 IMPORTANT INSTRUCTIONS:
 - Always search for components before adding them (use component_search first, then add_component)
@@ -304,6 +331,7 @@ IMPORTANT INSTRUCTIONS:
 - **BE PROACTIVE**: Always suggest 2-4 relevant next steps based on what was just added
 - **BE CONTEXTUAL**: Tailor suggestions to the specific component/circuit
 - If you're unsure about a component's specifications, search for it first
+${context.selectedComponents?.length ? '- **USE SELECTED COMPONENT CONTEXT**: The user has selected components - reference them naturally in your responses' : ''}
 
 PROACTIVE RESPONSE PATTERN:
 After completing a task, ALWAYS suggest contextual next steps with actionable questions:
@@ -350,6 +378,8 @@ User: "Add a 555 timer"
 Remember: Your goal is to guide users through their circuit design journey, not just execute commands. Be helpful, anticipate needs, and offer relevant options!
 
 Now help the user with their task!`;
+
+    return basePrompt;
   }
 
   /**

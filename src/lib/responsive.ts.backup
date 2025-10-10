@@ -1,0 +1,221 @@
+/**
+ * Responsive utility functions for BuildPCBs
+ * All values should be relative to the design dimensions (1280x832)
+ * These utilities convert design values to truly responsive CSS units
+ * with proper constraints to prevent distortion on large screens
+ */
+
+// Design constants
+export const DESIGN_WIDTH = 1280;
+export const DESIGN_HEIGHT = 832;
+
+// Maximum viewport width where scaling stops (prevents huge screens from distorting)
+const MAX_SCALE_WIDTH = 1920; // Stop scaling beyond 1920px (common large screen)
+const MIN_SCALE_WIDTH = 768; // Minimum supported width
+
+/**
+ * Convert design pixel values to responsive units
+ */
+export const toVW = (value: number) => `${(value / DESIGN_WIDTH) * 100}vw`;
+export const toVH = (value: number) => `${(value / DESIGN_HEIGHT) * 100}vh`;
+export const toRem = (value: number) => `${value / 16}rem`;
+
+/**
+ * Convert to pixels at max scale (for upper bounds)
+ */
+const toMaxPx = (value: number) => {
+  const scaleFactor = MAX_SCALE_WIDTH / DESIGN_WIDTH;
+  return `${value * scaleFactor}px`;
+};
+
+/**
+ * Convert to pixels at min scale (for lower bounds)
+ */
+const toMinPx = (value: number) => {
+  const scaleFactor = MIN_SCALE_WIDTH / DESIGN_WIDTH;
+  return `${Math.max(value * scaleFactor, value * 0.7)}px`; // Never go below 70% of design
+};
+
+/**
+ * Smart responsive conversion based on value size and context
+ * Small values (borders, small spacing) -> rem for accessibility
+ * Medium values (spacing, small dimensions) -> clamp() with px max
+ * Large values (widths, heights) -> clamp() with sensible px bounds
+ */
+export const responsive = (value: number) => {
+  if (value <= 2) return toRem(value); // Very small values (borders) stay in rem
+
+  if (value <= 8) {
+    // Small spacing: 0.8x to 1.2x of design value
+    return `clamp(${toMinPx(value * 0.8)}, ${toVW(value)}, ${toMaxPx(
+      value * 1.2
+    )})`;
+  }
+
+  if (value <= 32) {
+    // Medium spacing: 0.75x to 1.25x of design value
+    return `clamp(${toMinPx(value * 0.75)}, ${toVW(value)}, ${toMaxPx(
+      value * 1.25
+    )})`;
+  }
+
+  // Large dimensions: 0.7x to 1.3x of design value, but capped at actual pixels
+  return `clamp(${toMinPx(value * 0.7)}, ${toVW(value)}, ${toMaxPx(
+    value * 1.3
+  )})`;
+};
+
+/**
+ * Responsive size conversion with min/max constraints
+ * Now properly bounded to prevent infinite scaling
+ */
+export const responsiveSize = (
+  value: number,
+  minRem?: number,
+  maxPx?: number // Changed from maxVw to actual pixel limit
+) => {
+  const vwValue = toVW(value);
+  const calculatedMax = maxPx || toMaxPx(value * 1.3);
+
+  if (minRem) {
+    return `clamp(${toRem(minRem)}, ${vwValue}, ${calculatedMax})`;
+  }
+
+  // Default: scale from 70% to 130% of design value
+  return `clamp(${toMinPx(value * 0.7)}, ${vwValue}, ${calculatedMax})`;
+};
+
+/**
+ * Creates responsive style objects with fluid scaling
+ */
+export const createResponsiveStyles = (
+  styles: Record<string, number | string>
+) => {
+  const responsiveStyles: Record<string, string> = {};
+
+  for (const [key, value] of Object.entries(styles)) {
+    if (typeof value === "number") {
+      // Handle different CSS properties appropriately
+      if (key.includes("Width") || key === "width") {
+        responsiveStyles[key] = responsiveSize(value, 2); // Min 2rem width
+      } else if (key.includes("Height") || key === "height") {
+        responsiveStyles[key] =
+          key === "height"
+            ? responsiveSize(value, 2) // Use same scaling as width for proportional elements
+            : responsive(value);
+      } else if (key.includes("padding") || key.includes("margin")) {
+        responsiveStyles[key] = responsive(value);
+      } else if (key.includes("border") && key.includes("Radius")) {
+        responsiveStyles[key] = `max(${toRem(value)}, ${toVW(value)})`;
+      } else if (key.includes("border") && key.includes("Width")) {
+        responsiveStyles[key] = toRem(value); // Border widths stay in rem
+      } else if (key === "top" || key === "bottom") {
+        responsiveStyles[key] = `max(${toRem(value)}, ${toVH(value)})`;
+      } else if (key === "left" || key === "right") {
+        responsiveStyles[key] = `max(${toRem(value)}, ${toVW(value)})`;
+      } else {
+        responsiveStyles[key] = responsive(value);
+      }
+    } else {
+      responsiveStyles[key] = value;
+    }
+  }
+
+  return responsiveStyles;
+};
+
+/**
+ * Type-safe responsive style builder
+ */
+export interface ResponsiveStyleConfig {
+  top?: number;
+  left?: number;
+  right?: number;
+  bottom?: number;
+  width?: number;
+  height?: number;
+  borderRadius?: number;
+  padding?: number;
+  margin?: number;
+  borderWidth?: number;
+}
+
+export const r = (config: ResponsiveStyleConfig) =>
+  createResponsiveStyles(config as Record<string, number | string>);
+
+/**
+ * Font size responsive utilities with better scaling
+ * Fonts should scale less aggressively than layout elements
+ */
+export const responsiveFontSize = (designPx: number) => {
+  // Fonts: min 85% at small screens, max 110% at large screens (stop at actual px)
+  const maxSize = (designPx * 1.1 * MAX_SCALE_WIDTH) / DESIGN_WIDTH;
+  return `clamp(${toRem(designPx * 0.85)}, ${toVW(designPx)}, ${maxSize}px)`;
+};
+
+/**
+ * Square/circular element responsive utility
+ * Ensures width and height scale proportionally to maintain aspect ratio
+ */
+export const responsiveSquare = (size: number) => {
+  // Use responsive() for proper clamping with px bounds
+  const responsiveValue = responsive(size);
+  return {
+    width: responsiveValue,
+    height: responsiveValue,
+  };
+};
+
+/**
+ * Responsive spacing system based on design values
+ */
+export const spacing = {
+  xs: responsive(4),
+  sm: responsive(8),
+  md: responsive(16),
+  lg: responsive(24),
+  xl: responsive(32),
+  "2xl": responsive(48),
+  "3xl": responsive(64),
+};
+
+/**
+ * Breakpoint-aware responsive helper
+ * For when you need different behavior at specific screen sizes
+ */
+export const breakpoints = {
+  mobile: 768,
+  tablet: 1024,
+  desktop: 1280,
+  large: 1920,
+  ultrawide: 2560,
+};
+
+/**
+ * Calculate actual pixel value at current viewport
+ * Useful for JS calculations that need px values
+ */
+export const calculateResponsiveValue = (
+  designValue: number,
+  viewportWidth: number = window.innerWidth
+): number => {
+  const scaleFactor = viewportWidth / DESIGN_WIDTH;
+
+  // Clamp to reasonable bounds
+  const minScale = MIN_SCALE_WIDTH / DESIGN_WIDTH;
+  const maxScale = MAX_SCALE_WIDTH / DESIGN_WIDTH;
+  const clampedScale = Math.max(minScale, Math.min(maxScale, scaleFactor));
+
+  return designValue * clampedScale;
+};
+
+/**
+ * Container-relative sizing (for modern browsers with container queries)
+ * Use this when element should scale relative to parent, not viewport
+ */
+export const containerRelative = (value: number) => {
+  // Container query units: cqw (container query width)
+  return `clamp(${toMinPx(value * 0.7)}, ${
+    (value / DESIGN_WIDTH) * 100
+  }cqw, ${toMaxPx(value * 1.3)})`;
+};

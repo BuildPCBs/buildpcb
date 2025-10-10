@@ -99,8 +99,10 @@ export const createIntelligentComponent = (
           return interactivePin;
         });
 
-        // 4. Add component label
-        const label = new fabric.Text(componentInfo.name.substring(0, 8), {
+        // 4. Add component label with RefDes
+        // Check if component data has refDes, otherwise use name
+        const displayText = (componentInfo as any).refDes || componentInfo.name.substring(0, 8);
+        const label = new fabric.Text(displayText, {
           fontSize: 8,
           fill: "#333333",
           fontFamily: "Arial, sans-serif",

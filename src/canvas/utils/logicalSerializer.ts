@@ -1,5 +1,6 @@
 import * as fabric from "fabric";
 import { Circuit, Connection } from "@/types";
+import { refDesService } from "@/lib/refdes-service";
 
 // Logical component configuration for proper wiring restoration
 interface LogicalComponent {
@@ -160,8 +161,9 @@ export async function loadCanvasFromLogicalCircuit(
       netlistCount: netlistData?.length || 0,
     });
 
-    // Clear existing canvas and wait for completion
+    // Clear existing canvas and RefDes service, then wait for completion
     canvas.clear();
+    refDesService.clear(); // Reset RefDes counters for new project/load
     await new Promise((resolve) => setTimeout(resolve, 50)); // Small delay to ensure clearing is complete
 
     const totalComponents = circuit.components?.length || 0;

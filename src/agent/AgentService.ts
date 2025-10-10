@@ -2,6 +2,7 @@ import { logger } from "@/lib/logger";
 import { canvasCommandManager } from "@/canvas/canvas-command-manager";
 import { useProjectStore } from "@/store/projectStore";
 import { authStorage } from "@/lib/auth-storage";
+import { SelectedComponent } from "@/contexts/CanvasContext";
 import {
   AgentContext,
   AgentCanvasContext,
@@ -136,11 +137,15 @@ export class AgentService {
     options: {
       userId?: string;
       history?: AgentChatHistoryMessage[];
+      selectedComponents?: SelectedComponent[];
       onContentUpdate?: (content: string) => void;
     } = {}
   ): Promise<AgentResult> {
-    const { userId, history, onContentUpdate } = options;
-    logger.info(`🧠 Executing natural language command`, { prompt });
+    const { userId, history, selectedComponents, onContentUpdate } = options;
+    logger.info(`🧠 Executing natural language command`, { 
+      prompt,
+      selectedComponentsCount: selectedComponents?.length || 0,
+    });
 
     // Check if LLM orchestrator is available
     if (!this.llmOrchestrator) {
@@ -158,6 +163,15 @@ export class AgentService {
     try {
       // Build context with streaming callback
       const context = this.buildContext(userId);
+
+      // Add selected components to context if provided
+      if (selectedComponents && selectedComponents.length > 0) {
+        context.selectedComponents = selectedComponents;
+        logger.info(`📦 Selected components context:`, {
+          count: selectedComponents.length,
+          components: selectedComponents.map(c => ({ id: c.id, name: c.name, type: c.type })),
+        });
+      }
 
       // Add content update callback to context
       if (onContentUpdate) {
@@ -277,7 +291,7 @@ export class AgentService {
       "ZOOM_IN",
       "ZOOM_OUT",
       "PAN_CANVAS",
-      "GROUP_COMPONENTS",
+      // GROUP_COMPONENTS removed - not applicable to PCB schematics
       "CREATE_CIRCUIT",
       "EDIT_CIRCUIT",
       "DELETE_CIRCUIT",
