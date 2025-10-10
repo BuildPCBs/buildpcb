@@ -84,7 +84,7 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
             .eq("name", payload.name)
             .single();
 
-          const svgString = dbComponent?.symbol_svg;
+          let svgString = dbComponent?.symbol_svg;
           if (!svgString) {
             throw new Error(`No SVG found for component name: ${payload.name}`);
           }
@@ -141,6 +141,69 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
           } else {
             logger.canvas(`Generated new component ID: ${componentId}`);
           }
+
+          // 4b. Extract RefDes prefix from SVG and assign number (e.g., U? → U1)
+          logger.canvas(
+            `🔍 Attempting to extract RefDes from SVG for ${payload.name}`
+          );
+
+          const refdesPrefix = refDesService.getRefDesFromSVG(svgString);
+          logger.canvas(`🏷️ Extracted prefix: ${refdesPrefix || "none"}`);
+
+          let assignedRefDes: string | null = null;
+
+          if (refdesPrefix) {
+            assignedRefDes = refDesService.assignRefDes(
+              componentId,
+              refdesPrefix
+            );
+            logger.canvas(
+              `✅ Assigned RefDes: ${assignedRefDes} to ${payload.name}`
+            );
+
+            // Find and update the existing text element (make it visible and change text)
+            logger.canvas(
+              `🔍 Searching through ${allSvgObjects.length} SVG objects`
+            );
+
+            let refDesTextObj: any = null;
+            allSvgObjects.forEach((obj: any, index: number) => {
+              logger.canvas(
+                `Object ${index}: type=${obj.type}, text="${obj.text}", opacity=${obj.opacity}`
+              );
+
+              if (obj.type === "text" && obj.text && obj.text.includes("?")) {
+                refDesTextObj = obj;
+                logger.canvas(
+                  `📝 Found RefDes text at index ${index}: (${obj.left}, ${obj.top}), opacity: ${obj.opacity}, fontSize: ${obj.fontSize}`
+                );
+
+                // Update the text and make it visible
+                obj.set({
+                  text: assignedRefDes,
+                  opacity: 1,
+                  fill: "#000080",
+                  fontWeight: "bold",
+                  visible: true,
+                });
+
+                logger.canvas(
+                  `✅ Updated text object to: "${obj.text}", opacity: ${obj.opacity}`
+                );
+              }
+            });
+
+            if (!refDesTextObj) {
+              logger.canvas(
+                `❌ ERROR: Could not find any text element with "?" in ${allSvgObjects.length} objects`
+              );
+            }
+          } else {
+            logger.canvas(
+              `⚠️ No RefDes prefix found in SVG for ${payload.name}`
+            );
+          }
+
           const interactivePins: fabric.Circle[] = [];
 
           // We also separate the main symbol parts from the pin markers
@@ -228,34 +291,15 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
 
           // 7. Attach metadata and add the final object to the canvas
           console.log(
-            `🏷️ Setting component data: componentId=${componentId}, componentName=${payload.name}`
+            `🏷️ Setting component data: componentId=${componentId}, componentName=${
+              payload.name
+            }, refDes=${assignedRefDes || "none"}`
           );
-          
-          // Assign RefDes (e.g., U1, R5, etc.)
-          const refDes = refDesService.assignRefDes(componentId, payload.name);
-          logger.component(`RefDes assigned: ${refDes} for ${payload.name}`, { componentId });
-          
-          // Update any text elements in the symbol with the numbered RefDes
-          // Find text objects and replace U? with U1, R? with R5, etc.
-          symbolParts.forEach((obj) => {
-            if (obj.type === 'text') {
-              const textObj = obj as fabric.Text;
-              const currentText = textObj.text || '';
-              
-              // Replace ? with the number (e.g., "U?" → "U1")
-              if (currentText.includes('?')) {
-                const updatedText = currentText.replace('?', refDes.replace(/\D+/g, ''));
-                textObj.set('text', updatedText);
-                logger.canvas(`Updated RefDes text: ${currentText} → ${updatedText}`);
-              }
-            }
-          });
-          
           componentSandwich.set("data", {
             type: "component",
             componentId: componentId,
             componentName: payload.name,
-            refDes: refDes, // Store assigned RefDes
+            refDes: assignedRefDes, // Store the assigned RefDes (U1, R1, etc.)
             isComponentSandwich: true,
             originalDatabaseId: payload.id, // Store the original database ID for serialization
           });

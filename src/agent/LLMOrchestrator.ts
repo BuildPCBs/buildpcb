@@ -279,8 +279,11 @@ export class LLMOrchestrator {
    * System prompt that defines the agent's personality and capabilities
    */
   private getSystemPrompt(context: AgentContext): string {
-    console.log("🔍 getSystemPrompt - context.selectedComponents:", context.selectedComponents);
-    
+    console.log(
+      "🔍 getSystemPrompt - context.selectedComponents:",
+      context.selectedComponents
+    );
+
     let basePrompt = `You are BuildPCB Agent - an expert PCB design assistant for BuildPCB.
 
 CRITICAL IDENTITY RULES:
@@ -306,16 +309,30 @@ Available tools:
 
     // Add selected components context if available
     if (context.selectedComponents && context.selectedComponents.length > 0) {
-      console.log("✅ Adding selected components to system prompt:", context.selectedComponents);
+      console.log(
+        "✅ Adding selected components to system prompt:",
+        context.selectedComponents
+      );
       basePrompt += `\n\n🎯 SELECTED COMPONENTS CONTEXT:
 The user has selected the following component(s) on the canvas:
-${context.selectedComponents.map((comp, idx) => 
-  `${idx + 1}. ${comp.name} (ID: ${comp.id}, Type: ${comp.type}${comp.pins?.length ? `, ${comp.pins.length} pins` : ''})`
-).join('\n')}
+${context.selectedComponents
+  .map(
+    (comp, idx) =>
+      `${idx + 1}. ${comp.name} (ID: ${comp.id}, Type: ${comp.type}${
+        comp.pins?.length ? `, ${comp.pins.length} pins` : ""
+      })`
+  )
+  .join("\n")}
 
 When the user refers to "this", "this component", "it", or "the selected component", they are referring to these components.
 You can reference them directly without asking which component they mean.
-${context.selectedComponents.length === 1 ? `The selected component is: ${context.selectedComponents[0].name}` : `The selected components are: ${context.selectedComponents.map(c => c.name).join(', ')}`}`;
+${
+  context.selectedComponents.length === 1
+    ? `The selected component is: ${context.selectedComponents[0].name}`
+    : `The selected components are: ${context.selectedComponents
+        .map((c) => c.name)
+        .join(", ")}`
+}`;
     } else {
       console.log("⚠️ No selected components to add to system prompt");
     }
@@ -331,7 +348,11 @@ IMPORTANT INSTRUCTIONS:
 - **BE PROACTIVE**: Always suggest 2-4 relevant next steps based on what was just added
 - **BE CONTEXTUAL**: Tailor suggestions to the specific component/circuit
 - If you're unsure about a component's specifications, search for it first
-${context.selectedComponents?.length ? '- **USE SELECTED COMPONENT CONTEXT**: The user has selected components - reference them naturally in your responses' : ''}
+${
+  context.selectedComponents?.length
+    ? "- **USE SELECTED COMPONENT CONTEXT**: The user has selected components - reference them naturally in your responses"
+    : ""
+}
 
 PROACTIVE RESPONSE PATTERN:
 After completing a task, ALWAYS suggest contextual next steps with actionable questions:

@@ -88,9 +88,12 @@ const DashboardContent = () => {
     const diffInDays = Math.floor(diffInHours / 24);
 
     if (diffInSeconds < 60) return `${diffInSeconds} seconds ago`;
-    if (diffInMinutes < 60) return `${diffInMinutes} minute${diffInMinutes !== 1 ? 's' : ''} ago`;
-    if (diffInHours < 24) return `${diffInHours} hour${diffInHours !== 1 ? 's' : ''} ago`;
-    if (diffInDays < 7) return `${diffInDays} day${diffInDays !== 1 ? 's' : ''} ago`;
+    if (diffInMinutes < 60)
+      return `${diffInMinutes} minute${diffInMinutes !== 1 ? "s" : ""} ago`;
+    if (diffInHours < 24)
+      return `${diffInHours} hour${diffInHours !== 1 ? "s" : ""} ago`;
+    if (diffInDays < 7)
+      return `${diffInDays} day${diffInDays !== 1 ? "s" : ""} ago`;
     return date.toLocaleDateString();
   };
 

@@ -15,7 +15,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
 import { loadCanvasFromLogicalCircuit } from "@/canvas/utils/logicalSerializer";
 import { useProjectStore } from "@/store/projectStore";
-import { refDesService } from "@/lib/refdes-service";
 
 interface ProjectContextType {
   // Current project state
@@ -465,7 +464,16 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
           });
 
           try {
-            await loadCanvasFromLogicalCircuit(canvas, currentCircuit as any);
+            // Extract RefDes assignments from canvas data
+            const refDesAssignments =
+              currentProject.canvas_settings.refDesAssignments;
+
+            await loadCanvasFromLogicalCircuit(
+              canvas,
+              currentCircuit as any,
+              undefined, // netlistData
+              refDesAssignments // RefDes assignments
+            );
             console.log("✅ Logical circuit loading completed");
 
             // DEBUG: Check how many objects are actually on the canvas

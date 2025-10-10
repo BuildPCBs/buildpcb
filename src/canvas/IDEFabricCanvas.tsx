@@ -1829,7 +1829,7 @@ export function IDEFabricCanvas({
 
         if (componentId) {
           // Remove RefDes assignment (preserves gaps like KiCad)
-          refDesService.removeAssignment(componentId);
+          refDesService.unassignRefDes(componentId);
           logger.canvas(`🏷️ RefDes removed for: ${componentId}`);
 
           // Find and remove all wires connected to this component

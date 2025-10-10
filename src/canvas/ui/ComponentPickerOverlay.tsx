@@ -19,7 +19,7 @@ import { logger } from "@/lib/logger";
 
 // Clean component names by removing _unit1, _unit2, etc. suffixes
 function cleanComponentName(name: string): string {
-  return name.replace(/_unit\d+$/i, '').replace(/_\d+$/i, '');
+  return name.replace(/_unit\d+$/i, "").replace(/_\d+$/i, "");
 }
 
 // Custom debounce hook
@@ -1017,7 +1017,9 @@ export function ComponentPickerOverlay({
                             className="w-12 h-12 object-contain"
                             placeholder={
                               <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center text-sm font-medium text-gray-600">
-                                {cleanComponentName(component.name ?? component.package_id ?? "?")
+                                {cleanComponentName(
+                                  component.name ?? component.package_id ?? "?"
+                                )
                                   .charAt(0)
                                   .toUpperCase()}
                               </div>

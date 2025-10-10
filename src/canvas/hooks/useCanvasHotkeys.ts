@@ -34,7 +34,7 @@ interface UseCanvasHotkeysProps {
  * - Ctrl/Cmd + S: Save project
  * - R: Rotate selected component 90°
  * - G: Toggle grid visibility
- * 
+ *
  * NOTE: Group/Ungroup removed - not applicable in PCB schematic context
  */
 export function useCanvasHotkeys({

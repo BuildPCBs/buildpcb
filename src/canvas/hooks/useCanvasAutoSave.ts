@@ -114,14 +114,15 @@ export function useCanvasAutoSave({
                   })),
                 }
               : null;
-          
+
           // Include RefDes assignments for persistence
-          const refDesAssignments = refDesService.getAllAssignments();
-          
+          const refDesAssignments = refDesService.getAll();
+
           const extendedCanvasData = {
             ...data.canvasData,
             chatData: chatData,
-            refDesAssignments: refDesAssignments.length > 0 ? refDesAssignments : null,
+            refDesAssignments:
+              refDesAssignments.length > 0 ? refDesAssignments : null,
           };
 
           setCurrentData({
@@ -336,14 +337,15 @@ export function useCanvasAutoSave({
                 })),
               }
             : null;
-        
+
         // Include RefDes assignments for persistence
-        const refDesAssignments = refDesService.getAllAssignments();
-        
+        const refDesAssignments = refDesService.getAll();
+
         const extendedCanvasData = {
           ...data.canvasData,
           chatData: chatData,
-          refDesAssignments: refDesAssignments.length > 0 ? refDesAssignments : null,
+          refDesAssignments:
+            refDesAssignments.length > 0 ? refDesAssignments : null,
         };
 
         // Update the current data state for consistency
@@ -440,7 +442,9 @@ export function useCanvasAutoSave({
       console.log("🕐 Clearing auto-save interval");
       clearInterval(intervalId);
     };
-  }, [autoSaveEnabled, projectId, canvas, isDirty, autoSaveInterval, saveNow]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSaveEnabled, projectId, canvas, isDirty, autoSaveInterval]);
+  // Note: saveNow is intentionally excluded to prevent infinite recreation
 
   // Listen for auto-save completion to mark clean (simplified since we're not using useAutoSave)
   // useEffect(() => {

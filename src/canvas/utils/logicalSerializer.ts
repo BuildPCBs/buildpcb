@@ -1,6 +1,7 @@
 import * as fabric from "fabric";
 import { Circuit, Connection } from "@/types";
 import { refDesService } from "@/lib/refdes-service";
+import { logger } from "@/lib/logger";
 
 // Logical component configuration for proper wiring restoration
 interface LogicalComponent {
@@ -138,7 +139,8 @@ let isCurrentlyLoading = false;
 export async function loadCanvasFromLogicalCircuit(
   canvas: fabric.Canvas,
   circuit: Partial<Circuit>,
-  netlistData?: any[] // NEW: Netlist data parameter
+  netlistData?: any[], // NEW: Netlist data parameter
+  refDesAssignments?: any[] // RefDes assignments to restore
 ): Promise<void> {
   if (isCurrentlyLoading) {
     console.warn(
@@ -164,6 +166,19 @@ export async function loadCanvasFromLogicalCircuit(
     // Clear existing canvas and RefDes service, then wait for completion
     canvas.clear();
     refDesService.clear(); // Reset RefDes counters for new project/load
+
+    // Restore RefDes assignments if provided
+    if (
+      refDesAssignments &&
+      Array.isArray(refDesAssignments) &&
+      refDesAssignments.length > 0
+    ) {
+      refDesService.loadAssignments(refDesAssignments);
+      logger.canvas(
+        `✅ Restored ${refDesAssignments.length} RefDes assignments`
+      );
+    }
+
     await new Promise((resolve) => setTimeout(resolve, 50)); // Small delay to ensure clearing is complete
 
     const totalComponents = circuit.components?.length || 0;
