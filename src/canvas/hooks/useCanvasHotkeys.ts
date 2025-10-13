@@ -109,9 +109,21 @@ export function useCanvasHotkeys({
 
           case "s":
             e.preventDefault();
-            console.log("TRIGGER: Ctrl/Cmd+S shortcut pressed.");
+            console.log("🔵 TRIGGER: Ctrl/Cmd+S shortcut pressed.");
+            console.log("🔍 Save function details:", {
+              hasOnSave: !!onSave,
+              onSaveType: typeof onSave,
+            });
             if (onSave) {
-              onSave();
+              console.log("✅ Calling onSave function...");
+              try {
+                onSave();
+                console.log("✅ onSave function called successfully");
+              } catch (error) {
+                console.error("❌ Error calling onSave:", error);
+              }
+            } else {
+              console.warn("⚠️ No onSave function provided!");
             }
             break;
 

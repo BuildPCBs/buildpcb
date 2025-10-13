@@ -121,12 +121,23 @@ class RefDesService {
     // Check if already assigned
     const existing = this.assignments.get(componentId);
     if (existing) {
+      console.log(
+        `♻️ RefDes already assigned for ${componentId}: ${existing.refdes}`
+      );
       return existing.refdes;
     }
 
     // Get next number for this prefix
     const currentMax = this.prefixCounters.get(prefix) || 0;
     const nextNumber = currentMax + 1;
+
+    console.log(
+      `🆕 Assigning new RefDes: ${prefix}${nextNumber} to ${componentId}`
+    );
+    console.log(
+      `   Current counter for ${prefix}: ${currentMax} → ${nextNumber}`
+    );
+    console.log(`   Total assignments: ${this.assignments.size + 1}`);
 
     // Update counter
     this.prefixCounters.set(prefix, nextNumber);

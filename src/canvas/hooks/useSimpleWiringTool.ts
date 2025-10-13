@@ -42,6 +42,7 @@ interface UseSimpleWiringToolReturn {
     toPinNumber: string
   ) => void;
   refreshAllJunctionDots: () => void; // Add junction dot refresh function
+  addWireIntersectionDots: () => void; // Add intersection dot calculation
 }
 
 export function useSimpleWiringTool({
@@ -311,13 +312,13 @@ export function useSimpleWiringTool({
       const startDot = createJunctionDot(
         new fabric.Point(endpoints.start.x, endpoints.start.y)
       );
-      (startDot as any).data = { type: "junctionDot", pinConnection: true }; // Mark as pin connection dot
+      (startDot as any).data = { type: "junctionDot", pinConnection: true };
       canvas.add(startDot);
 
       const endDot = createJunctionDot(
         new fabric.Point(endpoints.end.x, endpoints.end.y)
       );
-      (endDot as any).data = { type: "junctionDot", pinConnection: true }; // Mark as pin connection dot
+      (endDot as any).data = { type: "junctionDot", pinConnection: true };
       canvas.add(endDot);
 
       logger.wire(
@@ -407,6 +408,18 @@ export function useSimpleWiringTool({
   const addWireIntersectionDots = useCallback(() => {
     if (!canvas) return;
 
+    // FIRST: Clear ALL existing intersection dots (NOT endpoint dots)
+    // This prevents old intersection dots from leaving "prints" when wires move
+    const canvasObjects = canvas.getObjects();
+    canvasObjects.forEach((obj) => {
+      if (obj.type === "circle" && (obj as any).data?.type === "junctionDot") {
+        // Only remove intersection dots (dots WITHOUT pinConnection flag)
+        if (!(obj as any).data?.pinConnection) {
+          canvas.remove(obj);
+        }
+      }
+    });
+
     const allSegments: Array<{
       segment: fabric.Point[];
       wire: fabric.Line | fabric.Path;
@@ -436,28 +449,11 @@ export function useSimpleWiringTool({
           seg2[1]
         );
         if (intersection) {
-          // Check if we already have a dot at this position by looking at canvas objects
-          const canvasObjects = canvas.getObjects();
-          const existingDot = canvasObjects.find((obj) => {
-            if (
-              obj.type === "circle" &&
-              (obj as any).data?.type === "junctionDot"
-            ) {
-              const distance = Math.sqrt(
-                Math.pow(obj.left! - intersection.x, 2) +
-                  Math.pow(obj.top! - intersection.y, 2)
-              );
-              return distance < 3; // 3px tolerance
-            }
-            return false;
-          });
-
-          if (!existingDot) {
-            const intersectionDot = createJunctionDot(intersection);
-            // Mark the dot so we can identify it later
-            (intersectionDot as any).data = { type: "junctionDot" };
-            canvas.add(intersectionDot);
-          }
+          // Create intersection dot (no need to check for existing since we cleared all)
+          const intersectionDot = createJunctionDot(intersection);
+          // Mark as intersection dot (WITHOUT pinConnection flag)
+          (intersectionDot as any).data = { type: "junctionDot" };
+          canvas.add(intersectionDot);
         }
       }
     }
@@ -1200,13 +1196,28 @@ export function useSimpleWiringTool({
       );
       logger.wire("📊 Current connections count:", connections.length);
 
-      // DEBUG: Check component structure before wire updates
-      const componentObj = canvas
-        .getObjects()
-        .find(
+      // Find component - check both canvas objects AND active selection
+      const allObjects = canvas.getObjects();
+      const activeSelection = canvas.getActiveObject();
+
+      let componentObj = allObjects.find(
+        (obj: any) =>
+          obj.data?.componentId === componentId || obj.id === componentId
+      );
+
+      // If not found in canvas, check if it's in an active selection
+      if (
+        !componentObj &&
+        activeSelection &&
+        activeSelection.type === "activeSelection"
+      ) {
+        const selectedObjects = (activeSelection as any)._objects || [];
+        componentObj = selectedObjects.find(
           (obj: any) =>
             obj.data?.componentId === componentId || obj.id === componentId
         );
+      }
+
       if (componentObj && componentObj.type === "group") {
         const groupObjects = (componentObj as fabric.Group).getObjects();
         const pins = groupObjects.filter(
@@ -1217,17 +1228,12 @@ export function useSimpleWiringTool({
           {
             totalObjects: groupObjects.length,
             pins: pins.length,
-            pinDetails: pins.map((pin: any) => ({
-              id: pin.data?.pinId,
-              visible: pin.visible,
-              opacity: pin.opacity,
-            })),
+            inActiveSelection: !allObjects.includes(componentObj),
           }
         );
       }
 
-      // Get all objects on canvas for obstacle detection
-      const allObjects = canvas.getObjects();
+      // Continue with existing logic using allObjects for obstacles
       const obstacles = allObjects.filter(
         (obj) =>
           (obj as any).componentType &&
@@ -1247,10 +1253,20 @@ export function useSimpleWiringTool({
         `📍 Found ${connectedConnections.length} wires connected to component`
       );
 
-      // Clear ALL junction dots to ensure clean state before recalculation
-      // This prevents orphaned intersection dots when wires are moved
-      logger.wire("🧹 Clearing all junction dots before recalculation");
-      clearJunctionDots();
+      // Collect OLD endpoint positions BEFORE updating wires
+      // We'll use these to remove old dots at their exact positions
+      logger.wire("🧹 Collecting old endpoint positions for cleanup");
+      const oldEndpoints = new Set<string>();
+
+      connectedConnections.forEach((connection) => {
+        const endpoints = getWireEndpoints(connection.wire);
+        if (endpoints) {
+          oldEndpoints.add(`${endpoints.start.x},${endpoints.start.y}`);
+          oldEndpoints.add(`${endpoints.end.x},${endpoints.end.y}`);
+        }
+      });
+
+      logger.wire(`📍 Collected ${oldEndpoints.size} old endpoint positions`);
 
       // Update each connected wire with intelligent rerouting
       connectedConnections.forEach((connection, index) => {
@@ -1388,16 +1404,36 @@ export function useSimpleWiringTool({
         }
       });
 
-      // Add endpoint dots to all updated wires with debugging
+      // NOW remove old dots at the OLD endpoint positions
+      // This ensures we don't remove the NEW dots we're about to create
+      logger.wire("🧹 Removing old dots at old endpoint positions");
+      const canvasObjects = canvas.getObjects();
+      let dotsRemoved = 0;
+
+      canvasObjects.forEach((obj) => {
+        if (
+          obj.type === "circle" &&
+          (obj as any).data?.type === "junctionDot"
+        ) {
+          const dotPos = `${obj.left},${obj.top}`;
+          if (oldEndpoints.has(dotPos)) {
+            canvas.remove(obj);
+            dotsRemoved++;
+          }
+        }
+      });
+
+      logger.wire(`🧹 Removed ${dotsRemoved} old junction dots`);
+
+      // Add NEW endpoint dots to all updated wires
       connectedConnections.forEach((connection, index) => {
         logger.wire(`🔴 Adding endpoint dots for wire ${index + 1}`);
         addWireEndpointDots(connection.wire);
       });
 
-      // Recalculate intersection dots for all wires after component movement
-      // This ensures junction dots appear/disappear correctly when wires intersect
-      logger.wire("🔍 Recalculating intersection dots after wire updates");
-      addWireIntersectionDots();
+      // DON'T recalculate intersection dots during movement - only after movement completes
+      // This prevents duplicate intersection dots from being created on every frame
+      // Intersection dots will be added in handleObjectMoved event instead
 
       // Force canvas redraw to show updates
       canvas.renderAll();
@@ -1481,6 +1517,7 @@ export function useSimpleWiringTool({
     (componentId: string, pinNumber: string): fabric.Object | null => {
       if (!canvas) return null;
 
+      // Search in canvas objects
       const objects = canvas.getObjects();
       for (const obj of objects) {
         if (obj.type === "group") {
@@ -1508,6 +1545,29 @@ export function useSimpleWiringTool({
           }
         }
       }
+
+      // Also search in active selection if present
+      const activeSelection = canvas.getActiveObject();
+      if (activeSelection && activeSelection.type === "activeSelection") {
+        const selectedObjects = (activeSelection as any)._objects || [];
+        for (const obj of selectedObjects) {
+          if (obj.type === "group") {
+            const groupObjects = (obj as fabric.Group).getObjects();
+            for (const groupObj of groupObjects) {
+              const pinData = (groupObj as any).data;
+              if (
+                pinData &&
+                pinData.type === "pin" &&
+                pinData.componentId === componentId &&
+                pinData.pinNumber === pinNumber
+              ) {
+                return groupObj;
+              }
+            }
+          }
+        }
+      }
+
       return null;
     },
     [canvas]
@@ -1519,6 +1579,35 @@ export function useSimpleWiringTool({
       const target = (e as any).target;
       if (!target) return;
 
+      // Handle multiple selection (ActiveSelection)
+      if (target.type === "activeSelection") {
+        const selectedObjects = (target as any)._objects || [];
+        const componentIds: string[] = [];
+
+        // Collect all component IDs from selection
+        selectedObjects.forEach((obj: any) => {
+          const objData = obj.data;
+          if (objData && objData.type === "component" && objData.componentId) {
+            componentIds.push(objData.componentId);
+          }
+        });
+
+        if (componentIds.length > 0) {
+          logger.wire(
+            `Multiple components moving (${componentIds.length}) - updating wires`
+          );
+
+          // Use requestAnimationFrame to throttle updates and ensure smooth rendering
+          requestAnimationFrame(() => {
+            componentIds.forEach((componentId) => {
+              updateWiresForComponent(componentId);
+            });
+          });
+        }
+        return;
+      }
+
+      // Handle single component movement
       const componentData = (target as any).data;
       if (!componentData || componentData.type !== "component") return;
 
@@ -1685,5 +1774,6 @@ export function useSimpleWiringTool({
     updateWiresForComponent,
     registerRestoredWire,
     refreshAllJunctionDots, // Add the junction dot refresh function
+    addWireIntersectionDots, // Add intersection dot calculation
   };
 }

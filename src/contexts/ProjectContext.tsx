@@ -58,21 +58,33 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
   const [isFirstTimeUser, setIsFirstTimeUser] = useState(false);
 
   // Load project when user becomes authenticated
+  // BUT ONLY if we're not on a specific project page (which will load its own project)
   useEffect(() => {
     if (isAuthenticated && !authLoading) {
-      console.log("🔄 User authenticated, loading project...");
+      // Check if we're on a specific project page
+      const isOnSpecificProjectPage = typeof window !== 'undefined' && 
+        window.location.pathname.startsWith('/project/') &&
+        window.location.pathname !== '/project/new';
+      
+      if (isOnSpecificProjectPage) {
+        console.log("🎯 On specific project page - skipping auto-load (page will load its own project)");
+        return;
+      }
+      
+      console.log("🔄 User authenticated, loading most recent project...");
       loadProject();
     } else if (!isAuthenticated) {
       // Clear project state when not authenticated
       console.log("🚪 User not authenticated, clearing project state");
       setCurrentProject(null);
       setCurrentCircuit(null);
+      setCurrentNetlist([]);
       setIsLoading(false);
       setError(null);
     } else if (authLoading) {
       console.log("⏳ Still loading auth state...");
     }
-  }, [isAuthenticated, authLoading]);
+  }, [isAuthenticated, authLoading]); // loadProject is defined below, will be called when conditions are met
 
   const loadSpecificProject = useCallback(
     async (projectId: string) => {
@@ -143,7 +155,11 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
         setCurrentCircuit(circuit);
 
         // Load the netlist data for this project
-        const netlist: any[] = latestVersion?.netlist_data || [];
+        // Priority: version netlist_data > canvas_data.netlist
+        const netlist: any[] =
+          latestVersion?.netlist_data ||
+          latestVersion?.canvas_data?.netlist ||
+          [];
         setCurrentNetlist(netlist);
 
         // Store canvas data for later restoration (when canvas is ready)
@@ -260,7 +276,11 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
       setCurrentCircuit(circuit);
 
       // Load the netlist data for this project
-      const netlist: any[] = latestVersion?.netlist_data || [];
+      // Priority: version netlist_data > canvas_data.netlist
+      const netlist: any[] =
+        latestVersion?.netlist_data ||
+        latestVersion?.canvas_data?.netlist ||
+        [];
       setCurrentNetlist(netlist);
 
       // Load canvas data - ALWAYS prioritize latest version data
@@ -456,6 +476,12 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
         const canvasDataWithoutChat = { ...currentProject.canvas_settings };
         delete canvasDataWithoutChat.chatData;
 
+        // 🔥 CRITICAL: Clear canvas first to prevent contamination from previous project
+        console.log("🧹 Clearing canvas before loading new project data...");
+        canvas.clear();
+        canvas.backgroundColor = "#FFFFFF";
+        canvas.renderAll();
+
         // Load circuit data to recreate components
         if (currentCircuit) {
           console.log("🔄 Loading components using logical circuit loader...", {
@@ -468,10 +494,13 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
             const refDesAssignments =
               currentProject.canvas_settings.refDesAssignments;
 
+            // Extract netlist from canvas data (saved by serializeCanvasData)
+            const netlistData = currentProject.canvas_settings.netlist;
+
             await loadCanvasFromLogicalCircuit(
               canvas,
               currentCircuit as any,
-              undefined, // netlistData
+              netlistData, // Pass netlist for wire restoration
               refDesAssignments // RefDes assignments
             );
             console.log("✅ Logical circuit loading completed");

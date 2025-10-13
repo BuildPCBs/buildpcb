@@ -49,6 +49,26 @@ interface AIChatContextType {
 
 const AIChatContext = createContext<AIChatContextType | undefined>(undefined);
 
+/**
+ * Format stream messages with minimal emojis
+ */
+function formatStreamMessage(message: {
+  type: string;
+  message: string;
+}): string {
+  const prefix = {
+    status: "→",
+    think: "•",
+    progress: "...",
+    success: "✓",
+    error: "✗",
+    warn: "!",
+  }[message.type] || "•";
+
+  return `${prefix} ${message.message}`;
+}
+
+
 export function useAIChat() {
   const context = useContext(AIChatContext);
   if (context === undefined) {
@@ -78,9 +98,38 @@ export function AIChatProvider({
     canvas,
     enableLiveUpdates: false,
   });
-  const localStorageKey = useMemo(() => {
-    const projectKey = currentProject?.id || "global";
-    return `buildpcb-chat-${projectKey}`;
+
+  // REMOVED: localStorage chat persistence (chat is saved in Supabase database instead)
+  // This was causing cross-project contamination bugs
+
+  // Clear messages when switching projects
+  const previousProjectIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const currentProjectId = currentProject?.id || null;
+
+    // On first mount, just set the reference
+    if (previousProjectIdRef.current === null && currentProjectId === null) {
+      return; // Both null, skip
+    }
+
+    // If this is the first real project load, set it
+    if (previousProjectIdRef.current === null && currentProjectId !== null) {
+      previousProjectIdRef.current = currentProjectId;
+      return;
+    }
+
+    // If project changed, clear messages (new project will load its own chat from database)
+    if (previousProjectIdRef.current !== currentProjectId) {
+      logger.component("🔄 Project changed - clearing chat", {
+        from: previousProjectIdRef.current,
+        to: currentProjectId,
+      });
+
+      setMessages([]);
+      setIsThinking(false);
+      setCurrentMessageIndex(-1);
+      previousProjectIdRef.current = currentProjectId;
+    }
   }, [currentProject?.id]);
 
   const restoreMessagesFromChatData = useCallback(
@@ -113,13 +162,15 @@ export function AIChatProvider({
             0,
             50
           ) || "",
-        messagesWithComponents: restoredMessages.filter(msg => msg.selectedComponents?.length > 0).length,
+        messagesWithComponents: restoredMessages.filter(
+          (msg) => msg.selectedComponents?.length > 0
+        ).length,
         componentDetails: restoredMessages
-          .filter(msg => msg.selectedComponents?.length > 0)
-          .map(msg => ({
+          .filter((msg) => msg.selectedComponents?.length > 0)
+          .map((msg) => ({
             id: msg.id,
-            selectedComponents: msg.selectedComponents
-          }))
+            selectedComponents: msg.selectedComponents,
+          })),
       });
 
       setMessages(restoredMessages);
@@ -133,71 +184,10 @@ export function AIChatProvider({
     []
   );
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!localStorageKey) return;
-    if (messages.length > 0) return;
+  // REMOVED: localStorage restoration and persistence useEffects
+  // Chat is now only stored in Supabase database (project.chat_data)
 
-    try {
-      const cached = window.localStorage.getItem(localStorageKey);
-      if (!cached) return;
-
-      const parsed = JSON.parse(cached);
-      if (parsed?.chatData?.messages?.length) {
-        logger.component("Restoring chat from local cache", {
-          messageCount: parsed.chatData.messages.length,
-        });
-        restoreMessagesFromChatData(parsed.chatData);
-      }
-    } catch (error) {
-      logger.component("Failed to restore chat from local cache", error);
-    }
-  }, [localStorageKey, messages.length, restoreMessagesFromChatData]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!localStorageKey) return;
-
-    if (messages.length === 0) {
-      window.localStorage.removeItem(localStorageKey);
-      return;
-    }
-
-    try {
-      const serializedMessages = messages.slice(-200).map((msg) => ({
-        ...msg,
-        timestamp:
-          msg.timestamp instanceof Date
-            ? msg.timestamp.toISOString()
-            : msg.timestamp,
-      }));
-
-      // Debug: Log messages with selectedComponents
-      const msgsWithComponents = serializedMessages.filter(m => m.selectedComponents && m.selectedComponents.length > 0);
-      if (msgsWithComponents.length > 0) {
-        logger.component("Saving messages with selectedComponents to localStorage", {
-          count: msgsWithComponents.length,
-          details: msgsWithComponents.map(m => ({
-            id: m.id,
-            type: m.type,
-            selectedComponents: m.selectedComponents
-          }))
-        });
-      }
-
-      const payload = {
-        chatData: { messages: serializedMessages },
-        projectId: currentProject?.id || null,
-        updatedAt: Date.now(),
-      };
-
-      window.localStorage.setItem(localStorageKey, JSON.stringify(payload));
-    } catch (error) {
-      logger.component("Failed to cache chat messages locally", error);
-    }
-  }, [messages, localStorageKey, currentProject?.id]);
-
-  // Listen for chat data restoration events
+  // Listen for chat data restoration events (from project load)
   useEffect(() => {
     const handleChatDataRestored = (event: CustomEvent) => {
       logger.component("chatDataRestored event received", {
@@ -332,7 +322,10 @@ export function AIChatProvider({
 
     // Log selected components for debugging
     if (selectedComponents && selectedComponents.length > 0) {
-      console.log("🎯 Selected components being passed to AI:", selectedComponents);
+      console.log(
+        "🎯 Selected components being passed to AI:",
+        selectedComponents
+      );
     } else {
       console.log("⚠️ No selected components to pass to AI");
     }
@@ -344,7 +337,10 @@ export function AIChatProvider({
       content: prompt,
       timestamp: new Date(),
       status: "complete",
-      selectedComponents: selectedComponents && selectedComponents.length > 0 ? selectedComponents : undefined,
+      selectedComponents:
+        selectedComponents && selectedComponents.length > 0
+          ? selectedComponents
+          : undefined,
     };
 
     addMessage(userMessage);
@@ -389,16 +385,38 @@ export function AIChatProvider({
 
       const streamingHandler = agentService.getStreamingHandler();
 
-      // Subscribe to streaming status updates for the status indicator
+      // Track accumulated status messages for building the narrative
+      let accumulatedContent = "";
+
+      // Subscribe to streaming status updates and append them to content
       const unsubscribe = streamingHandler.subscribe((message) => {
-        // Update just the status indicator (shown above content)
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === aiMessageId
-              ? { ...msg, streamingStatus: message.message }
-              : msg
-          )
-        );
+        // Append ALL messages to the content to show agent's thought process
+        // This creates a "growing message" like GitHub Copilot
+        if (
+          message.type === "status" ||
+          message.type === "think" ||
+          message.type === "progress" ||
+          message.type === "success" ||
+          message.type === "error" ||
+          message.type === "warn"
+        ) {
+          // Format the message with emoji based on type
+          const formattedMessage = formatStreamMessage(message);
+          accumulatedContent += formattedMessage + "\n\n";
+
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === aiMessageId
+                ? {
+                    ...msg,
+                    content: accumulatedContent,
+                    streamingStatus: message.message, // Also update status bar
+                    isStreaming: true,
+                  }
+                : msg
+            )
+          );
+        }
       });
 
       // Execute with streaming content callback
@@ -406,14 +424,16 @@ export function AIChatProvider({
         history: conversationHistory,
         selectedComponents: selectedComponents || [],
         onContentUpdate: (content: string) => {
-          // The LLM streams its full narrative response including all steps
-          // We just display it as it comes in - character by character
+          // The final LLM response gets appended to the accumulated status messages
+          // This way we preserve both the agent's thought process AND the final response
+          const fullContent = accumulatedContent + content;
+
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === aiMessageId
                 ? {
                     ...msg,
-                    content: content, // This already includes the full narrative
+                    content: fullContent,
                     isStreaming: true,
                     status: "complete",
                   }
@@ -428,10 +448,11 @@ export function AIChatProvider({
 
       const finalContent =
         (result.message && result.message.trim().length > 0
-          ? result.message.trim()
+          ? accumulatedContent + result.message.trim() // Include all accumulated status messages + final response
           : result.status === "success"
-          ? "Done."
-          : "The agent could not complete the request.") || "";
+          ? accumulatedContent + "Done."
+          : accumulatedContent + "The agent could not complete the request.") ||
+        "";
 
       // Mark streaming as complete
       setMessages((prev) =>

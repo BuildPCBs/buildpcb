@@ -491,17 +491,21 @@ export async function loadCanvasFromLogicalCircuit(
     }
 
     // DISABLED: Wire connections are now handled by netlist restoration system
+    // Wire restoration happens via custom event 'netlistRestored' dispatched from ProjectContext
     // This prevents duplicate wire creation and ID conflicts
     if (circuit.connections && circuit.connections.length > 0) {
       console.log(
-        `🔗 Skipping ${circuit.connections.length} wire connections - will be handled by netlist restoration`
+        `🔗 Skipping ${circuit.connections.length} wire connections - handled by netlist event system`
       );
     }
 
-    // NEW: Restore netlist data if provided
+    // NOTE: netlistData parameter is not used here
+    // Wire restoration happens via custom event 'netlistRestored' dispatched from ProjectContext
+    // which triggers wire recreation in IDEFabricCanvas.tsx
     if (netlistData && netlistData.length > 0) {
-      console.log(`🕸️ Restoring ${netlistData.length} nets to netlist hook`);
-      // This will be handled by the calling code that has access to the netlist hook
+      console.log(
+        `🕸️ Netlist data available (${netlistData.length} nets) - will be restored via custom event`
+      );
     }
 
     canvas.renderAll();

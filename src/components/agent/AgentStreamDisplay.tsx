@@ -32,70 +32,74 @@ export function AgentStreamDisplay({
   minHeight,
   maxHeight,
 }: AgentStreamDisplayProps) {
-  // Only show the most recent message
-  const currentMessage = messages[messages.length - 1];
-
-  if (!currentMessage) return null;
+  // Show all messages (accumulated)
+  if (!messages || messages.length === 0) return null;
 
   const styles = getChatUIStyles();
 
   return (
     <div
-      className={`relative flex items-center flex-shrink-0 ${className}`}
+      className={`relative flex flex-col gap-1.5 flex-shrink-0 ${className}`}
       style={{
         width: width || styles.content.width,
         minWidth: minWidth || styles.content.minWidth,
         maxWidth: maxWidth || styles.content.maxWidth,
         minHeight: minHeight || styles.streamer.minHeight,
         maxHeight: maxHeight || styles.streamer.maxHeight,
-        // Remove fixed height - let content determine size
-        borderRadius: styles.streamer.borderRadius,
-        borderWidth: responsive(1),
-        ...getMessageStyles(currentMessage.type),
-        paddingTop: responsive(3),
-        paddingBottom: responsive(3),
-        paddingLeft: responsive(8),
-        paddingRight: responsive(8),
         zIndex: 2, // Ensure streamer appears above prompt entry
       }}
     >
-      {/* Icon based on message type */}
-      <div className="flex-shrink-0" style={{ marginRight: responsive(5) }}>
-        {getIcon(currentMessage.type)}
-      </div>
-
-      {/* Message Content */}
-      <div className="flex-1 overflow-hidden">
-        <span
+      {messages.map((message) => (
+        <div
+          key={message.id}
+          className="flex items-center flex-shrink-0"
           style={{
-            fontSize: responsive(8.5),
-            fontWeight: 400,
-            lineHeight: 1.4,
+            borderRadius: styles.streamer.borderRadius,
+            borderWidth: responsive(1),
+            ...getMessageStyles(message.type),
+            paddingTop: responsive(3),
+            paddingBottom: responsive(3),
+            paddingLeft: responsive(8),
+            paddingRight: responsive(8),
           }}
         >
-          {currentMessage.message}
-        </span>
-
-        {/* Progress bar if applicable */}
-        {currentMessage.progress && (
-          <div
-            className="mt-0.5 bg-white bg-opacity-30 rounded-full overflow-hidden"
-            style={{ height: responsive(1.5) }}
-          >
-            <div
-              className="h-full transition-all duration-300"
-              style={{
-                width: `${
-                  (currentMessage.progress.current /
-                    currentMessage.progress.total) *
-                  100
-                }%`,
-                backgroundColor: getProgressBarColor(currentMessage.type),
-              }}
-            />
+          {/* Icon based on message type */}
+          <div className="flex-shrink-0" style={{ marginRight: responsive(5) }}>
+            {getIcon(message.type)}
           </div>
-        )}
-      </div>
+
+          {/* Message Content */}
+          <div className="flex-1 overflow-hidden">
+            <span
+              style={{
+                fontSize: responsive(8.5),
+                fontWeight: 400,
+                lineHeight: 1.4,
+              }}
+            >
+              {message.message}
+            </span>
+
+            {/* Progress bar if applicable */}
+            {message.progress && (
+              <div
+                className="mt-0.5 bg-white bg-opacity-30 rounded-full overflow-hidden"
+                style={{ height: responsive(1.5) }}
+              >
+                <div
+                  className="h-full transition-all duration-300"
+                  style={{
+                    width: `${
+                      (message.progress.current / message.progress.total) * 100
+                    }%`,
+                    backgroundColor: getProgressBarColor(message.type),
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

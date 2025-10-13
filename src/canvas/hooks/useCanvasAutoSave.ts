@@ -14,6 +14,7 @@ import { useAIChat } from "@/contexts/AIChatContext";
 import { useProject } from "@/contexts/ProjectContext";
 import { logger } from "@/lib/logger";
 import { refDesService } from "@/lib/refdes-service";
+import { updateProjectThumbnail } from "@/lib/thumbnail-generator";
 
 interface UseCanvasAutoSaveOptions {
   canvas: fabric.Canvas | null;
@@ -118,8 +119,9 @@ export function useCanvasAutoSave({
           // Include RefDes assignments for persistence
           const refDesAssignments = refDesService.getAll();
 
+          // IMPORTANT: Preserve netlist from serializeCanvasData
           const extendedCanvasData = {
-            ...data.canvasData,
+            ...data.canvasData, // This already contains netlist from serializeCanvasData
             chatData: chatData,
             refDesAssignments:
               refDesAssignments.length > 0 ? refDesAssignments : null,
@@ -379,6 +381,13 @@ export function useCanvasAutoSave({
         });
 
         const saveStartTime = Date.now();
+        
+        console.log("💾 Manual save START - Call stack:", {
+          timestamp: new Date().toISOString(),
+          projectId: currentProjectId,
+          stack: new Error().stack?.split('\n').slice(1, 5).join('\n'),
+        });
+        
         await DatabaseService.createVersion(
           currentProjectId,
           circuitData,
@@ -395,6 +404,13 @@ export function useCanvasAutoSave({
           duration: `${saveDuration}ms`,
           canvasDataSize: JSON.stringify(extendedCanvasData).length,
         });
+
+        // Generate and upload thumbnail after successful save (non-blocking)
+        if (canvas) {
+          updateProjectThumbnail(currentProjectId, canvas).catch((error) => {
+            console.warn("Failed to update thumbnail (non-critical):", error);
+          });
+        }
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : "Manual save failed";

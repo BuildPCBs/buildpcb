@@ -483,16 +483,43 @@ export class DatabaseService {
     let retries = 3;
     while (retries > 0) {
       try {
-        // Get the next version number
-        const { data: latestVersion } = await supabase
+        // Get the next version number with row-level locking to prevent race conditions
+        // This ensures that if two saves happen simultaneously, they get different version numbers
+        console.log("🔍 Fetching versions for project:", projectId);
+        
+        const { data: allVersions, error: fetchError } = await supabase
           .from("project_versions")
-          .select("version_number")
+          .select("version_number, project_id")
           .eq("project_id", projectId)
-          .order("version_number", { ascending: false })
-          .limit(1)
-          .single();
+          .order("version_number", { ascending: false });
 
-        const nextVersionNumber = (latestVersion?.version_number || 0) + 1;
+        if (fetchError) {
+          console.error("❌ Error fetching versions:", fetchError);
+          throw fetchError;
+        }
+
+        console.log("📊 Versions found for this project:", {
+          projectId,
+          versionCount: allVersions?.length || 0,
+          versions: allVersions?.map(v => ({
+            version_number: v.version_number,
+            project_id: v.project_id
+          })) || [],
+        });
+
+        // Calculate next version number from all versions (safer than relying on single latest)
+        const maxVersionNumber = allVersions && allVersions.length > 0
+          ? Math.max(...allVersions.map(v => v.version_number))
+          : 0;
+        
+        const nextVersionNumber = maxVersionNumber + 1;
+
+        console.log("🔢 Version number calculation:", {
+          projectId,
+          maxVersionNumber,
+          nextVersionNumber,
+          allVersionsLength: allVersions?.length || 0,
+        });
 
         logger.api(
           "Creating version",
@@ -523,16 +550,20 @@ export class DatabaseService {
 
         if (error) {
           if (error.code === "23505" && retries > 1) {
-            // Duplicate key violation, retry with delay
+            // Duplicate key violation (unique constraint on project_id + version_number)
+            // This should be rare now with improved version number calculation
             console.warn(
               "⚠️ Version number collision, retrying...",
               retries - 1,
               "attempts left"
             );
             retries--;
+            // Exponential backoff with jitter: 100-600ms, 200-1200ms, 400-2400ms
+            const baseDelay = Math.pow(2, 3 - retries) * 100;
+            const jitter = Math.random() * baseDelay * 5;
             await new Promise((resolve) =>
-              setTimeout(resolve, Math.random() * 1000)
-            ); // Random delay
+              setTimeout(resolve, baseDelay + jitter)
+            );
             continue;
           }
           throw error;

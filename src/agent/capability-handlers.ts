@@ -2,6 +2,7 @@ import { Capability } from "./capabilities";
 import { logger } from "@/lib/logger";
 import { AgentContext, AgentResult, CapabilityHandler } from "./types";
 import { addComponent } from "./handlers/priority1/addComponent";
+import { readComponent } from "./handlers/priority1/readComponent";
 
 export const capabilityHandlers: Record<Capability, CapabilityHandler> = {
   CREATE_CIRCUIT: async (
@@ -37,14 +38,7 @@ export const capabilityHandlers: Record<Capability, CapabilityHandler> = {
     context.streamer.status("Creating custom component...");
     return { status: "success", message: "Component created." };
   },
-  READ_COMPONENT: async (
-    context: AgentContext,
-    prompt: string
-  ): Promise<AgentResult> => {
-    logger.component("READ_COMPONENT called", { prompt });
-    context.streamer.status("Reading component properties...");
-    return { status: "success", message: "Component read." };
-  },
+  READ_COMPONENT: readComponent,
   UPDATE_COMPONENT: async (
     context: AgentContext,
     prompt: string

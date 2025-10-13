@@ -650,6 +650,53 @@ export function useElasticWire({
       const target = (e as any).target;
       if (!target) return;
 
+      // Handle multiple selection (ActiveSelection)
+      if (target.type === "activeSelection") {
+        const selectedObjects = (target as any)._objects || [];
+        const componentIds: string[] = [];
+
+        // Collect all component IDs from selection
+        selectedObjects.forEach((obj: any) => {
+          const objData = obj.data;
+          if (objData && objData.type === "component" && objData.componentId) {
+            componentIds.push(objData.componentId);
+          }
+        });
+
+        if (componentIds.length > 0) {
+          logger.wire(
+            `Elastic wire: Multiple components moving (${componentIds.length}) - updating wires`
+          );
+
+          // Update elastic wires for all selected components
+          elasticConnections.forEach((connection) => {
+            if (
+              componentIds.includes(connection.fromComponentId) ||
+              componentIds.includes(connection.toComponentId)
+            ) {
+              const fromPin = findPinByComponentAndNumber(
+                connection.fromComponentId,
+                connection.fromPinNumber
+              );
+              const toPin = findPinByComponentAndNumber(
+                connection.toComponentId,
+                connection.toPinNumber
+              );
+
+              if (fromPin && toPin) {
+                const fromPoint = getAbsoluteCenter(fromPin);
+                const toPoint = getAbsoluteCenter(toPin);
+                connection.elasticWire.updateEndPoint(toPoint);
+              }
+            }
+          });
+        }
+
+        canvas.renderAll();
+        return;
+      }
+
+      // Handle single component movement
       const componentData = (target as any).data;
       if (!componentData || componentData.type !== "component") return;
 

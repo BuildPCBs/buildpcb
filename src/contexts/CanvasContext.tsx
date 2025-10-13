@@ -56,17 +56,27 @@ export function CanvasProvider({
   // Listen to canvas selection events
   useEffect(() => {
     if (!canvas) {
-      console.log("⚠️ CanvasContext: No canvas available for selection tracking");
+      console.log(
+        "⚠️ CanvasContext: No canvas available for selection tracking"
+      );
       return;
     }
 
-    console.log("✅ CanvasContext: Setting up selection listeners on canvas", canvas);
+    console.log(
+      "✅ CanvasContext: Setting up selection listeners on canvas",
+      canvas
+    );
 
     const extractComponentData = (
       obj: fabric.Object
     ): SelectedComponent | null => {
       const data = (obj as any).data;
-      console.log("🔍 Extracting component data from object:", obj, "data:", data);
+      console.log(
+        "🔍 Extracting component data from object:",
+        obj,
+        "data:",
+        data
+      );
       if (!data || data.type !== "component") {
         console.log("❌ Not a component, skipping");
         return null;
@@ -74,7 +84,7 @@ export function CanvasProvider({
 
       // Clean up component name by removing suffixes like _unit1, _unit2, etc.
       const rawName = data.componentName || data.name || "Unknown Component";
-      const cleanName = rawName.replace(/_unit\d+$/i, '').replace(/_\d+$/i, '');
+      const cleanName = rawName.replace(/_unit\d+$/i, "").replace(/_\d+$/i, "");
 
       const component = {
         id: (obj as any).id || "",

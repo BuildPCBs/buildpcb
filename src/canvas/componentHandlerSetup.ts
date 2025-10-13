@@ -131,8 +131,9 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
 
           // 4. Create Interactive Pins from the tagged SVG elements
           // Generate or use preserved component ID for wire connections
+          // Use crypto.randomUUID() for guaranteed uniqueness instead of Date.now()
           const componentId =
-            payload.preservedComponentId || `component_${Date.now()}`;
+            payload.preservedComponentId || `component_${crypto.randomUUID()}`;
 
           if (payload.preservedComponentId) {
             logger.canvas(
@@ -161,43 +162,106 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
               `✅ Assigned RefDes: ${assignedRefDes} to ${payload.name}`
             );
 
-            // Find and update the existing text element (make it visible and change text)
+            // Find and update the RefDes text in the SVG, hide the stroked-text rendering
             logger.canvas(
               `🔍 Searching through ${allSvgObjects.length} SVG objects`
             );
 
-            let refDesTextObj: any = null;
+            // Log ALL text elements to see what we have
+            logger.canvas("📋 ALL text elements found:");
             allSvgObjects.forEach((obj: any, index: number) => {
-              logger.canvas(
-                `Object ${index}: type=${obj.type}, text="${obj.text}", opacity=${obj.opacity}`
-              );
-
-              if (obj.type === "text" && obj.text && obj.text.includes("?")) {
-                refDesTextObj = obj;
+              if (obj.type === "text" && obj.text) {
                 logger.canvas(
-                  `📝 Found RefDes text at index ${index}: (${obj.left}, ${obj.top}), opacity: ${obj.opacity}, fontSize: ${obj.fontSize}`
-                );
-
-                // Update the text and make it visible
-                obj.set({
-                  text: assignedRefDes,
-                  opacity: 1,
-                  fill: "#000080",
-                  fontWeight: "bold",
-                  visible: true,
-                });
-
-                logger.canvas(
-                  `✅ Updated text object to: "${obj.text}", opacity: ${obj.opacity}`
+                  `  [${index}] "${obj.text}" at (${obj.left}, ${obj.top}), visible=${obj.visible}, opacity=${obj.opacity}`
                 );
               }
             });
 
-            if (!refDesTextObj) {
+            let updatedTextCount = 0;
+            let hiddenPathCount = 0;
+            let foundTextIndex = -1;
+            let nextTextIndex = -1;
+
+            // First pass: find the RefDes text and the next text element
+            allSvgObjects.forEach((obj: any, index: number) => {
+              if (obj.type === "text" && obj.text) {
+                if (obj.text.includes("?") && foundTextIndex === -1) {
+                  foundTextIndex = index;
+                } else if (foundTextIndex !== -1 && nextTextIndex === -1) {
+                  // This is the next text element after RefDes (e.g., "R_Variable_US")
+                  nextTextIndex = index;
+                }
+              }
+            });
+
+            logger.canvas(
+              `🔍 Text element positions: RefDes at ${foundTextIndex}, Next text at ${nextTextIndex}`
+            );
+
+            // Second pass: update RefDes and hide only its stroked-text paths
+            allSvgObjects.forEach((obj: any, index: number) => {
+              // Update the RefDes text element with "?"
+              if (obj.type === "text" && obj.text && obj.text.includes("?")) {
+                logger.canvas(
+                  `📝 Found RefDes text at index ${index}: "${obj.text}"`
+                );
+
+                // Update the text content to our RefDes (R1, C1, etc.)
+                obj.set({
+                  text: assignedRefDes,
+                  opacity: 1,
+                  visible: true,
+                  fill: "#006464",
+                  stroke: "#006464",
+                  strokeWidth: 0.1524,
+                });
+                updatedTextCount++;
+
+                logger.canvas(`✅ Updated RefDes text to: "${assignedRefDes}"`);
+              }
+
+              // Hide ONLY path objects between RefDes text and next text element
+              // This ensures we only hide "R?" paths, not "R_Variable_US" paths
+              if (foundTextIndex !== -1 && obj.type === "path") {
+                const shouldHide =
+                  nextTextIndex !== -1
+                    ? index > foundTextIndex && index < nextTextIndex // Hide paths between RefDes and component name
+                    : index > foundTextIndex && index < foundTextIndex + 20; // Fallback: hide 20 paths if no next text
+
+                if (shouldHide) {
+                  obj.set({ visible: false, opacity: 0 });
+                  hiddenPathCount++;
+                }
+              }
+            });
+
+            // If no RefDes text was found in the loaded SVG (outside viewBox),
+            // create a new text object for the RefDes
+            if (foundTextIndex === -1) {
               logger.canvas(
-                `❌ ERROR: Could not find any text element with "?" in ${allSvgObjects.length} objects`
+                `⚠️ RefDes text "${assignedRefDes}" not found in loaded SVG - creating new text object`
               );
+
+              const refDesText = new fabric.Text(assignedRefDes, {
+                left: 0,
+                top: -5, // Position above the component
+                fontSize: 12,
+                fill: "#006464",
+                stroke: "#006464",
+                strokeWidth: 0.1,
+                fontFamily: "Arial",
+                selectable: false,
+                evented: false,
+              });
+
+              allSvgObjects.push(refDesText);
+              updatedTextCount++;
+              logger.canvas(`✅ Created new RefDes text: "${assignedRefDes}"`);
             }
+
+            logger.canvas(
+              `📊 Updated ${updatedTextCount} text elements, hidden ${hiddenPathCount} stroked-text paths`
+            );
           } else {
             logger.canvas(
               `⚠️ No RefDes prefix found in SVG for ${payload.name}`
@@ -337,6 +401,11 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
           // Function to show pins on component hover
           const showPins = () => {
             if (!(currentCanvas as any).wireMode) return; // Only show pins in wire mode
+            if (
+              componentSandwich.lockMovementX ||
+              componentSandwich.lockMovementY
+            )
+              return; // Don't show during drag
             interactivePins.forEach((pin) => {
               pin.set({
                 visible: true,
@@ -363,6 +432,23 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
           // Add hover event handlers to the component group
           componentSandwich.on("mouseover", showPins);
           componentSandwich.on("mouseout", hidePins);
+
+          // Hide pins when component starts moving
+          componentSandwich.on("moving", () => {
+            interactivePins.forEach((pin) => {
+              pin.set({
+                visible: false,
+                opacity: 0,
+                evented: false,
+              });
+            });
+          });
+
+          // Re-evaluate pin visibility when component stops moving
+          componentSandwich.on("modified", () => {
+            // Force pins to hidden state after move
+            hidePins();
+          });
 
           // Also add hover handlers to individual pins to keep them visible when hovering directly on pins
           interactivePins.forEach((pin) => {

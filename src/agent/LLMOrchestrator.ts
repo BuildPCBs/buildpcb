@@ -14,8 +14,46 @@ import type {
   AgentChatHistoryMessage,
 } from "./types";
 import { logger } from "@/lib/logger";
-import { getToolDefinitions, executeTool } from "./tools";
+import { executeTool, getToolDefinitions } from "./tools";
 
+/**
+ * Convert technical tool names to user-friendly messages
+ */
+function getUserFriendlyToolMessage(toolName: string, args: any): string {
+  switch (toolName) {
+    case "component_search":
+      return `🔍 Looking for ${args.query}...`;
+    case "add_component":
+      return `📦 Adding component to canvas...`;
+    case "draw_wire":
+      return `🔌 Connecting components...`;
+    case "get_canvas_state":
+      return `👀 Checking what's on your canvas...`;
+    case "delete_component":
+      return `🗑️ Removing component...`;
+    default:
+      return `⚙️ Working on it...`;
+  }
+}
+
+/**
+ * Get user-friendly thinking message based on tool count
+ */
+function getThinkingMessage(toolCount: number): string {
+  if (toolCount === 1) {
+    return "Let me do that for you...";
+  } else if (toolCount === 2) {
+    return "Working on a couple of things...";
+  } else if (toolCount <= 4) {
+    return "I'll handle this step by step...";
+  } else {
+    return "This will take a few moments...";
+  }
+}
+
+/**
+ * LLM Orchestrator - Coordinates the thought-action loop
+ */
 export class LLMOrchestrator {
   private maxIterations = 10; // Prevent infinite loops
   private apiEndpoint = "/api/agent/execute";
@@ -33,7 +71,7 @@ export class LLMOrchestrator {
     history: AgentChatHistoryMessage[] = []
   ): Promise<AgentResult> {
     logger.info("🧠 LLM Orchestrator starting", { prompt });
-    context.streamer.think("Understanding your request...");
+    // Don't show technical "Understanding your request..." - let LLM respond naturally
 
     try {
       // Initialize conversation with system prompt and user command
@@ -169,10 +207,8 @@ export class LLMOrchestrator {
 
         // Check if LLM wants to call tools
         if (message.tool_calls && message.tool_calls.length > 0) {
-          // LLM decided to use tools
-          context.streamer.think(
-            `Executing ${message.tool_calls.length} action(s)...`
-          );
+          // Show user-friendly thinking message
+          context.streamer.think(getThinkingMessage(message.tool_calls.length));
 
           // Execute each tool call
           for (const toolCall of message.tool_calls) {
@@ -181,7 +217,11 @@ export class LLMOrchestrator {
             const toolArgs = JSON.parse(toolCall.function.arguments);
 
             logger.debug(`🔧 Tool call: ${toolName}`, toolArgs);
-            context.streamer.status(`Running ${toolName}...`);
+
+            // Show user-friendly status message
+            context.streamer.status(
+              getUserFriendlyToolMessage(toolName, toolArgs)
+            );
 
             // Execute the tool
             const toolResult = await executeTool(toolName, toolArgs, context);
@@ -301,11 +341,30 @@ Your role is to help users design electronic circuits by:
 - **Suggesting relevant next steps based on context**
 
 Available tools:
-1. component_search: Find components in the library
-2. add_component: Place a component on the canvas
+1. component_search: Find components in the library (returns MULTIPLE variants)
+2. add_component: Place a component on the canvas (use exact UID from search)
 3. get_canvas_state: See what's currently on the canvas
 4. draw_wire: Connect two component pins
-5. delete_component: Remove a component`;
+5. delete_component: Remove a component
+
+COMPONENT SEARCH WORKFLOW (CRITICAL):
+1. ALWAYS call component_search FIRST with natural language query
+2. You will receive MULTIPLE component variants (e.g., NE555D vs NE555P, DIP vs SMD)
+3. REVIEW all variants and their descriptions
+4. CHOOSE the most appropriate variant based on context:
+   - Breadboard/hobbyist projects → DIP packages (through-hole)
+   - PCB/professional projects → SMD packages (surface mount)
+   - Consider voltage ratings, current ratings, package size
+5. Use the EXACT UID from search results in add_component
+
+Example workflow:
+User: "add a 555 timer"
+→ component_search(query: "555 timer")
+→ Receives: [NE555P_unit1 (DIP-8), NE555D_unit1 (SOIC-8), TLC555_unit1 (CMOS)]
+→ Choose NE555P_unit1 for breadboard (most common)
+→ add_component(component_uid: "actual-uid-from-search")
+
+NEVER make up component names or UIDs - always use search results!`;
 
     // Add selected components context if available
     if (context.selectedComponents && context.selectedComponents.length > 0) {
@@ -340,19 +399,80 @@ ${
     basePrompt += `
 
 IMPORTANT INSTRUCTIONS:
-- Always search for components before adding them (use component_search first, then add_component)
+- **ALWAYS use component_search before add_component** - you will see all variants
+- When you get search results with multiple variants, EXPLAIN the differences briefly
+- Choose the most appropriate variant based on user context (breadboard = DIP, PCB = SMD)
 - When placing multiple components, space them appropriately (e.g., x: 100, 200, 300...)
 - For power components (VCC/GND), check the component's pinout from search results
 - Think step by step - break complex tasks into smaller actions
 - After completing actions, provide a clear summary to the user
 - **BE PROACTIVE**: Always suggest 2-4 relevant next steps based on what was just added
 - **BE CONTEXTUAL**: Tailor suggestions to the specific component/circuit
-- If you're unsure about a component's specifications, search for it first
+- **FULL NLP SUPPORT**: Understand natural language like "build a timer circuit", "add voltage regulation", "I need power supply"
+- **MAKE INTELLIGENT DECISIONS**: When asked to connect components, use your electronics knowledge to wire them correctly without asking for details
 ${
   context.selectedComponents?.length
     ? "- **USE SELECTED COMPONENT CONTEXT**: The user has selected components - reference them naturally in your responses"
     : ""
 }
+
+COMMON CIRCUIT KNOWLEDGE (Use this to make intelligent wiring decisions):
+
+555 Timer Standard Connections:
+- Pin 1: GND (Ground)
+- Pin 2: TR (Trigger - connect to timing circuit or button)
+- Pin 3: Q (Output - drives LEDs, transistors, etc.)
+- Pin 4: R (Reset - connect to VCC or control circuit)
+- Pin 5: CV (Control Voltage - optional capacitor to GND for stability)
+- Pin 6: THR (Threshold - connect to timing circuit)
+- Pin 7: DIS (Discharge - connects to timing resistor)
+- Pin 8: VCC (Power supply +5V to +15V)
+
+Astable Mode (Blinking LED):
+- Pin 8 → VCC
+- Pin 1 → GND
+- Pin 4 → VCC (always on)
+- Pin 2 → Pin 6 (trigger and threshold tied together)
+- Timing: R1 (VCC to Pin 7), R2 (Pin 7 to Pin 2/6), C (Pin 2/6 to GND)
+- Pin 3 → LED (with current-limiting resistor to GND)
+
+LED Connections:
+- Anode (long leg, +) → Input signal or VCC
+- Cathode (short leg, -) → Current-limiting resistor → GND
+- Standard resistor values: 220Ω-1kΩ (220Ω for 5V, 1kΩ for higher brightness/voltage)
+- When connecting to 555 output: Pin 3 → Resistor → LED Anode, LED Cathode → GND
+
+Voltage Regulator (78xx series):
+- Pin 1: Input (unregulated voltage, e.g., 7-35V for 7805)
+- Pin 2: GND (Ground)
+- Pin 3: Output (regulated voltage, e.g., 5V for 7805)
+- Input capacitor: 0.33µF or 0.1µF ceramic (Pin 1 to GND)
+- Output capacitor: 0.1µF ceramic (Pin 3 to GND)
+
+Capacitor Selection:
+- Ceramic (0.1µF, 0.01µF): High-frequency filtering, decoupling
+- Electrolytic (1µF-1000µF): Power supply smoothing, timing circuits
+- Timing with 555: 1µF-100µF for visible blinking (1Hz-10Hz)
+
+Resistor Selection:
+- LED current limiting: 220Ω-1kΩ
+- Pull-up/pull-down: 10kΩ
+- 555 timing resistors: 1kΩ-1MΩ (typical: 10kΩ-100kΩ)
+
+When user asks to "connect X to Y":
+1. Check canvas to identify the components
+2. Use your circuit knowledge to determine the correct pins
+3. Make the connections automatically
+4. Explain what you connected and why
+
+Example: "connect 555 timer to LED"
+→ Check canvas, find 555 timer (U1) and LED (D1)
+→ Wire Pin 3 (Q output) → 220Ω resistor → LED anode
+→ Wire LED cathode → GND
+→ Wire Pin 8 → VCC, Pin 1 → GND (power connections)
+→ Respond: "I've connected the 555 timer output (Pin 3) to drive the LED through a 220Ω current-limiting resistor. I also connected power (Pin 8 to VCC, Pin 1 to GND). For a blinking LED, you'll need timing components - would you like me to add them?"
+
+DO NOT ask users for pin numbers unless the connection is truly ambiguous. Use standard circuit practices!
 
 PROACTIVE RESPONSE PATTERN:
 After completing a task, ALWAYS suggest contextual next steps with actionable questions:

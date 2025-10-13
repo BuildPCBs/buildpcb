@@ -17,9 +17,26 @@ import { useServerSearch } from "@/hooks/useServerSearch";
 import { canvasCommandManager } from "@/canvas/canvas-command-manager";
 import { logger } from "@/lib/logger";
 
-// Clean component names by removing _unit1, _unit2, etc. suffixes
+// Clean component names - format unit numbers nicely
 function cleanComponentName(name: string): string {
-  return name.replace(/_unit\d+$/i, "").replace(/_\d+$/i, "");
+  // Check if it has _unitN suffix
+  const unitMatch = name.match(/^(.+)_unit(\d+)$/i);
+  if (unitMatch) {
+    const baseName = unitMatch[1];
+    const unitNumber = unitMatch[2];
+    return `${baseName} (Unit ${unitNumber})`;
+  }
+
+  // Check if it has _N suffix (fallback)
+  const numMatch = name.match(/^(.+)_(\d+)$/i);
+  if (numMatch) {
+    const baseName = numMatch[1];
+    const unitNumber = numMatch[2];
+    return `${baseName} (Unit ${unitNumber})`;
+  }
+
+  // No unit suffix, return as-is
+  return name;
 }
 
 // Custom debounce hook

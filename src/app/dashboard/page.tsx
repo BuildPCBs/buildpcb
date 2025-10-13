@@ -464,7 +464,7 @@ const DashboardContent = () => {
                       <div>
                         {/* Project Image/Thumbnail */}
                         <div
-                          className="w-full bg-white border border-[#a6a6a6]"
+                          className="w-full bg-white border border-[#a6a6a6] overflow-hidden relative"
                           style={{
                             ...r({
                               borderRadius: 20,
@@ -474,7 +474,27 @@ const DashboardContent = () => {
                             marginBottom: spacing(5),
                           }}
                         >
-                          {/* Placeholder for project preview */}
+                          {project.thumbnail_url ? (
+                            <img
+                              src={project.thumbnail_url}
+                              alt={`${project.name} preview`}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                // Fallback if image fails to load
+                                (e.target as HTMLImageElement).style.display =
+                                  "none";
+                              }}
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+                              <div className="text-center">
+                                <div className="text-4xl mb-2">📐</div>
+                                <p className="text-xs text-gray-400">
+                                  No preview
+                                </p>
+                              </div>
+                            </div>
+                          )}
                         </div>
 
                         {/* Project Info - Fixed alignment */}

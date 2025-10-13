@@ -102,6 +102,10 @@ export function IDEFabricCanvas({
   const netlistRef = useRef<any[]>([]);
   const [isNetlistRestored, setIsNetlistRestored] = useState(false);
 
+  // Feature flag: Enable/disable multi-select wire movement
+  // Set to false to disable multi-component selection entirely
+  const ENABLE_MULTI_SELECT_WIRE_MOVEMENT = false;
+
   // Simple Wiring Tool - Works with Database Pin Data
   const wiringTool = useSimpleWiringTool({
     canvas: fabricCanvas,
@@ -127,6 +131,22 @@ export function IDEFabricCanvas({
   }, [netlist]);
 
   const { currentProject, restoreCanvasData } = useProject();
+
+  // Reset chat restoration flag when project changes
+  const previousProjectIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const currentProjectId = currentProject?.id || null;
+
+    if (previousProjectIdRef.current !== currentProjectId) {
+      logger.canvas("🔄 Project changed - resetting chat restoration flag", {
+        from: previousProjectIdRef.current,
+        to: currentProjectId,
+      });
+
+      setChatRestored(false);
+      previousProjectIdRef.current = currentProjectId;
+    }
+  }, [currentProject?.id]);
 
   // Auto-save functionality
   const autoSave = useCanvasAutoSave({
@@ -526,8 +546,13 @@ export function IDEFabricCanvas({
         logger.canvas(`🗑️ External component deletion request: ${componentId}`);
 
         if (component && fabricCanvas) {
-          handleObjectDeletion(component);
-          fabricCanvas.renderAll();
+          // Find and execute deletion logic similar to handleObjectDeletion
+          // This will be executed by the proper handler defined later
+          window.dispatchEvent(
+            new CustomEvent("executeDelete", {
+              detail: { component },
+            })
+          );
         }
       };
 
@@ -958,6 +983,7 @@ export function IDEFabricCanvas({
       enableRetinaScaling: true, // Enable high-DPI rendering
       imageSmoothingEnabled: false, // Disable image smoothing for crisp rendering
       renderOnAddRemove: true,
+      selection: false, // DISABLE multi-selection (no drag-to-select box)
     });
 
     // Initialize wire mode flag on canvas
@@ -1376,30 +1402,49 @@ export function IDEFabricCanvas({
         checkAlignments(movingObject);
       }
 
-      // PART 2: Only track component movement (not wire movement) for wire following
-      if (
-        movingObject &&
-        ((movingObject as any).componentType ||
-          movingObject.type === "group") &&
-        movingObject.type === "group"
-      ) {
-        // This is a component being moved - update connected wires
-        logger.canvas(
-          "Component moving - updating connected wires in real-time"
-        );
-        // ENABLED: Simple wiring tool now supports wire updates on component move
-        const componentId =
-          (movingObject as any).data?.componentId ||
-          (movingObject as any).id ||
-          `component_${Date.now()}`;
-        logger.canvas(
-          "🎯 Component moving - calling updateWiresForComponent with ID:",
-          componentId
-        );
-        wiringTool.updateWiresForComponent(componentId);
+      // PART 4: Update wires for moving components (handles both single and multi-select)
+      if (movingObject) {
+        // Handle multiple selected components (ActiveSelection)
+        if (
+          movingObject.type === "activeSelection" &&
+          ENABLE_MULTI_SELECT_WIRE_MOVEMENT
+        ) {
+          const selectedObjects = (movingObject as any)._objects || [];
+          const componentIds: string[] = [];
+
+          selectedObjects.forEach((obj: any) => {
+            const componentId =
+              obj.data?.componentId || obj.id || (obj as any).componentId;
+
+            const isComponent =
+              obj.data?.type === "component" ||
+              obj.componentType === "component" ||
+              obj.type === "group";
+
+            if (isComponent && componentId) {
+              componentIds.push(componentId);
+            }
+          });
+
+          if (componentIds.length > 0) {
+            componentIds.forEach((componentId) => {
+              wiringTool.updateWiresForComponent(componentId);
+            });
+          }
+        }
+        // Handle single component movement
+        else if (
+          ((movingObject as any).componentType ||
+            movingObject.type === "group") &&
+          movingObject.type === "group"
+        ) {
+          const componentId =
+            (movingObject as any).data?.componentId ||
+            (movingObject as any).id ||
+            `component_${Date.now()}`;
+          wiringTool.updateWiresForComponent(componentId);
+        }
       }
-      // PART 3: No Follow Rule - If a wire is being moved, do nothing
-      // Components should NOT follow wires
     };
 
     const handleObjectMoved = (e: any) => {
@@ -1427,23 +1472,58 @@ export function IDEFabricCanvas({
       // Remove alignment guides when movement stops
       removeAlignmentGuides();
 
-      // Final position update for components only
-      if (
-        movedObject &&
-        ((movedObject as any).componentType || movedObject.type === "group") &&
-        movedObject.type === "group"
-      ) {
-        logger.canvas("Component movement completed - final wire update");
-        // ENABLED: Simple wiring tool now supports wire updates on component move
-        const componentId =
-          (movedObject as any).data?.componentId ||
-          (movedObject as any).id ||
-          `component_${Date.now()}`;
-        logger.canvas(
-          "🎯 Component moved - calling updateWiresForComponent with ID:",
-          componentId
-        );
-        wiringTool.updateWiresForComponent(componentId);
+      // Final position update for components (handles both single and multi-select)
+      if (movedObject) {
+        // Handle multiple selected components (ActiveSelection)
+        if (
+          movedObject.type === "activeSelection" &&
+          ENABLE_MULTI_SELECT_WIRE_MOVEMENT
+        ) {
+          const selectedObjects = (movedObject as any)._objects || [];
+          const componentIds: string[] = [];
+
+          selectedObjects.forEach((obj: any) => {
+            const componentId =
+              obj.data?.componentId || obj.id || (obj as any).componentId;
+
+            const isComponent =
+              obj.data?.type === "component" ||
+              obj.componentType === "component" ||
+              obj.type === "group";
+
+            if (isComponent && componentId) {
+              componentIds.push(componentId);
+            }
+          });
+
+          if (componentIds.length > 0) {
+            componentIds.forEach((componentId) => {
+              wiringTool.updateWiresForComponent(componentId);
+            });
+            // Recalculate intersection dots ONLY after movement completes
+            // This prevents duplicate dots during continuous dragging
+            if (wiringTool.addWireIntersectionDots) {
+              wiringTool.addWireIntersectionDots();
+            }
+          }
+        }
+        // Handle single component movement
+        else if (
+          ((movedObject as any).componentType ||
+            movedObject.type === "group") &&
+          movedObject.type === "group"
+        ) {
+          const componentId =
+            (movedObject as any).data?.componentId ||
+            (movedObject as any).id ||
+            `component_${Date.now()}`;
+          wiringTool.updateWiresForComponent(componentId);
+          // Recalculate intersection dots ONLY after movement completes
+          // This prevents duplicate dots during continuous dragging
+          if (wiringTool.addWireIntersectionDots) {
+            wiringTool.addWireIntersectionDots();
+          }
+        }
       }
 
       // Save state for undo/redo
@@ -1856,6 +1936,35 @@ export function IDEFabricCanvas({
             );
           });
 
+          // Remove junction dots for deleted wires (both pin connection dots and intersection dots)
+          const wiresToClean = connectedWires;
+          wiresToClean.forEach((wire) => {
+            const wireConnectionData = (wire as any).connectionData;
+            if (wireConnectionData) {
+              // Remove pin connection dots for this wire
+              const dotsToRemove = fabricCanvas
+                .getObjects()
+                .filter((dot: any) => {
+                  if (
+                    dot.type === "circle" &&
+                    dot.data?.type === "junctionDot"
+                  ) {
+                    // Check if this dot is associated with the deleted component
+                    const dotComponentId = dot.data?.componentId;
+                    return dotComponentId === componentId;
+                  }
+                  return false;
+                });
+
+              dotsToRemove.forEach((dot) => {
+                fabricCanvas.remove(dot);
+                logger.canvas(
+                  `🔵 Removed junction dot for component: ${componentId}`
+                );
+              });
+            }
+          });
+
           // Update netlist: remove all connections involving this component
           if (obj.type === "group") {
             const groupObjects = (obj as fabric.Group).getObjects();
@@ -1896,6 +2005,14 @@ export function IDEFabricCanvas({
           // Update the wiring tool's netlist as well
           if (wiringTool && wiringTool.setNetlist) {
             wiringTool.setNetlist(netlistRef.current);
+          }
+
+          // Refresh junction dots for remaining wires (recalculate intersections)
+          if (wiringTool && wiringTool.refreshAllJunctionDots) {
+            logger.canvas(
+              `🔵 Refreshing junction dots after component deletion`
+            );
+            wiringTool.refreshAllJunctionDots();
           }
 
           // Trigger auto-save to persist netlist changes
@@ -1966,6 +2083,12 @@ export function IDEFabricCanvas({
             wiringTool.setNetlist(netlistRef.current);
           }
 
+          // Refresh junction dots for remaining wires (recalculate intersections)
+          if (wiringTool && wiringTool.refreshAllJunctionDots) {
+            logger.canvas(`🔵 Refreshing junction dots after wire deletion`);
+            wiringTool.refreshAllJunctionDots();
+          }
+
           // Trigger auto-save to persist netlist changes
           if (autoSave?.saveNow) {
             logger.canvas(`💾 Triggering auto-save after wire deletion`);
@@ -1977,71 +2100,28 @@ export function IDEFabricCanvas({
       // Remove the object from canvas
       fabricCanvas.remove(obj);
 
-      // Debug: Check for orphaned pins after component deletion
+      // For components (groups), pins are INSIDE the group, not on canvas
+      // So we don't need to search for orphaned pins separately
       if (objData?.type === "component" || obj.type === "group") {
         const componentId = objData?.componentId;
         logger.canvas(
-          `🔍 Starting orphaned object cleanup for component: ${componentId}`
+          `✅ Component ${componentId} removed (pins were inside the group)`
         );
 
+        // Still check for any OTHER orphaned objects related to this component (not pins)
         const allObjects = fabricCanvas.getObjects();
-        logger.canvas(`📊 Total objects on canvas: ${allObjects.length}`);
-
-        // Log all pin objects for debugging
-        const allPins = allObjects.filter((canvasObj: any) => {
-          const canvasObjData = canvasObj.data;
-          return canvasObjData?.type === "pin";
-        });
-
-        logger.canvas(`📍 Total pins on canvas: ${allPins.length}`);
-        allPins.forEach((pin, index) => {
-          const pinData = (pin as any).data;
-          logger.canvas(
-            `  Pin ${index + 1}: ${pinData?.componentId}:${
-              pinData?.pinNumber
-            } (target: ${componentId})`
-          );
-        });
-
-        const orphanedPins = allObjects.filter((canvasObj: any) => {
-          const canvasObjData = canvasObj.data;
-          const isPin = canvasObjData?.type === "pin";
-          const matchesComponent = canvasObjData?.componentId === componentId;
-
-          if (isPin) {
-            logger.canvas(
-              `🔍 Pin check: ${canvasObjData?.componentId}:${canvasObjData?.pinNumber} - matches target ${componentId}? ${matchesComponent}`
-            );
-          }
-
-          return isPin && matchesComponent;
-        });
-
-        if (orphanedPins.length > 0) {
-          logger.canvas(
-            `🔍 Found ${orphanedPins.length} orphaned pins after component deletion, removing them...`
-          );
-          orphanedPins.forEach((orphanPin) => {
-            fabricCanvas.remove(orphanPin);
-            logger.canvas(
-              `🗑️ Removed orphaned pin: ${
-                (orphanPin as any).data?.componentId
-              }:${(orphanPin as any).data?.pinNumber}`
-            );
-          });
-        } else {
-          logger.canvas(`✅ No orphaned pins found after component deletion`);
-        }
-
-        // Also check for any other orphaned objects related to this component
         const orphanedObjects = allObjects.filter((canvasObj: any) => {
           const canvasObjData = canvasObj.data;
-          return canvasObjData?.componentId === objData?.componentId;
+          // Don't look for pins - they were in the group
+          return (
+            canvasObjData?.componentId === objData?.componentId &&
+            canvasObjData?.type !== "pin"
+          );
         });
 
         if (orphanedObjects.length > 0) {
           logger.canvas(
-            `🔍 Found ${orphanedObjects.length} total orphaned objects for component ${objData?.componentId}:`
+            `🔍 Found ${orphanedObjects.length} orphaned objects for component ${objData?.componentId}:`
           );
           orphanedObjects.forEach((orphanObj, index) => {
             const orphanData = (orphanObj as any).data;
@@ -2059,6 +2139,31 @@ export function IDEFabricCanvas({
     },
     [fabricCanvas, netlist, wiringTool, autoSave]
   );
+
+  // Listen for external delete requests (from agent/AI commands)
+  useEffect(() => {
+    const handleExecuteDelete = (event: CustomEvent) => {
+      const { component } = event.detail;
+      if (component && fabricCanvas) {
+        logger.canvas("🤖 Executing AI-triggered deletion with cleanup");
+        handleObjectDeletion(component);
+        fabricCanvas.renderAll();
+        debouncedSaveState(); // Save for undo/redo
+      }
+    };
+
+    window.addEventListener(
+      "executeDelete",
+      handleExecuteDelete as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "executeDelete",
+        handleExecuteDelete as EventListener
+      );
+    };
+  }, [fabricCanvas, handleObjectDeletion, debouncedSaveState]);
 
   const handleCopy = () => {
     logger.canvas("DEBUG: handleCopy called");
@@ -2236,25 +2341,59 @@ export function IDEFabricCanvas({
     logger.canvas("--- ACTION END: handleRedo ---");
   };
 
-  const handleSave = async () => {
-    logger.canvas("--- ACTION START: handleSave ---");
+  const handleSave = useCallback(async () => {
+    logger.canvas("🔵 --- ACTION START: handleSave ---");
+    logger.canvas("🔍 handleSave debug:", {
+      hasCurrentProject: !!currentProject,
+      projectId: currentProject?.id,
+      hasOnSave: !!onSave,
+      hasAutoSave: !!autoSave,
+      autoSaveSaveNowType: typeof autoSave?.saveNow,
+    });
+
     if (!currentProject) {
-      logger.canvas("Cannot save: no project loaded");
+      logger.canvas("❌ Cannot save: no project loaded");
+      alert("Cannot save: No project loaded");
       return;
     }
 
     try {
       // Use the shared save function if provided, otherwise fallback to auto-save
       if (onSave) {
+        logger.canvas("✅ Calling onSave prop function...");
         await onSave();
+        logger.canvas("✅ onSave completed successfully");
       } else {
-        autoSave.saveNow();
+        logger.canvas("⚠️ No onSave prop, using autoSave.saveNow...");
+        await autoSave.saveNow();
+        logger.canvas("✅ autoSave.saveNow completed successfully");
       }
-      logger.canvas("--- ACTION END: handleSave ---");
+      logger.canvas("🟢 --- ACTION END: handleSave ---");
     } catch (error) {
-      logger.canvas("--- ACTION FAILED: handleSave ---", error);
+      logger.canvas("🔴 --- ACTION FAILED: handleSave ---", error);
+      console.error("Save failed:", error);
+
+      // Show error notification
+      const errorNotification = document.createElement("div");
+      errorNotification.textContent = `❌ Save failed: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`;
+      errorNotification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #ef4444;
+        color: white;
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-weight: 500;
+        z-index: 10000;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      `;
+      document.body.appendChild(errorNotification);
+      setTimeout(() => errorNotification.remove(), 3000);
     }
-  };
+  }, [currentProject, onSave, autoSave]);
 
   // PART 3: The Connection (The Central Hub)
   // PART 3: The Connection (The Central Hub) - TEMPORARILY DISABLED FOR DIRECT TESTING
@@ -2422,67 +2561,69 @@ export function IDEFabricCanvas({
       className={`w-full h-full canvas-container ${className}`}
       style={{ width: "100%", height: "100%" }}
     >
-      {/* Rulers Layout - Only visible when manipulating objects */}
+      {/* Rulers Layout - Always rendered, visibility controlled by opacity */}
       <div className="relative w-full h-full">
-        {areRulersVisible && (
-          <>
-            {/* Top-left corner space */}
-            <div
-              className="absolute top-0 left-0 border-b border-r border-gray-300"
-              style={{
-                width: rulerSize,
-                height: rulerSize,
-                background: "linear-gradient(135deg, #fafafa 0%, #f0f0f0 100%)",
-                zIndex: 10,
-              }}
-            />
+        {/* Top-left corner space */}
+        <div
+          className="absolute top-0 left-0 border-b border-r border-gray-300 transition-opacity duration-200"
+          style={{
+            width: rulerSize,
+            height: rulerSize,
+            background: "linear-gradient(135deg, #fafafa 0%, #f0f0f0 100%)",
+            zIndex: 10,
+            opacity: areRulersVisible ? 1 : 0,
+            pointerEvents: areRulersVisible ? "auto" : "none",
+          }}
+        />
 
-            {/* Horizontal Ruler */}
-            <div
-              className="absolute top-0"
-              style={{
-                left: rulerSize,
-                width: canvasDimensions.width,
-                height: rulerSize,
-                zIndex: 10,
-              }}
-            >
-              <HorizontalRuler
-                width={canvasDimensions.width}
-                height={rulerSize}
-                viewportTransform={viewportState.viewportTransform}
-                zoom={viewportState.zoom}
-              />
-            </div>
+        {/* Horizontal Ruler */}
+        <div
+          className="absolute top-0 transition-opacity duration-200"
+          style={{
+            left: rulerSize,
+            width: canvasDimensions.width,
+            height: rulerSize,
+            zIndex: 10,
+            opacity: areRulersVisible ? 1 : 0,
+            pointerEvents: areRulersVisible ? "auto" : "none",
+          }}
+        >
+          <HorizontalRuler
+            width={canvasDimensions.width}
+            height={rulerSize}
+            viewportTransform={viewportState.viewportTransform}
+            zoom={viewportState.zoom}
+          />
+        </div>
 
-            {/* Vertical Ruler */}
-            <div
-              className="absolute left-0"
-              style={{
-                top: rulerSize,
-                width: rulerSize,
-                height: canvasDimensions.height,
-                zIndex: 10,
-              }}
-            >
-              <VerticalRuler
-                width={rulerSize}
-                height={canvasDimensions.height}
-                viewportTransform={viewportState.viewportTransform}
-                zoom={viewportState.zoom}
-              />
-            </div>
-          </>
-        )}
+        {/* Vertical Ruler */}
+        <div
+          className="absolute left-0 transition-opacity duration-200"
+          style={{
+            top: rulerSize,
+            width: rulerSize,
+            height: canvasDimensions.height,
+            zIndex: 10,
+            opacity: areRulersVisible ? 1 : 0,
+            pointerEvents: areRulersVisible ? "auto" : "none",
+          }}
+        >
+          <VerticalRuler
+            width={rulerSize}
+            height={canvasDimensions.height}
+            viewportTransform={viewportState.viewportTransform}
+            zoom={viewportState.zoom}
+          />
+        </div>
 
         {/* Main Canvas */}
         <div
           className="absolute"
           style={{
-            top: areRulersVisible ? rulerSize : 0,
-            left: areRulersVisible ? rulerSize : 0,
-            width: areRulersVisible ? canvasDimensions.width : "100%",
-            height: areRulersVisible ? canvasDimensions.height : "100%",
+            top: rulerSize,
+            left: rulerSize,
+            width: canvasDimensions.width,
+            height: canvasDimensions.height,
           }}
         >
           <canvas ref={canvasRef} />
