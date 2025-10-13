@@ -15,10 +15,6 @@ interface ProjectState {
   lastSaved: Date | null;
   isDirty: boolean; // Has unsaved changes
 
-  // Auto-save configuration
-  autoSaveEnabled: boolean;
-  autoSaveInterval: number; // milliseconds
-
   // Actions
   setProject: (
     projectId: string,
@@ -30,10 +26,6 @@ interface ProjectState {
   markClean: () => void;
   setLastSaved: (date: Date) => void;
   clearProject: () => void;
-
-  // Auto-save settings
-  setAutoSaveEnabled: (enabled: boolean) => void;
-  setAutoSaveInterval: (interval: number) => void;
 }
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
@@ -44,8 +36,6 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   circuit: null,
   lastSaved: null,
   isDirty: false,
-  autoSaveEnabled: true,
-  autoSaveInterval: 120000, // Increased to 2 minutes for better performance
 
   // Actions
   setProject: (projectId: string, versionId: string, projectName: string) => {
@@ -96,15 +86,5 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       lastSaved: null,
       isDirty: false,
     });
-  },
-
-  setAutoSaveEnabled: (enabled: boolean) => {
-    logger.component("Auto-save enabled:", enabled);
-    set({ autoSaveEnabled: enabled });
-  },
-
-  setAutoSaveInterval: (interval: number) => {
-    logger.component("Auto-save interval set to:", interval, "ms");
-    set({ autoSaveInterval: interval });
   },
 }));

@@ -386,8 +386,10 @@ export const addComponentTool: Tool = {
       success: true,
       component_id: instanceId,
       name: component.name,
+      pins: pins,
+      pin_count: pins.length,
       position: position,
-      message: `Added ${component.name} at (${position.x}, ${position.y})`,
+      message: `✅ Added ${component.name} (ID: ${instanceId}) with ${pins.length} pins at position (${position.x}, ${position.y})`,
     };
   },
 };
@@ -399,7 +401,7 @@ export const addComponentTool: Tool = {
 export const getCanvasStateTool: Tool = {
   name: "get_canvas_state",
   description:
-    "Get the current state of the canvas including all components and their positions. Use this to understand what's already on the canvas before adding more components.",
+    "Get the current state of the canvas including all components, their positions, and existing wire connections. Use this to understand what's already on the canvas and what components are already connected.",
   parameters: {
     type: "object",
     properties: {},
@@ -421,16 +423,68 @@ export const getCanvasStateTool: Tool = {
       (obj: any) => obj.data?.type === "component"
     );
 
-    const componentList = components.map((comp: any) => ({
-      id: comp.id,
-      name: comp.data?.componentName,
-      type: comp.componentType,
-      position: {
-        x: Math.round(comp.left || 0),
-        y: Math.round(comp.top || 0),
-      },
-      rotation: comp.angle || 0,
-    }));
+    const componentList = components.map((comp: any) => {
+      // Extract pin information from the component group
+      const pins: Array<{ number: string; name?: string }> = [];
+      if (comp.type === "group") {
+        const groupObjects = (comp as fabric.Group).getObjects();
+        groupObjects.forEach((obj: any) => {
+          if (obj.data?.type === "pin") {
+            pins.push({
+              number: obj.data.pinNumber?.toString() || "?",
+              name: obj.data.pinName || undefined,
+            });
+          }
+        });
+      }
+
+      return {
+        id: comp.id,
+        name: comp.data?.componentName,
+        type: comp.componentType,
+        position: {
+          x: Math.round(comp.left || 0),
+          y: Math.round(comp.top || 0),
+        },
+        rotation: comp.angle || 0,
+        pins: pins.sort((a, b) => parseInt(a.number) - parseInt(b.number)),
+        pin_count: pins.length,
+      };
+    });
+
+    // Extract wire/connection information
+    const wires = objects.filter(
+      (obj: any) => obj.wireType === "connection" || obj.connectionData
+    );
+
+    const connectionList = wires
+      .map((wire: any) => {
+        const connData = wire.connectionData;
+        if (!connData) return null;
+
+        // Find component names for better readability
+        const fromComponent = componentList.find(
+          (c) => c.id === connData.fromComponentId
+        );
+        const toComponent = componentList.find(
+          (c) => c.id === connData.toComponentId
+        );
+
+        return {
+          from_component: {
+            id: connData.fromComponentId,
+            name: fromComponent?.name || "Unknown",
+            pin: connData.fromPinNumber,
+          },
+          to_component: {
+            id: connData.toComponentId,
+            name: toComponent?.name || "Unknown",
+            pin: connData.toPinNumber,
+          },
+          wire_id: wire.id || `wire_${Math.random().toString(36).substr(2, 9)}`,
+        };
+      })
+      .filter(Boolean);
 
     return {
       success: true,
@@ -440,25 +494,149 @@ export const getCanvasStateTool: Tool = {
       },
       component_count: componentList.length,
       components: componentList,
+      connection_count: connectionList.length,
+      connections: connectionList,
+      message: `Canvas has ${componentList.length} component(s) and ${connectionList.length} wire connection(s). Each component listed with its ID, name, and available pins. All existing connections are shown.`,
     };
   },
 };
 
 /**
- * Tool 4: Draw Wire
+ * Tool 4: Get Component Connections
+ * Find all wires connected to a specific component
+ */
+export const getComponentConnectionsTool: Tool = {
+  name: "get_component_connections",
+  description:
+    "Get all wire connections for a specific component. Use this when you need to know what a particular component is connected to. Requires the component's instance ID (starting with 'component_').",
+  parameters: {
+    type: "object",
+    properties: {
+      component_id: {
+        type: "string",
+        description:
+          "The instance ID of the component to check connections for (must start with 'component_')",
+      },
+    },
+    required: ["component_id"],
+  },
+  execute: async (context: AgentContext, args: { component_id: string }) => {
+    logger.debug("🔧 Tool: get_component_connections", args);
+
+    const canvas = canvasCommandManager.getCanvas();
+    if (!canvas) {
+      return {
+        success: false,
+        message: "Canvas not available",
+      };
+    }
+
+    const objects = canvas.getObjects();
+
+    // Find the component
+    const component = objects.find(
+      (obj: any) =>
+        obj.data?.type === "component" &&
+        (obj.id === args.component_id || obj.objectId === args.component_id)
+    );
+
+    if (!component) {
+      return {
+        success: false,
+        message: `Component with ID ${args.component_id} not found on canvas`,
+      };
+    }
+
+    const componentName =
+      (component as any).data?.componentName || "Unknown Component";
+
+    // Find all wires connected to this component
+    const wires = objects.filter(
+      (obj: any) => obj.wireType === "connection" || obj.connectionData
+    );
+
+    const connections = wires
+      .map((wire: any) => {
+        const connData = wire.connectionData;
+        if (!connData) return null;
+
+        // Check if this wire is connected to our target component
+        if (connData.fromComponentId === args.component_id) {
+          // This component is the source
+          const toComponent = objects.find(
+            (obj: any) =>
+              obj.data?.type === "component" &&
+              (obj.id === connData.toComponentId ||
+                obj.objectId === connData.toComponentId)
+          );
+          const toComponentName = toComponent
+            ? (toComponent as any).data?.componentName || "Unknown"
+            : "Unknown";
+
+          return {
+            direction: "outgoing",
+            pin: connData.fromPinNumber,
+            connected_to: {
+              component_id: connData.toComponentId,
+              component_name: toComponentName,
+              pin: connData.toPinNumber,
+            },
+          };
+        } else if (connData.toComponentId === args.component_id) {
+          // This component is the destination
+          const fromComponent = objects.find(
+            (obj: any) =>
+              obj.data?.type === "component" &&
+              (obj.id === connData.fromComponentId ||
+                obj.objectId === connData.fromComponentId)
+          );
+          const fromComponentName = fromComponent
+            ? (fromComponent as any).data?.componentName || "Unknown"
+            : "Unknown";
+
+          return {
+            direction: "incoming",
+            pin: connData.toPinNumber,
+            connected_from: {
+              component_id: connData.fromComponentId,
+              component_name: fromComponentName,
+              pin: connData.fromPinNumber,
+            },
+          };
+        }
+
+        return null;
+      })
+      .filter(Boolean);
+
+    return {
+      success: true,
+      component: {
+        id: args.component_id,
+        name: componentName,
+      },
+      connection_count: connections.length,
+      connections: connections,
+      message: `${componentName} has ${connections.length} wire connection(s).`,
+    };
+  },
+};
+
+/**
+ * Tool 5: Draw Wire
  * Connect two component pins with a wire
  */
 export const drawWireTool: Tool = {
   name: "draw_wire",
   description:
-    "Draw a wire connection between two component pins. Use this to connect components electrically. Requires the component IDs and pin numbers from the components on the canvas. First use get_canvas_state to see available components and their pins.",
+    "Draw a wire connection between two component pins. Use this to connect components electrically. IMPORTANT: You MUST use the component INSTANCE IDs (starting with 'component_') from either selected components context or get_canvas_state results. NEVER use database UIDs or component names. If components are selected (check SELECTED COMPONENTS CONTEXT in system prompt), use their IDs directly. Otherwise, use get_canvas_state to find component IDs first. Requires exact component instance IDs and pin numbers.",
   parameters: {
     type: "object",
     properties: {
       from_component_id: {
         type: "string",
         description:
-          "The canvas ID of the starting component (e.g., 'U1', 'R1', use get_canvas_state to find)",
+          "The INSTANCE ID of the starting component (must start with 'component_', from selected components or get_canvas_state)",
       },
       from_pin: {
         type: "string",
@@ -468,7 +646,7 @@ export const drawWireTool: Tool = {
       to_component_id: {
         type: "string",
         description:
-          "The canvas ID of the ending component (e.g., 'U1', 'R1', use get_canvas_state to find)",
+          "The INSTANCE ID of the ending component (must start with 'component_', from selected components or get_canvas_state)",
       },
       to_pin: {
         type: "string",
@@ -513,17 +691,33 @@ export const drawWireTool: Tool = {
     ): fabric.Object | null => {
       const objects = canvas.getObjects();
 
+      logger.wire(`Looking for component ${componentId} pin ${pinNumber}`);
+
       for (const obj of objects) {
         if (obj.type === "group") {
           const group = obj as fabric.Group;
           const groupObjects = group.getObjects();
 
-          // Check if this is the right component (by objectId or id)
+          // Check if this is the right component by multiple possible ID fields
+          const objId = (obj as any).id;
+          const objObjectId = (obj as any).objectId;
+          const objUid = (obj as any).data?.componentMetadata?.uid;
+          const objName = (obj as any).data?.componentName;
+
           const isRightComponent =
-            (obj as any).objectId === componentId ||
-            (obj as any).id === componentId;
+            objId === componentId ||
+            objObjectId === componentId ||
+            objUid === componentId ||
+            (componentId.startsWith("component_") && objId === componentId) ||
+            (componentId.startsWith("component_") &&
+              objObjectId === componentId);
+
+          logger.wire(
+            `Checking component: id=${objId}, objectId=${objObjectId}, uid=${objUid}, name=${objName}, isMatch=${isRightComponent}`
+          );
 
           if (isRightComponent) {
+            logger.wire(`Found matching component ${objId} for ${componentId}`);
             // Find the pin within this component
             for (const child of groupObjects) {
               const pinData = (child as any).data;
@@ -531,28 +725,30 @@ export const drawWireTool: Tool = {
                 pinData?.type === "pin" &&
                 pinData?.pinNumber?.toString() === pinNumber
               ) {
+                logger.wire(
+                  `Found pin ${pinNumber} on component ${componentId}`
+                );
                 return child;
               }
             }
+            logger.wire(
+              `Pin ${pinNumber} not found on component ${componentId}`
+            );
           }
         }
       }
 
+      logger.wire(`Component ${componentId} not found on canvas`);
       return null;
     };
 
     // Helper to get absolute pin position
     const getPinWorldCoordinates = (pin: fabric.Object) => {
-      const group = pin.group;
-      if (!group) return pin.getCenterPoint();
-
-      const pinCenter = pin.getCenterPoint();
-      const groupMatrix = group.calcTransformMatrix();
-      const point = fabric.util.transformPoint(
-        new fabric.Point(pinCenter.x, pinCenter.y),
-        groupMatrix
+      const identityMatrix = [1, 0, 0, 1, 0, 0] as fabric.TMat2D;
+      return fabric.util.transformPoint(
+        new fabric.Point(pin.left || 0, pin.top || 0),
+        pin.group?.calcTransformMatrix() || identityMatrix
       );
-      return point;
     };
 
     try {
@@ -561,11 +757,25 @@ export const drawWireTool: Tool = {
       const toPin = findPin(args.to_component_id, args.to_pin);
 
       if (!fromPin) {
+        // Get available components for better error message
+        const availableComponents = canvas
+          .getObjects()
+          .filter((obj: any) => obj.data?.type === "component")
+          .map((obj: any) => ({
+            id: obj.id,
+            name: obj.data?.componentName,
+            uid: obj.data?.componentMetadata?.uid,
+          }));
+
+        logger.wire("Available components:", availableComponents);
+
         return {
           success: false,
           message: `Pin ${args.from_pin} not found on component ${cleanName(
             args.from_component_id
-          )}`,
+          )}. Make sure you're using the correct INSTANCE ID (starting with 'component_') from get_canvas_state, not a database UID. Available components: ${availableComponents
+            .map((c) => `${c.name} (${c.id})`)
+            .join(", ")}`,
         };
       }
 
@@ -574,7 +784,7 @@ export const drawWireTool: Tool = {
           success: false,
           message: `Pin ${args.to_pin} not found on component ${cleanName(
             args.to_component_id
-          )}`,
+          )}. Make sure you're using the correct INSTANCE ID (starting with 'component_') from get_canvas_state, not a database UID.`,
         };
       }
 
@@ -587,11 +797,19 @@ export const drawWireTool: Tool = {
           component: args.from_component_id,
           pin: args.from_pin,
           coords: fromCoords,
+          pinGroupId: fromPin.group ? (fromPin.group as any).id : "no-group",
+          pinGroupDataId: fromPin.group
+            ? (fromPin.group as any).data?.componentId
+            : "no-data",
         },
         to: {
           component: args.to_component_id,
           pin: args.to_pin,
           coords: toCoords,
+          pinGroupId: toPin.group ? (toPin.group as any).id : "no-group",
+          pinGroupDataId: toPin.group
+            ? (toPin.group as any).data?.componentId
+            : "no-data",
         },
       });
 
@@ -645,6 +863,25 @@ export const drawWireTool: Tool = {
 
       // Add wire to canvas
       canvas.add(wire);
+
+      // CRITICAL: Register wire with the wiring tool so it updates when components move
+      const wiringTool = (window as any).__wiringTool;
+      if (wiringTool && wiringTool.registerRestoredWire) {
+        wiringTool.registerRestoredWire(
+          wire,
+          args.from_component_id,
+          args.from_pin,
+          args.to_component_id,
+          args.to_pin
+        );
+        logger.wire(
+          "✅ Wire registered with wiring tool for movement tracking"
+        );
+      } else {
+        logger.warn(
+          "⚠️ Wiring tool not available - wire won't update on component movement"
+        );
+      }
 
       // Create endpoint dots
       const fromDot = new fabric.Circle({
@@ -706,7 +943,7 @@ export const drawWireTool: Tool = {
 };
 
 /**
- * Tool 5: Delete Component
+ * Tool 6: Delete Component
  * Remove a component from the canvas
  */
 export const deleteComponentTool: Tool = {
@@ -772,6 +1009,7 @@ export const allTools: Tool[] = [
   componentSearchTool,
   addComponentTool,
   getCanvasStateTool,
+  getComponentConnectionsTool,
   drawWireTool,
   deleteComponentTool,
 ];

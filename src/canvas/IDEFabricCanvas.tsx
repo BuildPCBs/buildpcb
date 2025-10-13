@@ -12,7 +12,6 @@ import {
 import { useCanvasHotkeys } from "./hooks/useCanvasHotkeys";
 import { useSimpleWiringTool } from "./hooks/useSimpleWiringTool";
 import { useCanvasViewport } from "./hooks/useCanvasViewport";
-import { useCanvasAutoSave } from "./hooks/useCanvasAutoSave";
 import { useHistoryStack } from "./hooks/useHistoryStack";
 import { memoryMonitor } from "@/lib/memory-monitor";
 import { logger } from "@/lib/logger";
@@ -125,6 +124,16 @@ export function IDEFabricCanvas({
     },
   });
 
+  // Expose wiringTool globally for agent access
+  // This allows the agent's drawWireTool to register wires properly
+  // Update the reference whenever wiringTool changes (without re-logging)
+  useEffect(() => {
+    (window as any).__wiringTool = wiringTool;
+    return () => {
+      delete (window as any).__wiringTool;
+    };
+  }, [wiringTool]);
+
   // Keep netlistRef in sync with parent's netlist state (source of truth)
   useEffect(() => {
     netlistRef.current = netlist;
@@ -147,13 +156,6 @@ export function IDEFabricCanvas({
       previousProjectIdRef.current = currentProjectId;
     }
   }, [currentProject?.id]);
-
-  // Auto-save functionality
-  const autoSave = useCanvasAutoSave({
-    canvas: fabricCanvas,
-    netlist: () => netlistRef.current, // Use ref for current value (avoids stale closure)
-    enabled: !!currentProject, // Only enable when we have a project
-  });
 
   // History stack for undo/redo
   const {
@@ -605,20 +607,29 @@ export function IDEFabricCanvas({
             );
           }
 
-          // Check objects within groups
+          // CRITICAL FIX: Check if THIS GROUP is the right component first
+          // This prevents wires from connecting to the wrong instance when multiple components exist
+          const isTargetComponent =
+            (obj as any).id === componentId ||
+            (obj as any).data?.componentId === componentId;
+
+          if (!isTargetComponent) {
+            continue; // Skip this group - it's not the component we're looking for
+          }
+
+          logger.wire(`✅ Found target component group: ${componentId}`);
+
+          // Check objects within THIS specific group
           const groupObjects = (obj as fabric.Group).getObjects();
           for (const groupObj of groupObjects) {
             const pinData = (groupObj as any).data;
             if (pinData && pinData.type === "pin") {
               totalPinsChecked++;
               logger.wire(
-                `📍 Found pin: ${pinData.componentId}:${pinData.pinNumber}`
+                `📍 Found pin in target component: ${pinData.pinNumber}`
               );
 
-              if (
-                pinData.componentId === componentId &&
-                pinData.pinNumber.toString() === pinNumber.toString()
-              ) {
+              if (pinData.pinNumber.toString() === pinNumber.toString()) {
                 logger.wire(
                   `✅ Found matching pin: ${componentId}:${pinNumber}`
                 );
@@ -2015,11 +2026,7 @@ export function IDEFabricCanvas({
             wiringTool.refreshAllJunctionDots();
           }
 
-          // Trigger auto-save to persist netlist changes
-          if (autoSave?.saveNow) {
-            logger.canvas(`💾 Triggering auto-save after component deletion`);
-            autoSave.saveNow();
-          }
+          // Auto-save removed - manual save only via Export button
         }
       }
 
@@ -2089,11 +2096,7 @@ export function IDEFabricCanvas({
             wiringTool.refreshAllJunctionDots();
           }
 
-          // Trigger auto-save to persist netlist changes
-          if (autoSave?.saveNow) {
-            logger.canvas(`💾 Triggering auto-save after wire deletion`);
-            autoSave.saveNow();
-          }
+          // Auto-save removed - manual save only via Export button
         }
       }
 
@@ -2137,7 +2140,7 @@ export function IDEFabricCanvas({
 
       logger.canvas(`✅ Object removed from canvas`);
     },
-    [fabricCanvas, netlist, wiringTool, autoSave]
+    [fabricCanvas, netlist, wiringTool]
   );
 
   // Listen for external delete requests (from agent/AI commands)
@@ -2347,8 +2350,6 @@ export function IDEFabricCanvas({
       hasCurrentProject: !!currentProject,
       projectId: currentProject?.id,
       hasOnSave: !!onSave,
-      hasAutoSave: !!autoSave,
-      autoSaveSaveNowType: typeof autoSave?.saveNow,
     });
 
     if (!currentProject) {
@@ -2358,15 +2359,13 @@ export function IDEFabricCanvas({
     }
 
     try {
-      // Use the shared save function if provided, otherwise fallback to auto-save
+      // Use the shared save function
       if (onSave) {
         logger.canvas("✅ Calling onSave prop function...");
         await onSave();
         logger.canvas("✅ onSave completed successfully");
       } else {
-        logger.canvas("⚠️ No onSave prop, using autoSave.saveNow...");
-        await autoSave.saveNow();
-        logger.canvas("✅ autoSave.saveNow completed successfully");
+        throw new Error("Save function not available");
       }
       logger.canvas("🟢 --- ACTION END: handleSave ---");
     } catch (error) {
@@ -2393,7 +2392,7 @@ export function IDEFabricCanvas({
       document.body.appendChild(errorNotification);
       setTimeout(() => errorNotification.remove(), 3000);
     }
-  }, [currentProject, onSave, autoSave]);
+  }, [currentProject, onSave]);
 
   // PART 3: The Connection (The Central Hub)
   // PART 3: The Connection (The Central Hub) - TEMPORARILY DISABLED FOR DIRECT TESTING
@@ -2685,55 +2684,6 @@ export function IDEFabricCanvas({
           )}
         </div>
       )} */}
-
-      {/* Auto-save status indicator */}
-      {currentProject && (
-        <div className="absolute top-2 left-1/2 transform -translate-x-1/2 bg-gray-800 bg-opacity-90 text-white px-3 py-1 rounded text-xs">
-          <div className="flex items-center gap-2">
-            {autoSave.saving && (
-              <div className="w-2 h-2 bg-yellow-400 rounded-full animate-spin"></div>
-            )}
-            {!autoSave.saving && autoSave.isDirty && (
-              <div className="w-2 h-2 bg-orange-400 rounded-full"></div>
-            )}
-            {!autoSave.saving && !autoSave.isDirty && (
-              <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-            )}
-            {autoSave.saving ? (
-              <span>Saving...</span>
-            ) : autoSave.isDirty ? (
-              <span>Unsaved changes</span>
-            ) : autoSave.lastSaved ? (
-              <div className="flex items-center gap-2">
-                <span>Saved {autoSave.lastSaved.toLocaleTimeString()}</span>
-                <span className="text-gray-300">•</span>
-                <EditableProjectName
-                  onRenameSuccess={(newName) => {
-                    console.log(`✅ Project renamed to: ${newName}`);
-                  }}
-                  onRenameError={(error) => {
-                    console.error(`❌ Failed to rename project: ${error}`);
-                  }}
-                />
-              </div>
-            ) : (
-              <EditableProjectName
-                onRenameSuccess={(newName) => {
-                  console.log(`✅ Project renamed to: ${newName}`);
-                }}
-                onRenameError={(error) => {
-                  console.error(`❌ Failed to rename project: ${error}`);
-                }}
-              />
-            )}
-          </div>
-          {autoSave.error && (
-            <div className="text-xs text-red-300 mt-1">
-              Save failed: {autoSave.error}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Component Picker Overlay */}
       <ComponentPickerOverlay

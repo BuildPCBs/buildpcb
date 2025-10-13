@@ -142,7 +142,7 @@ export class AgentService {
     } = {}
   ): Promise<AgentResult> {
     const { userId, history, selectedComponents, onContentUpdate } = options;
-    logger.info(`🧠 Executing natural language command`, { 
+    logger.info(`🧠 Executing natural language command`, {
       prompt,
       selectedComponentsCount: selectedComponents?.length || 0,
     });
@@ -169,7 +169,11 @@ export class AgentService {
         context.selectedComponents = selectedComponents;
         logger.info(`📦 Selected components context:`, {
           count: selectedComponents.length,
-          components: selectedComponents.map(c => ({ id: c.id, name: c.name, type: c.type })),
+          components: selectedComponents.map((c) => ({
+            id: c.id,
+            name: c.name,
+            type: c.type,
+          })),
         });
       }
 

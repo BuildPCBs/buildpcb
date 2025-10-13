@@ -14,7 +14,6 @@ import { useProject } from "@/contexts/ProjectContext";
 import { Circuit } from "@/lib/schemas/circuit";
 import { canvasCommandManager } from "@/canvas/canvas-command-manager";
 import { useAIChat } from "@/contexts/AIChatContext";
-import { useCanvasAutoSave } from "@/canvas/hooks/useCanvasAutoSave";
 import { useProjectStore } from "@/store/projectStore";
 
 interface TopToolbarProps {
@@ -39,15 +38,8 @@ export function TopToolbar({
   const { messages } = useAIChat();
   const isProjectDirty = useProjectStore((state) => state.isDirty);
 
-  // Get canvas instance for auto-save
+  // Get canvas instance for save functionality
   const canvas = canvasCommandManager.getCanvas();
-
-  // Use the same auto-save mechanism as Ctrl+S
-  const autoSave = useCanvasAutoSave({
-    canvas,
-    netlist: getNetlist ? getNetlist() : [],
-    enabled: !!currentProject, // Only enable when project is loaded
-  });
 
   // Track last save time for better status display
   const [lastSaveTime, setLastSaveTime] = useState<Date | null>(null);
@@ -124,12 +116,11 @@ export function TopToolbar({
         messageCount: overrideMessages?.length || 0,
       });
 
-      // Use the shared save function with override messages
+      // Use the shared save function
       if (onSave) {
         await onSave(overrideMessages);
       } else {
-        // Fallback to auto-save if no shared function provided
-        await autoSave.saveNow(overrideMessages);
+        throw new Error("Save function not available");
       }
 
       // Update last save time

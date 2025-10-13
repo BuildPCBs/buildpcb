@@ -93,7 +93,9 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
           console.log(
             `📦 Loading SVG for ${payload.name}, svgLength: ${svgString.length}`
           );
-          const svgLoadResult = await fabric.loadSVGFromString(svgString);
+          // Clean the SVG string to remove namespace prefixes like 'ns0:'
+          const cleanedSvgString = svgString.replace(/ns0:/g, "").replace(/xmlns:ns0="[^"]+"/g, "");
+          const svgLoadResult = await fabric.loadSVGFromString(cleanedSvgString);
           const allSvgObjects = svgLoadResult.objects;
 
           // Disable image smoothing on all SVG objects for crisp rendering at all zoom levels

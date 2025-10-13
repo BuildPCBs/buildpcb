@@ -127,8 +127,8 @@ export function AIChatInterface({
     const unsubscribe = streamingHandler.subscribe((message) => {
       setStreamMessages((prev) => {
         const updated = [...prev, message];
-        if (updated.length > 4) {
-          return updated.slice(-4);
+        if (updated.length > 1) {
+          return updated.slice(-1);
         }
         return updated;
       });
@@ -455,45 +455,6 @@ export function AIChatInterface({
                       /* AI Response - Full Width Text Block */
                       <div className="w-full">
                         <div className="w-full p-2.5 bg-gray-50 rounded-lg border border-gray-100">
-                          {/* Streaming Status Indicator - Shows before/during content */}
-                          {message.isStreaming && message.streamingStatus && (
-                            <div
-                              className="flex items-center mb-2 px-2 py-1.5 rounded"
-                              style={{
-                                backgroundColor: "#EFF6FF",
-                                border: "1px solid #3B82F6",
-                              }}
-                            >
-                              <div className="flex-shrink-0 mr-2">
-                                <svg
-                                  className="w-3 h-3 text-blue-600 animate-spin"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <circle
-                                    className="opacity-25"
-                                    cx="12"
-                                    cy="12"
-                                    r="10"
-                                    stroke="currentColor"
-                                    strokeWidth="4"
-                                  />
-                                  <path
-                                    className="opacity-75"
-                                    fill="currentColor"
-                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                  />
-                                </svg>
-                              </div>
-                              <span
-                                className="text-blue-800 font-medium"
-                                style={{ fontSize: responsive(8) }}
-                              >
-                                {message.streamingStatus}
-                              </span>
-                            </div>
-                          )}
-
                           {/* Response Content */}
                           {message.content && (
                             <div
@@ -576,41 +537,6 @@ export function AIChatInterface({
                                   className="inline-block ml-1 w-1.5 h-4 bg-blue-600 animate-pulse"
                                   style={{ verticalAlign: "middle" }}
                                 />
-                              )}
-                            </div>
-                          )}
-
-                          {/* Status Indicator for Processing States */}
-                          {message.status && message.status !== "complete" && (
-                            <div className="flex items-center gap-2 text-xs text-gray-500 mb-2">
-                              {message.status === "receiving" && (
-                                <>
-                                  <div className="flex gap-1">
-                                    <div className="w-1 h-1 bg-blue-400 rounded-full animate-pulse"></div>
-                                    <div
-                                      className="w-1 h-1 bg-blue-400 rounded-full animate-pulse"
-                                      style={{ animationDelay: "0.2s" }}
-                                    ></div>
-                                    <div
-                                      className="w-1 h-1 bg-blue-400 rounded-full animate-pulse"
-                                      style={{ animationDelay: "0.4s" }}
-                                    ></div>
-                                  </div>
-                                  <span className="text-blue-600 font-medium">
-                                    {message.content
-                                      ? "Streaming response..."
-                                      : "Thinking..."}
-                                  </span>
-                                </>
-                              )}
-                              {message.status === "parsing" && (
-                                <>
-                                  <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                                  <span>Processing...</span>
-                                </>
-                              )}
-                              {message.status === "error" && (
-                                <span className="text-red-500">⚠ Error</span>
                               )}
                             </div>
                           )}
@@ -715,20 +641,20 @@ export function AIChatInterface({
                             </div>
                           )}
                         </div>
+
+                        {/* Agent Stream Display - Shows after streaming assistant messages */}
+                        {message.type === "assistant" &&
+                          message.isStreaming &&
+                          streamMessages.length > 0 && (
+                            <div className="mt-2">
+                              <AgentStreamDisplay messages={streamMessages} />
+                            </div>
+                          )}
                       </div>
                     )}
                   </div>
                 );
               })}
-              {streamMessages.length > 0 && (
-                <div className="mb-4">
-                  <AgentStreamDisplay
-                    messages={streamMessages}
-                    width="100%"
-                    maxWidth="100%"
-                  />
-                </div>
-              )}
             </>
           )}
         </div>

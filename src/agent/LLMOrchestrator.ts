@@ -207,9 +207,6 @@ export class LLMOrchestrator {
 
         // Check if LLM wants to call tools
         if (message.tool_calls && message.tool_calls.length > 0) {
-          // Show user-friendly thinking message
-          context.streamer.think(getThinkingMessage(message.tool_calls.length));
-
           // Execute each tool call
           for (const toolCall of message.tool_calls) {
             if (toolCall.type !== "function") continue;
@@ -243,8 +240,7 @@ export class LLMOrchestrator {
         // No tool calls - LLM has finished
         if (message.content) {
           finalResponse = message.content;
-          const summary = this.getActionableSummary(finalResponse);
-          context.streamer.success(summary);
+          // Don't send summary to streamer - let the main response appear in chat
           break;
         }
 
@@ -343,9 +339,10 @@ Your role is to help users design electronic circuits by:
 Available tools:
 1. component_search: Find components in the library (returns MULTIPLE variants)
 2. add_component: Place a component on the canvas (use exact UID from search)
-3. get_canvas_state: See what's currently on the canvas
-4. draw_wire: Connect two component pins
-5. delete_component: Remove a component
+3. get_canvas_state: See what's currently on the canvas AND all existing wire connections
+4. get_component_connections: Check what a specific component is connected to
+5. draw_wire: Connect two component pins
+6. delete_component: Remove a component
 
 COMPONENT SEARCH WORKFLOW (CRITICAL):
 1. ALWAYS call component_search FIRST with natural language query
@@ -362,6 +359,26 @@ User: "add a 555 timer"
 → component_search(query: "555 timer")
 → Receives: [NE555P_unit1 (DIP-8), NE555D_unit1 (SOIC-8), TLC555_unit1 (CMOS)]
 → Choose NE555P_unit1 for breadboard (most common)
+→ add_component(component_uid: "actual-uid-from-search")
+
+COMPONENT TRACKING (CRITICAL FOR WIRING):
+When adding multiple components, TRACK each component_id and name returned:
+- Store in your reasoning: "R1_id = component_xxx, R2_id = component_yyy"
+- Use get_canvas_state to see all components with their IDs and pins
+- Before wiring, verify you have the correct component INSTANCE IDs (starting with 'component_')
+- Component names in canvas state show what each ID represents
+- NEVER use database UIDs or component names for wiring - always use instance IDs
+
+Example multi-component workflow:
+User: "build LED circuit with 555 timer"
+1. Search and add 555 timer → track its INSTANCE ID (e.g., component_abc123)
+2. Search and add LED → track its INSTANCE ID (e.g., component_def456)
+3. Search and add resistor → track its INSTANCE ID (e.g., component_ghi789)
+4. Call get_canvas_state to verify all components, their pins, and any existing connections
+5. Wire using tracked INSTANCE IDs: draw_wire(component_abc123, "3", component_ghi789, "1")
+
+ALWAYS call get_canvas_state before wiring to refresh component list, pins, and EXISTING CONNECTIONS!
+
 → add_component(component_uid: "actual-uid-from-search")
 
 NEVER make up component names or UIDs - always use search results!`;

@@ -10,7 +10,8 @@ export function useCanvasZoom(canvas: fabric.Canvas | null) {
       opt.e.preventDefault();
       opt.e.stopPropagation();
 
-      const delta = (opt.e as WheelEvent).deltaY;
+      const event = opt.e as WheelEvent;
+      const delta = event.deltaY;
       let zoom = canvas.getZoom();
 
       // Calculate new zoom level
@@ -20,11 +21,12 @@ export function useCanvasZoom(canvas: fabric.Canvas | null) {
       if (zoom > 20) zoom = 20;
       if (zoom < 0.1) zoom = 0.1;
 
-      // Get mouse position for zoom center
-      const pointer = canvas.getPointer(opt.e as MouseEvent);
+      // Get the point in canvas space (accounting for current viewport transform)
+      // This ensures zoom happens at the cursor position, not the canvas center
+      const point = new fabric.Point(event.offsetX, event.offsetY);
 
-      // Zoom to point (centered on mouse cursor)
-      canvas.zoomToPoint(new fabric.Point(pointer.x, pointer.y), zoom);
+      // Zoom to the point where the cursor is
+      canvas.zoomToPoint(point, zoom);
     };
 
     // Add event listener

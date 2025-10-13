@@ -13,8 +13,8 @@ import { CanvasProvider } from "../../contexts/CanvasContext";
 import { logger } from "@/lib/logger";
 import { getChatUIStyles } from "../agent/ChatUIConfig";
 import { useProject } from "@/contexts/ProjectContext";
-import { useCanvasAutoSave } from "@/canvas/hooks/useCanvasAutoSave";
 import { canvasCommandManager } from "@/canvas/canvas-command-manager";
+import { Circuit } from "@/lib/schemas/circuit";
 
 export function IDECanvas() {
   // Override all browser mouse/keyboard controls
@@ -28,15 +28,8 @@ export function IDECanvas() {
   // Get project context for save functionality
   const { currentProject } = useProject();
 
-  // Get canvas instance for auto-save
+  // Get canvas instance for save functionality
   const fabricCanvas = canvasCommandManager.getCanvas();
-
-  // Use the auto-save mechanism
-  const autoSave = useCanvasAutoSave({
-    canvas: fabricCanvas,
-    netlist: getNetlist || (() => []),
-    enabled: !!currentProject, // Only enable when we have a project
-  });
 
   // Shared save function that both Ctrl+S and Export button will use
   const sharedSaveFunction = useCallback(
@@ -63,12 +56,31 @@ export function IDECanvas() {
         messageCount: overrideMessages?.length || 0,
       });
 
-      // Call the auto-save mechanism with optional messages
-      await autoSave.saveNow(overrideMessages);
+      // Implement manual save directly
+      const { serializeCanvasData, serializeCanvasToCircuit } = await import(
+        "@/canvas/utils/canvasSerializer"
+      );
+      const canvasData = serializeCanvasData(fabricCanvas, currentNetlist);
+      const circuit = serializeCanvasToCircuit(fabricCanvas);
 
-      logger.api("Shared save function completed");
+      if (!circuit) {
+        throw new Error("Cannot save: failed to serialize circuit");
+      }
+
+      // Import DatabaseService for saving
+      const { DatabaseService } = await import("@/lib/database");
+
+      await DatabaseService.createVersion(
+        currentProject.id,
+        circuit as Circuit,
+        canvasData,
+        `Manual save ${new Date().toLocaleTimeString()}`,
+        "Manual save via Export button"
+      );
+
+      logger.api("Manual save completed successfully");
     },
-    [currentProject, fabricCanvas, autoSave]
+    [currentProject, fabricCanvas, getNetlist]
   );
 
   const handleCanvasReady = (fabricCanvas: any) => {

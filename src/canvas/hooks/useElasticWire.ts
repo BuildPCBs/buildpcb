@@ -123,13 +123,22 @@ export function useElasticWire({
       const objects = canvas.getObjects();
       for (const obj of objects) {
         if (obj.type === "group") {
+          // CRITICAL FIX: Check if THIS GROUP is the right component first
+          // This prevents wires from connecting to the wrong instance when multiple components exist
+          const isTargetComponent =
+            (obj as any).id === componentId ||
+            (obj as any).data?.componentId === componentId;
+
+          if (!isTargetComponent) {
+            continue; // Skip this group - it's not the component we're looking for
+          }
+
           const groupObjects = (obj as fabric.Group).getObjects();
           for (const groupObj of groupObjects) {
             const pinData = (groupObj as any).data;
             if (
               pinData &&
               pinData.type === "pin" &&
-              pinData.componentId === componentId &&
               pinData.pinNumber === pinNumber
             ) {
               return groupObj;

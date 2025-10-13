@@ -1292,6 +1292,14 @@ export function useSimpleWiringTool({
           );
 
           // Get pin coordinates for the connection
+          logger.wire(`  🔍 Looking for pins with connection data:`, {
+            fromComponentId: connection.fromComponentId,
+            toComponentId: connection.toComponentId,
+            fromPinNumber: connection.fromPinNumber,
+            toPinNumber: connection.toPinNumber,
+            movedComponentId: componentId,
+          });
+
           const fromPin = findPinByComponentAndNumber(
             connection.fromComponentId,
             connection.fromPinNumber
@@ -1312,6 +1320,20 @@ export function useSimpleWiringTool({
               }
             );
             return;
+          }
+
+          // Log which component's pin we actually found
+          if (fromPin && fromPin.group) {
+            logger.wire(`  📍 Found fromPin in component:`, {
+              groupId: (fromPin.group as any).id,
+              groupDataComponentId: (fromPin.group as any).data?.componentId,
+            });
+          }
+          if (toPin && toPin.group) {
+            logger.wire(`  📍 Found toPin in component:`, {
+              groupId: (toPin.group as any).id,
+              groupDataComponentId: (toPin.group as any).data?.componentId,
+            });
           }
 
           logger.wire(`  ✅ Found pins for connection ${index + 1}`);
@@ -1517,19 +1539,44 @@ export function useSimpleWiringTool({
     (componentId: string, pinNumber: string): fabric.Object | null => {
       if (!canvas) return null;
 
+      logger.wire(`🔍 findPinByComponentAndNumber searching for:`, {
+        componentId,
+        pinNumber,
+      });
+
       // Search in canvas objects
       const objects = canvas.getObjects();
       for (const obj of objects) {
         if (obj.type === "group") {
+          // CRITICAL FIX: Check if THIS GROUP is the right component first
+          // This prevents wires from connecting to the wrong instance when multiple components exist
+          const isTargetComponent =
+            (obj as any).id === componentId ||
+            (obj as any).data?.componentId === componentId;
+
+          logger.wire(`  Checking group:`, {
+            groupId: (obj as any).id,
+            groupDataComponentId: (obj as any).data?.componentId,
+            isTargetComponent,
+            searchingFor: componentId,
+          });
+
+          if (!isTargetComponent) {
+            continue; // Skip this group - it's not the component we're looking for
+          }
+
+          // Now search for the pin within this specific component group
           const groupObjects = (obj as fabric.Group).getObjects();
           for (const groupObj of groupObjects) {
             const pinData = (groupObj as any).data;
             if (
               pinData &&
               pinData.type === "pin" &&
-              pinData.componentId === componentId &&
               pinData.pinNumber === pinNumber
             ) {
+              logger.wire(
+                `  ✅ Found pin ${pinNumber} in component ${componentId}`
+              );
               return groupObj;
             }
           }
@@ -1552,13 +1599,21 @@ export function useSimpleWiringTool({
         const selectedObjects = (activeSelection as any)._objects || [];
         for (const obj of selectedObjects) {
           if (obj.type === "group") {
+            // CRITICAL FIX: Check if THIS GROUP is the right component first
+            const isTargetComponent =
+              (obj as any).id === componentId ||
+              (obj as any).data?.componentId === componentId;
+
+            if (!isTargetComponent) {
+              continue; // Skip this group
+            }
+
             const groupObjects = (obj as fabric.Group).getObjects();
             for (const groupObj of groupObjects) {
               const pinData = (groupObj as any).data;
               if (
                 pinData &&
                 pinData.type === "pin" &&
-                pinData.componentId === componentId &&
                 pinData.pinNumber === pinNumber
               ) {
                 return groupObj;
@@ -1640,6 +1695,52 @@ export function useSimpleWiringTool({
         toPinNumber,
       });
 
+      // Create netlist connections
+      const fromConnection: NetConnection = {
+        componentId: fromComponentId,
+        pinNumber: fromPinNumber,
+      };
+      const toConnection: NetConnection = {
+        componentId: toComponentId,
+        pinNumber: toPinNumber,
+      };
+
+      // Update netlist - same logic as when creating wire through UI
+      const fromNet = netlist.getNetForConnection(
+        fromConnection.componentId,
+        fromConnection.pinNumber
+      );
+      const toNet = netlist.getNetForConnection(
+        toConnection.componentId,
+        toConnection.pinNumber
+      );
+
+      let wireNetId: string;
+      if (fromNet && toNet) {
+        if (fromNet.netId !== toNet.netId) {
+          logger.wire(`Merging nets: ${fromNet.netId} + ${toNet.netId}`);
+          netlist.mergeNets(fromNet.netId, toNet.netId);
+          wireNetId = fromNet.netId;
+        } else {
+          wireNetId = fromNet.netId;
+        }
+      } else if (fromNet) {
+        logger.wire(`Adding pin to existing net: ${fromNet.netId}`);
+        netlist.addConnectionToNet(fromNet.netId, toConnection);
+        wireNetId = fromNet.netId;
+      } else if (toNet) {
+        logger.wire(`Adding pin to existing net: ${toNet.netId}`);
+        netlist.addConnectionToNet(toNet.netId, fromConnection);
+        wireNetId = toNet.netId;
+      } else {
+        wireNetId = netlist.createNet([fromConnection, toConnection]);
+        logger.wire(`Created new net: ${wireNetId}`);
+      }
+
+      // Assign netId to the wire object
+      (wire as any).netId = wireNetId;
+      (wire as any).wireType = "connection";
+
       const wireConnection: WireConnection = {
         fromComponentId,
         fromPinNumber,
@@ -1649,9 +1750,9 @@ export function useSimpleWiringTool({
       };
 
       setConnections((prev) => [...prev, wireConnection]);
-      logger.wire("✅ Restored wire registered successfully");
+      logger.wire("✅ Restored wire registered successfully with netlist");
     },
-    []
+    [netlist]
   );
 
   // Set up component movement listener
