@@ -486,7 +486,7 @@ export class DatabaseService {
         // Get the next version number with row-level locking to prevent race conditions
         // This ensures that if two saves happen simultaneously, they get different version numbers
         console.log("🔍 Fetching versions for project:", projectId);
-        
+
         const { data: allVersions, error: fetchError } = await supabase
           .from("project_versions")
           .select("version_number, project_id")
@@ -501,17 +501,19 @@ export class DatabaseService {
         console.log("📊 Versions found for this project:", {
           projectId,
           versionCount: allVersions?.length || 0,
-          versions: allVersions?.map(v => ({
-            version_number: v.version_number,
-            project_id: v.project_id
-          })) || [],
+          versions:
+            allVersions?.map((v) => ({
+              version_number: v.version_number,
+              project_id: v.project_id,
+            })) || [],
         });
 
         // Calculate next version number from all versions (safer than relying on single latest)
-        const maxVersionNumber = allVersions && allVersions.length > 0
-          ? Math.max(...allVersions.map(v => v.version_number))
-          : 0;
-        
+        const maxVersionNumber =
+          allVersions && allVersions.length > 0
+            ? Math.max(...allVersions.map((v) => v.version_number))
+            : 0;
+
         const nextVersionNumber = maxVersionNumber + 1;
 
         console.log("🔢 Version number calculation:", {

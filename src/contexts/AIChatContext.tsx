@@ -56,18 +56,18 @@ function formatStreamMessage(message: {
   type: string;
   message: string;
 }): string {
-  const prefix = {
-    status: "→",
-    think: "•",
-    progress: "...",
-    success: "✓",
-    error: "✗",
-    warn: "!",
-  }[message.type] || "•";
+  const prefix =
+    {
+      status: "→",
+      think: "•",
+      progress: "...",
+      success: "✓",
+      error: "✗",
+      warn: "!",
+    }[message.type] || "•";
 
   return `${prefix} ${message.message}`;
 }
-
 
 export function useAIChat() {
   const context = useContext(AIChatContext);

@@ -381,13 +381,13 @@ export function useCanvasAutoSave({
         });
 
         const saveStartTime = Date.now();
-        
+
         console.log("💾 Manual save START - Call stack:", {
           timestamp: new Date().toISOString(),
           projectId: currentProjectId,
-          stack: new Error().stack?.split('\n').slice(1, 5).join('\n'),
+          stack: new Error().stack?.split("\n").slice(1, 5).join("\n"),
         });
-        
+
         await DatabaseService.createVersion(
           currentProjectId,
           circuitData,

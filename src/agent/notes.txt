@@ -41,3 +41,7 @@ then goes to quering database with vexctor,, or sending text or what ever of the
 then uses actionabkle process to each point in agent streamer, understand?
 
 then at end bunder vectors found, data and send back to LLM for deciding and then comes back with a fullk of what would be used, and then query db for exact in components_v2 and lay em down
+
+
+
+///when i draw a wire from -48v , and i mive, the wire somehow changed to another -48v

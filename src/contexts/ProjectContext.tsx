@@ -62,15 +62,18 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
   useEffect(() => {
     if (isAuthenticated && !authLoading) {
       // Check if we're on a specific project page
-      const isOnSpecificProjectPage = typeof window !== 'undefined' && 
-        window.location.pathname.startsWith('/project/') &&
-        window.location.pathname !== '/project/new';
-      
+      const isOnSpecificProjectPage =
+        typeof window !== "undefined" &&
+        window.location.pathname.startsWith("/project/") &&
+        window.location.pathname !== "/project/new";
+
       if (isOnSpecificProjectPage) {
-        console.log("🎯 On specific project page - skipping auto-load (page will load its own project)");
+        console.log(
+          "🎯 On specific project page - skipping auto-load (page will load its own project)"
+        );
         return;
       }
-      
+
       console.log("🔄 User authenticated, loading most recent project...");
       loadProject();
     } else if (!isAuthenticated) {
