@@ -84,7 +84,7 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
             .eq("name", payload.name)
             .single();
 
-          let svgString = dbComponent?.symbol_svg;
+          const svgString = dbComponent?.symbol_svg;
           if (!svgString) {
             throw new Error(`No SVG found for component name: ${payload.name}`);
           }
