@@ -28,28 +28,28 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: "/",
     siteName: siteConfig.name,
-    title: `${siteConfig.name} - AI-Powered PCB Design IDE`,
+    title: `${siteConfig.name} - AI-Powered PCB Design EDA`,
     description: siteConfig.description,
     images: [
       {
         url: siteConfig.ogImage,
         width: 1200,
         height: 630,
-        alt: `${siteConfig.name} - AI-Powered PCB Design IDE`,
+        alt: `${siteConfig.name} - AI-Powered PCB Design EDA`,
         type: "image/png",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: `${siteConfig.name} - AI-Powered PCB Design IDE`,
+    title: `${siteConfig.name} - AI-Powered PCB Design EDA`,
     description: siteConfig.description,
     images: [
       {
         url: siteConfig.twitterImage,
         width: 1200,
         height: 630,
-        alt: `${siteConfig.name} - AI-Powered PCB Design IDE`,
+        alt: `${siteConfig.name} - AI-Powered PCB Design EDA`,
       },
     ],
     creator: siteConfig.twitterCreator,
@@ -58,11 +58,11 @@ export const metadata: Metadata = {
     "og:image:secure_url": siteConfig.ogImage,
     "og:image:width": "1200",
     "og:image:height": "630",
-    "og:image:alt": `${siteConfig.name} - AI-Powered PCB Design IDE`,
+    "og:image:alt": `${siteConfig.name} - AI-Powered PCB Design EDA`,
     // LinkedIn specific
     "og:image:type": "image/png",
     // Discord/Slack rich embeds
-    "twitter:image:alt": `${siteConfig.name} - AI-Powered PCB Design IDE`,
+    "twitter:image:alt": `${siteConfig.name} - AI-Powered PCB Design EDA`,
   },
   robots: {
     index: true,
@@ -91,9 +91,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={dm_sans.className}>
         <AuthProvider>
-          <RouteGuard>
-            {children}
-          </RouteGuard>
+          <RouteGuard>{children}</RouteGuard>
           <AuthOverlayWrapper />
         </AuthProvider>
       </body>

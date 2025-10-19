@@ -2,6 +2,7 @@ import { AgentContext, AgentResult } from "../../types";
 import { DatabaseService } from "@/lib/database";
 import { logger } from "@/lib/logger";
 import { canvasCommandManager } from "@/canvas/canvas-command-manager";
+import { logPromptWithUserContext } from "@/lib/promptLogger";
 
 /**
  * ADD_COMPONENT Handler
@@ -12,6 +13,15 @@ export async function addComponent(
   prompt: string
 ): Promise<AgentResult> {
   logger.component("🎯 ADD_COMPONENT handler started", { prompt });
+
+  // Log the prompt (fire and forget - don't await)
+  logPromptWithUserContext(
+    prompt,
+    "component_search",
+    undefined,
+    undefined,
+    context.project.projectId || undefined
+  );
 
   try {
     // Step 1: Parse component name from prompt
@@ -198,6 +208,15 @@ export async function addComponent(
       position,
     });
 
+    // Log successful prompt completion
+    logPromptWithUserContext(
+      `SUCCESS: ${prompt}`,
+      "component_search",
+      successMsg.length,
+      undefined,
+      context.project.projectId || undefined
+    );
+
     return {
       status: "success",
       message: successMsg,
@@ -212,6 +231,15 @@ export async function addComponent(
       error instanceof Error ? error.message : "Unknown error occurred";
     context.streamer.error(`Error adding component: ${errorMsg}`);
     logger.error("❌ ADD_COMPONENT handler error", error);
+
+    // Log failed prompt
+    logPromptWithUserContext(
+      `ERROR: ${prompt}`,
+      "component_search",
+      errorMsg.length,
+      undefined,
+      context.project.projectId || undefined
+    );
 
     return {
       status: "error",
