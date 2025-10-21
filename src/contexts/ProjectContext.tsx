@@ -15,6 +15,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
 import { loadCanvasFromLogicalCircuit } from "@/canvas/utils/logicalSerializer";
 import { useProjectStore } from "@/store/projectStore";
+import { useAIChat } from "./AIChatContext"; // Add this import
+import { useAutoSave } from "@/hooks/useDatabase"; // Add this import
 
 interface ProjectContextType {
   // Current project state
@@ -56,6 +58,16 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
   const [error, setError] = useState<string | null>(null);
   const [isNewProject, setIsNewProject] = useState(false);
   const [isFirstTimeUser, setIsFirstTimeUser] = useState(false);
+  const { messages: chatMessages } = useAIChat(); // Get chat messages
+
+  // Correctly use the useAutoSave hook at the top level
+  useAutoSave(
+    currentProject?.id || null,
+    currentCircuit,
+    currentProject?.canvas_settings || {},
+    { messages: chatMessages },
+    currentNetlist || []
+  );
 
   // Load project when user becomes authenticated
   // BUT ONLY if we're not on a specific project page (which will load its own project)

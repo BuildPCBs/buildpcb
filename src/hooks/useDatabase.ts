@@ -8,6 +8,7 @@ import {
   ComponentDetails,
 } from "@/lib/database";
 import { Circuit } from "@/lib/schemas/circuit";
+import { ProjectService } from "@/lib/project-service"; // Add this line
 
 /**
  * Hook for managing user projects
@@ -345,6 +346,8 @@ export function useAutoSave(
   projectId: string | null,
   circuitData: Circuit | null,
   canvasData: Record<string, any>,
+  chatData: Record<string, any> | undefined, // Add chatData
+  netlistData: any[] | undefined, // Add netlistData
   interval = 60000 // Increased to 60 seconds for better performance
 ) {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
@@ -356,7 +359,12 @@ export function useAutoSave(
     if (!projectId || !circuitData) return;
 
     // Skip save if data hasn't actually changed
-    const currentDataHash = JSON.stringify({ circuitData, canvasData });
+    const currentDataHash = JSON.stringify({
+      circuitData,
+      canvasData,
+      chatData,
+      netlistData,
+    });
     if (currentDataHash === lastDataRef.current) {
       console.log("💾 Skipping auto-save - no changes detected");
       return;
@@ -367,12 +375,13 @@ export function useAutoSave(
       setError(null);
       console.log("💾 Auto-saving project changes...");
 
-      await DatabaseService.createVersion(
+      // Use ProjectService.saveProject to ensure all data is saved
+      await ProjectService.saveProject(
         projectId,
         circuitData,
         canvasData,
-        `Auto-save ${new Date().toLocaleTimeString()}`,
-        "Automatic save"
+        chatData,
+        netlistData
       );
 
       lastDataRef.current = currentDataHash;
@@ -384,7 +393,7 @@ export function useAutoSave(
     } finally {
       setSaving(false);
     }
-  }, [projectId, circuitData, canvasData]);
+  }, [projectId, circuitData, canvasData, chatData, netlistData]);
 
   useEffect(() => {
     if (!projectId || !circuitData) return;
