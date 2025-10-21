@@ -45,20 +45,29 @@ export function AIChatInterface({
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     if (scrollAreaRef.current) {
-      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+      // Use requestAnimationFrame to ensure DOM is updated
+      requestAnimationFrame(() => {
+        if (scrollAreaRef.current) {
+          scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+        }
+      });
     }
   }, [messages]);
 
   const handleDotClick = (index: number) => {
     setCurrentMessageIndex(index);
-    // Scroll to the specific message
+    // Scroll to the specific message with smooth behavior
     if (scrollAreaRef.current) {
       const messageElements = scrollAreaRef.current.querySelectorAll(
         "[data-message-index]"
       );
       const targetElement = messageElements[index] as HTMLElement;
       if (targetElement) {
-        targetElement.scrollIntoView({ behavior: "smooth", block: "center" });
+        targetElement.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+          inline: "nearest"
+        });
       }
     }
   };
@@ -179,16 +188,27 @@ export function AIChatInterface({
         </div>
       )}
 
-      {/* Chat Container - Full width and responsive height (500px design) */}
+      {/* Chat Container - Full width and flexible height */}
       <div
         ref={chatContainerRef}
         className="relative border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm w-full"
-        style={{ height: responsive(400) }}
+        style={{
+          height: 'auto',
+          maxHeight: responsive(500),
+          minHeight: responsive(300)
+        }}
       >
         {/* Messages Area */}
         <div
           ref={scrollAreaRef}
-          className="h-full overflow-y-auto p-3 space-y-3"
+          className="chat-scroll overflow-y-auto p-3 space-y-3"
+          style={{
+            maxHeight: responsive(450),
+            minHeight: responsive(250),
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            scrollBehavior: 'smooth'
+          }}
         >
           {messages.length === 0 && streamMessages.length === 0 ? (
             <div className="flex items-center justify-center h-full">
@@ -216,7 +236,7 @@ export function AIChatInterface({
                   <div
                     key={message.id}
                     data-message-index={index}
-                    className="mb-4"
+                    className="mb-4 chat-message"
                   >
                     {message.type === "user" ? (
                       /* User Message - Bubble Style */
