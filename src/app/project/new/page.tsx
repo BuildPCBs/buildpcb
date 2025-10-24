@@ -7,6 +7,9 @@ import { DatabaseService } from "@/lib/database";
 import { ResponsiveContainer } from "@/components/layout/ResponsiveContainer";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 
+export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
+
 const NewProjectPage = () => {
   const router = useRouter();
   const { user } = useAuth();
