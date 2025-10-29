@@ -22,6 +22,165 @@ let isComponentHandlerSetup = false;
 let componentEventUnsubscribe: (() => void) | null = null;
 // Removed isProcessingComponent - allowing concurrent component creation during restoration
 
+// TODO: Remove this SVG generation - create Fabric objects directly from symbol_data
+// This is a temporary solution until we fully convert to Konva.js
+
+// Generate SVG from symbol_data
+function generateSvgFromSymbolData(symbolData: any): string | null {
+  console.log(`🔧 Generating SVG from symbol_data:`, symbolData);
+
+  if (!symbolData || !symbolData.graphics) {
+    console.warn(`⚠️ Invalid symbol_data structure:`, symbolData);
+    return null;
+  }
+
+  const graphics = symbolData.graphics;
+  let svgElements = "";
+  let hasElements = false;
+
+  // Add rectangles
+  if (graphics.rectangles && Array.isArray(graphics.rectangles)) {
+    graphics.rectangles.forEach((rect: any, index: number) => {
+      if (rect && rect.start && rect.end) {
+        const width = Math.abs(rect.end.x - rect.start.x);
+        const height = Math.abs(rect.end.y - rect.start.y);
+        const x = Math.min(rect.start.x, rect.end.x);
+        const y = Math.min(rect.start.y, rect.end.y);
+        const fill = rect.fill?.type === "background" ? "#f0f0f0" : "none";
+        const stroke = rect.stroke?.type === "default" ? "#000" : "#000";
+        const strokeWidth = rect.stroke?.width || 0.254;
+
+        svgElements += `<rect x="${x}" y="${y}" width="${width}" height="${height}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"/>`;
+        hasElements = true;
+        console.log(`✅ Added rectangle ${index}:`, rect);
+      }
+    });
+  }
+
+  // Add circles
+  if (graphics.circles && Array.isArray(graphics.circles)) {
+    graphics.circles.forEach((circle: any, index: number) => {
+      if (circle && circle.center && typeof circle.radius === "number") {
+        const fill = circle.fill?.type === "background" ? "#f0f0f0" : "none";
+        const stroke = circle.stroke?.type === "default" ? "#000" : "#000";
+        const strokeWidth = circle.stroke?.width || 0.254;
+
+        svgElements += `<circle cx="${circle.center.x}" cy="${circle.center.y}" r="${circle.radius}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"/>`;
+        hasElements = true;
+        console.log(`✅ Added circle ${index}:`, circle);
+      }
+    });
+  }
+
+  // Add polylines
+  if (graphics.polylines && Array.isArray(graphics.polylines)) {
+    graphics.polylines.forEach((polyline: any, index: number) => {
+      if (polyline && polyline.points && Array.isArray(polyline.points)) {
+        const points = polyline.points
+          .map((p: any) => `${p.x},${p.y}`)
+          .join(" ");
+        const fill = polyline.fill?.type === "none" ? "none" : "#000";
+        const stroke = polyline.stroke?.type === "default" ? "#000" : "#000";
+        const strokeWidth = polyline.stroke?.width || 0.254;
+
+        svgElements += `<polyline points="${points}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"/>`;
+        hasElements = true;
+        console.log(`✅ Added polyline ${index}:`, polyline);
+      }
+    });
+  }
+
+  if (!hasElements) {
+    console.warn(`⚠️ No valid graphics elements found in symbol_data`);
+    return null;
+  }
+
+  // Calculate viewBox
+  const bounds = calculateBounds(symbolData.graphics);
+  if (bounds.width === 0 || bounds.height === 0) {
+    console.warn(`⚠️ Invalid bounds calculated:`, bounds);
+    // Fallback viewBox
+    const viewBox = "-10 -10 20 20";
+    return `<svg viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg">${svgElements}</svg>`;
+  }
+
+  const viewBox = `${bounds.minX - 2} ${bounds.minY - 2} ${bounds.width + 4} ${
+    bounds.height + 4
+  }`;
+
+  const result = `<svg viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg">${svgElements}</svg>`;
+  console.log(`✅ Generated SVG:`, result);
+  return result;
+}
+
+// Calculate bounds of graphics elements
+function calculateBounds(graphics: any) {
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
+  let hasBounds = false;
+
+  // Check rectangles
+  if (graphics.rectangles && Array.isArray(graphics.rectangles)) {
+    graphics.rectangles.forEach((rect: any) => {
+      if (rect && rect.start && rect.end) {
+        minX = Math.min(minX, rect.start.x, rect.end.x);
+        minY = Math.min(minY, rect.start.y, rect.end.y);
+        maxX = Math.max(maxX, rect.start.x, rect.end.x);
+        maxY = Math.max(maxY, rect.start.y, rect.end.y);
+        hasBounds = true;
+      }
+    });
+  }
+
+  // Check circles
+  if (graphics.circles && Array.isArray(graphics.circles)) {
+    graphics.circles.forEach((circle: any) => {
+      if (circle && circle.center && typeof circle.radius === "number") {
+        minX = Math.min(minX, circle.center.x - circle.radius);
+        minY = Math.min(minY, circle.center.y - circle.radius);
+        maxX = Math.max(maxX, circle.center.x + circle.radius);
+        maxY = Math.max(maxY, circle.center.y + circle.radius);
+        hasBounds = true;
+      }
+    });
+  }
+
+  // Check polylines
+  if (graphics.polylines && Array.isArray(graphics.polylines)) {
+    graphics.polylines.forEach((polyline: any) => {
+      if (polyline && polyline.points && Array.isArray(polyline.points)) {
+        polyline.points.forEach((point: any) => {
+          if (
+            point &&
+            typeof point.x === "number" &&
+            typeof point.y === "number"
+          ) {
+            minX = Math.min(minX, point.x);
+            minY = Math.min(minY, point.y);
+            maxX = Math.max(maxX, point.x);
+            maxY = Math.max(maxY, point.y);
+            hasBounds = true;
+          }
+        });
+      }
+    });
+  }
+
+  if (!hasBounds) {
+    console.warn(`⚠️ No valid bounds found, using defaults`);
+    return { minX: -10, minY: -10, width: 20, height: 20 };
+  }
+
+  return {
+    minX,
+    minY,
+    width: maxX - minX,
+    height: maxY - minY,
+  };
+}
+
 export function setupComponentHandler(canvas: fabric.Canvas) {
   if ((canvas as any)._componentHandlersSetup) {
     logger.canvas(
@@ -77,25 +236,61 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
         }
 
         try {
-          // 1. Fetch component's SVG and pin configuration from the database
-          const { data: dbComponent } = await supabase
-            .from("components_v2")
-            .select("symbol_svg, symbol_data")
+          // 1. Fetch component's symbol_data from the database
+          console.log(`🔍 Fetching component: ${payload.name}`);
+          const { data: dbComponent, error: fetchError } = await supabase
+            .from("components")
+            .select("symbol_data")
             .eq("name", payload.name)
             .single();
 
-          const svgString = dbComponent?.symbol_svg;
-          if (!svgString) {
-            throw new Error(`No SVG found for component name: ${payload.name}`);
+          if (fetchError) {
+            console.error(`❌ Database error for ${payload.name}:`, fetchError);
+            throw new Error(`Component ${payload.name} not found in database`);
           }
+
+          if (!dbComponent?.symbol_data) {
+            console.error(
+              `❌ No symbol_data for ${payload.name}:`,
+              dbComponent
+            );
+            throw new Error(
+              `No symbol_data found for component name: ${payload.name}`
+            );
+          }
+
+          console.log(
+            `✅ Found symbol_data for ${payload.name}:`,
+            dbComponent.symbol_data
+          );
+
+          // Generate SVG from symbol_data
+          const svgString = generateSvgFromSymbolData(dbComponent.symbol_data);
+          if (!svgString) {
+            console.error(
+              `❌ SVG generation failed for ${payload.name}, symbol_data:`,
+              dbComponent.symbol_data
+            );
+            throw new Error(
+              `Failed to generate SVG for component name: ${payload.name}`
+            );
+          }
+
+          console.log(
+            `✅ Generated SVG for ${payload.name}, length: ${svgString.length}`
+          );
 
           // 2. Load the SVG string into Fabric.js objects
           console.log(
             `📦 Loading SVG for ${payload.name}, svgLength: ${svgString.length}`
           );
           // Clean the SVG string to remove namespace prefixes like 'ns0:'
-          const cleanedSvgString = svgString.replace(/ns0:/g, "").replace(/xmlns:ns0="[^"]+"/g, "");
-          const svgLoadResult = await fabric.loadSVGFromString(cleanedSvgString);
+          const cleanedSvgString = svgString
+            .replace(/ns0:/g, "")
+            .replace(/xmlns:ns0="[^"]+"/g, "");
+          const svgLoadResult = await fabric.loadSVGFromString(
+            cleanedSvgString
+          );
           const allSvgObjects = svgLoadResult.objects;
 
           // Disable image smoothing on all SVG objects for crisp rendering at all zoom levels
@@ -114,17 +309,12 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
 
           console.log(`📦 SVG loaded: ${allSvgObjects.length} objects created`);
 
-          // 3. Get Pin Metadata (name, type) from the database JSON
+          // 3. Get Pin Metadata from symbol_data
           let dbPins: any[] = [];
           try {
             if (dbComponent?.symbol_data) {
-              let symbolData;
-              if (typeof dbComponent.symbol_data === "string") {
-                symbolData = JSON.parse(dbComponent.symbol_data);
-              } else {
-                // symbol_data is already an object
-                symbolData = dbComponent.symbol_data;
-              }
+              // symbol_data should already be an object in the new schema
+              const symbolData = dbComponent.symbol_data;
               dbPins = symbolData.pins || [];
             }
           } catch (error) {

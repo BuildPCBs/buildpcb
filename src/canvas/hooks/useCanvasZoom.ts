@@ -1,18 +1,18 @@
 import { useEffect } from "react";
-import * as fabric from "fabric";
+import Konva from "konva";
 
-export function useCanvasZoom(canvas: fabric.Canvas | null) {
+export function useCanvasZoom(stage: Konva.Stage | null) {
   useEffect(() => {
-    if (!canvas) return;
+    if (!stage) return;
 
-    const handleWheel = (opt: fabric.TEvent) => {
+    const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
       // Prevent default browser zoom action FIRST
-      opt.e.preventDefault();
-      opt.e.stopPropagation();
+      e.evt.preventDefault();
+      e.evt.stopPropagation();
 
-      const event = opt.e as WheelEvent;
+      const event = e.evt;
       const delta = event.deltaY;
-      let zoom = canvas.getZoom();
+      let zoom = stage.scaleX(); // Use scaleX as zoom level
 
       // Calculate new zoom level
       zoom *= 0.999 ** delta;
@@ -21,20 +21,37 @@ export function useCanvasZoom(canvas: fabric.Canvas | null) {
       if (zoom > 20) zoom = 20;
       if (zoom < 0.1) zoom = 0.1;
 
-      // Get the point in canvas space (accounting for current viewport transform)
-      // This ensures zoom happens at the cursor position, not the canvas center
-      const point = new fabric.Point(event.offsetX, event.offsetY);
+      // Get the point in stage space (accounting for current position)
+      const pointer = stage.getPointerPosition();
+      if (!pointer) return;
 
       // Zoom to the point where the cursor is
-      canvas.zoomToPoint(point, zoom);
+      const oldScale = stage.scaleX();
+      const newScale = zoom;
+
+      // Calculate the new position to zoom towards the pointer
+      const mousePointTo = {
+        x: (pointer.x - stage.x()) / oldScale,
+        y: (pointer.y - stage.y()) / oldScale,
+      };
+
+      stage.scale({ x: newScale, y: newScale });
+
+      const newPos = {
+        x: pointer.x - mousePointTo.x * newScale,
+        y: pointer.y - mousePointTo.y * newScale,
+      };
+
+      stage.position(newPos);
+      stage.batchDraw();
     };
 
     // Add event listener
-    canvas.on("mouse:wheel", handleWheel);
+    stage.on("wheel", handleWheel);
 
     // Cleanup function
     return () => {
-      canvas.off("mouse:wheel", handleWheel);
+      stage.off("wheel", handleWheel);
     };
-  }, [canvas]);
+  }, [stage]);
 }

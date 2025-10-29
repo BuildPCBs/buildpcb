@@ -1,81 +1,56 @@
 "use client";
 
 import React, { useRef, useEffect, useState } from "react";
-import * as fabric from "fabric";
-import { useFabricCanvasViewport } from "./useCanvasViewport";
+import { Stage, Layer, Rect, Circle } from "react-konva";
+import Konva from "konva";
+// import { useKonvaCanvasViewport } from "./useCanvasViewport";
 
-interface FabricCanvasProps {
+interface KonvaCanvasProps {
   width?: number;
   height?: number;
   className?: string;
 }
 
-export function FabricCanvas({
+export function KonvaCanvas({
   width = 800,
   height = 600,
   className = "",
-}: FabricCanvasProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [fabricCanvas, setFabricCanvas] = useState<fabric.Canvas | null>(null);
+}: KonvaCanvasProps) {
+  const stageRef = useRef<Konva.Stage>(null);
+  const [stage, setStage] = useState<Konva.Stage | null>(null);
+  const [zoom, setZoom] = useState(1);
 
-  // Use our custom hook for mouse wheel zooming
-  const { getCurrentZoom, setZoom, resetZoom, zoomToFit } =
-    useFabricCanvasViewport(fabricCanvas || undefined);
+  // TODO: Convert viewport hook to work with Konva
+  // const { getCurrentZoom, setZoom, resetZoom, zoomToFit } =
+  //   useKonvaCanvasViewport(stage || undefined);
 
   useEffect(() => {
-    if (!canvasRef.current) return;
+    if (!stageRef.current) return;
 
-    // Initialize Fabric.js canvas
-    const canvas = new fabric.Canvas(canvasRef.current, {
-      width,
-      height,
-      backgroundColor: "#f8f9fa",
-    });
-
-    setFabricCanvas(canvas);
-
-    // Add some sample objects to demonstrate zooming
-    const rect = new fabric.Rect({
-      left: 100,
-      top: 100,
-      width: 100,
-      height: 100,
-      fill: "#ff6b6b",
-    });
-
-    const circle = new fabric.Circle({
-      left: 300,
-      top: 200,
-      radius: 50,
-      fill: "#4ecdc4",
-    });
-
-    const triangle = new fabric.Triangle({
-      left: 500,
-      top: 150,
-      width: 80,
-      height: 80,
-      fill: "#45b7d1",
-    });
-
-    canvas.add(rect, circle, triangle);
-
-    // Cleanup function
-    return () => {
-      canvas.dispose();
-    };
-  }, [width, height]);
+    const konvaStage = stageRef.current;
+    setStage(konvaStage);
+  }, []);
 
   const handleResetZoom = () => {
-    resetZoom();
+    setZoom(1);
+    if (stage) {
+      stage.scale({ x: 1, y: 1 });
+      stage.position({ x: 0, y: 0 });
+      stage.batchDraw();
+    }
   };
 
   const handleZoomToFit = () => {
-    zoomToFit();
+    // TODO: Implement zoom to fit logic
+    console.log("Zoom to fit - to be implemented");
   };
 
-  const handleSetZoom = (zoom: number) => {
-    setZoom(zoom);
+  const handleSetZoom = (newZoom: number) => {
+    setZoom(newZoom);
+    if (stage) {
+      stage.scale({ x: newZoom, y: newZoom });
+      stage.batchDraw();
+    }
   };
 
   return (
@@ -113,26 +88,34 @@ export function FabricCanvas({
 
       {/* Zoom indicator */}
       <div className="absolute top-2 right-2 z-10 bg-black/70 text-white px-2 py-1 rounded text-sm">
-        Zoom: {Math.round((getCurrentZoom() || 1) * 100)}%
+        Zoom: {Math.round(zoom * 100)}%
       </div>
 
-      {/* Canvas element */}
-      <canvas
-        ref={canvasRef}
-        className="border border-gray-300 cursor-default"
-      />
+      {/* Konva Stage */}
+      <Stage
+        ref={stageRef}
+        width={width}
+        height={height}
+        style={{ backgroundColor: "#f8f9fa", border: "1px solid #d1d5db" }}
+        scaleX={zoom}
+        scaleY={zoom}
+      >
+        <Layer>
+          {/* Sample shapes - will be converted to dynamic components */}
+          <Rect x={100} y={100} width={100} height={100} fill="#ff6b6b" />
+          <Circle x={350} y={250} radius={50} fill="#4ecdc4" />
+        </Layer>
+      </Stage>
 
       {/* Instructions */}
       <div className="mt-4 text-sm text-gray-600">
         <p>
           <strong>Instructions:</strong>
         </p>
-        <ul className="list-disc ml-5 space-y-1">
-          <li>Use your mouse wheel to zoom in/out at the cursor position</li>
-          <li>Scroll up to zoom in, scroll down to zoom out</li>
-          <li>Zoom factor: 1.1x per scroll step</li>
-          <li>Zoom range: 10% - 1000%</li>
-          <li>Click the buttons above to test programmatic zoom controls</li>
+        <ul className="list-disc list-inside mt-2">
+          <li>Click and drag to pan the canvas</li>
+          <li>Use mouse wheel to zoom in/out</li>
+          <li>Use the buttons above to control zoom</li>
         </ul>
       </div>
     </div>

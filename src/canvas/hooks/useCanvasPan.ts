@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useCallback, useRef } from "react";
-import * as fabric from "fabric";
+import Konva from "konva";
 
 interface PanState {
   isPanMode: boolean;
@@ -10,7 +10,7 @@ interface PanState {
   lastY: number;
 }
 
-export function useCanvasPan(canvas: fabric.Canvas | undefined | null) {
+export function useCanvasPan(stage: Konva.Stage | undefined | null) {
   const panStateRef = useRef<PanState>({
     isPanMode: false,
     isDragging: false,
@@ -32,166 +32,121 @@ export function useCanvasPan(canvas: fabric.Canvas | undefined | null) {
         return; // Allow normal space key behavior in input fields
       }
 
-      if (e.code === "Space" && !e.repeat && canvas) {
+      if (e.code === "Space" && !e.repeat && stage) {
         e.preventDefault();
         panStateRef.current.isPanMode = true;
 
         // Change cursor to grab when entering pan mode
-        canvas.defaultCursor = "grab";
-        canvas.hoverCursor = "grab";
-        canvas.setCursor("grab");
+        stage.container().style.cursor = "grab";
 
         // Disable selection while in pan mode
-        canvas.selection = false;
-        canvas.forEachObject((obj) => {
-          // Don't change selectability of workspace object
-          if ((obj as any).name !== "workspace") {
-            obj.selectable = false;
-          }
-        });
+        // Konva handles this differently - we'll handle in mouse events
       }
     },
-    [canvas]
+    [stage]
   );
 
   const handleKeyUp = useCallback(
     (e: KeyboardEvent) => {
-      // Check if user is typing in an input field - don't trigger pan mode changes
-      const activeElement = document.activeElement;
-      if (
-        activeElement &&
-        (activeElement.tagName === "INPUT" ||
-          activeElement.tagName === "TEXTAREA" ||
-          (activeElement as HTMLElement).contentEditable === "true")
-      ) {
-        return; // Allow normal space key behavior in input fields
-      }
-
-      if (e.code === "Space" && canvas) {
-        e.preventDefault();
+      if (e.code === "Space" && stage) {
         panStateRef.current.isPanMode = false;
         panStateRef.current.isDragging = false;
 
-        // Reset cursor to default
-        canvas.defaultCursor = "default";
-        canvas.hoverCursor = "move";
-        canvas.setCursor("default");
-
-        // Re-enable selection
-        canvas.selection = true;
-        canvas.forEachObject((obj) => {
-          // Don't change selectability of workspace object (it should stay non-selectable)
-          if ((obj as any).name !== "workspace") {
-            obj.selectable = true;
-          }
-        });
+        // Reset cursor
+        stage.container().style.cursor = "default";
       }
     },
-    [canvas]
+    [stage]
   );
 
   // Handle mouse events for panning
-  const handleMouseDown = useCallback(
-    (e: fabric.TEvent) => {
-      if (!panStateRef.current.isPanMode || !canvas) return;
+  useEffect(() => {
+    if (!stage) return;
 
-      const event = e.e as MouseEvent;
+    const handleMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
+      if (!panStateRef.current.isPanMode) return;
+
+      e.evt.preventDefault();
       panStateRef.current.isDragging = true;
-      panStateRef.current.lastX = event.clientX;
-      panStateRef.current.lastY = event.clientY;
+      panStateRef.current.lastX = e.evt.clientX;
+      panStateRef.current.lastY = e.evt.clientY;
 
-      // Change cursor to grabbing during drag
-      canvas.setCursor("grabbing");
-    },
-    [canvas]
-  );
+      stage.container().style.cursor = "grabbing";
+    };
 
-  const handleMouseMove = useCallback(
-    (e: fabric.TEvent) => {
-      if (
-        !panStateRef.current.isPanMode ||
-        !panStateRef.current.isDragging ||
-        !canvas
-      )
+    const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
+      if (!panStateRef.current.isDragging || !panStateRef.current.isPanMode)
         return;
 
-      const event = e.e as MouseEvent;
-      const deltaX = event.clientX - panStateRef.current.lastX;
-      const deltaY = event.clientY - panStateRef.current.lastY;
+      e.evt.preventDefault();
 
-      // Get current viewport transform
-      const vpt = canvas.viewportTransform!;
+      const deltaX = e.evt.clientX - panStateRef.current.lastX;
+      const deltaY = e.evt.clientY - panStateRef.current.lastY;
 
-      // Update the viewport translation
-      vpt[4] += deltaX;
-      vpt[5] += deltaY;
+      // Get current position
+      const currentX = stage.x();
+      const currentY = stage.y();
 
-      // Apply the new viewport transform
-      canvas.setViewportTransform(vpt);
-      canvas.requestRenderAll();
+      // Update stage position
+      stage.x(currentX + deltaX);
+      stage.y(currentY + deltaY);
+      stage.batchDraw();
 
-      // Update last mouse position
-      panStateRef.current.lastX = event.clientX;
-      panStateRef.current.lastY = event.clientY;
-    },
-    [canvas]
-  );
+      panStateRef.current.lastX = e.evt.clientX;
+      panStateRef.current.lastY = e.evt.clientY;
+    };
 
-  const handleMouseUp = useCallback(() => {
-    if (!panStateRef.current.isPanMode || !canvas) return;
-
-    panStateRef.current.isDragging = false;
-
-    // Change cursor back to grab (not grabbing)
-    canvas.setCursor("grab");
-  }, [canvas]);
-
-  // Set up event listeners
-  useEffect(() => {
-    if (!canvas) return;
-
-    // Add keyboard event listeners to document
-    document.addEventListener("keydown", handleKeyDown);
-    document.addEventListener("keyup", handleKeyUp);
-
-    // Add mouse event listeners to canvas
-    canvas.on("mouse:down", handleMouseDown);
-    canvas.on("mouse:move", handleMouseMove);
-    canvas.on("mouse:up", handleMouseUp);
-
-    // Cleanup function
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("keyup", handleKeyUp);
-
-      if (canvas) {
-        canvas.off("mouse:down", handleMouseDown);
-        canvas.off("mouse:move", handleMouseMove);
-        canvas.off("mouse:up", handleMouseUp);
-
-        // Reset canvas state if component unmounts while in pan mode
-        if (panStateRef.current.isPanMode) {
-          canvas.defaultCursor = "default";
-          canvas.hoverCursor = "move";
-          canvas.setCursor("default");
-          canvas.selection = true;
-          canvas.forEachObject((obj) => {
-            // Don't change selectability of workspace object (it should stay non-selectable)
-            if ((obj as any).name !== "workspace") {
-              obj.selectable = true;
-            }
-          });
+    const handleMouseUp = () => {
+      if (panStateRef.current.isDragging) {
+        panStateRef.current.isDragging = false;
+        if (stage) {
+          stage.container().style.cursor = panStateRef.current.isPanMode
+            ? "grab"
+            : "default";
         }
       }
     };
-  }, [
-    canvas,
-    handleKeyDown,
-    handleKeyUp,
-    handleMouseDown,
-    handleMouseMove,
-    handleMouseUp,
-  ]);
+
+    // Add event listeners
+    stage.on("mousedown", handleMouseDown);
+    stage.on("mousemove", handleMouseMove);
+    stage.on("mouseup", handleMouseUp);
+
+    // Global mouse up to handle mouse release outside canvas
+    const handleGlobalMouseUp = () => {
+      if (panStateRef.current.isDragging) {
+        panStateRef.current.isDragging = false;
+        if (stage) {
+          stage.container().style.cursor = panStateRef.current.isPanMode
+            ? "grab"
+            : "default";
+        }
+      }
+    };
+
+    window.addEventListener("mouseup", handleGlobalMouseUp);
+
+    // Cleanup function
+    return () => {
+      if (stage) {
+        stage.off("mousedown", handleMouseDown);
+        stage.off("mousemove", handleMouseMove);
+        stage.off("mouseup", handleMouseUp);
+      }
+      window.removeEventListener("mouseup", handleGlobalMouseUp);
+    };
+  }, [stage]);
+
+  // Handle keyboard events
+  useEffect(() => {
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, [handleKeyDown, handleKeyUp]);
 
   // Return pan state for debugging or UI feedback
   return {

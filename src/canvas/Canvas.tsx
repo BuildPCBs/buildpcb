@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useEffect, useState } from "react";
-import * as fabric from "fabric";
-import { useCanvasPan } from "./hooks";
+import React, { useRef, useEffect, useState } from "react";
+import { Stage, Layer, Rect, Text } from "react-konva";
+import Konva from "konva";
+import { useCanvasPan } from "./hooks/useCanvasPan";
 
 interface CanvasProps {
   width?: number;
@@ -15,43 +16,51 @@ export function Canvas({
   height = 600,
   className = "",
 }: CanvasProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [fabricCanvas, setFabricCanvas] = useState<fabric.Canvas | null>(null);
-
-  // Use our custom hook for drag-to-pan functionality
-  const { isPanMode, isDragging } = useCanvasPan(fabricCanvas || undefined);
+  const stageRef = useRef<Konva.Stage>(null);
+  const [stage, setStage] = useState<Konva.Stage | null>(null);
 
   useEffect(() => {
-    if (!canvasRef.current) return;
+    if (!stageRef.current) return;
 
-    // Initialize Fabric.js canvas
-    const canvas = new fabric.Canvas(canvasRef.current, {
-      width,
-      height,
-      backgroundColor: "#FFFFFF",
-    });
-
-    // Clear any default objects that might be added
-    canvas.clear();
-
-    // Store the canvas instance
-    setFabricCanvas(canvas);
+    // Initialize Konva Stage
+    const konvaStage = stageRef.current;
+    setStage(konvaStage);
 
     // Cleanup function to prevent memory leaks
     return () => {
-      canvas.dispose();
-      setFabricCanvas(null);
+      // Konva handles cleanup automatically
+      setStage(null);
     };
-  }, [width, height]);
+  }, []);
 
   return (
-    <canvas
-      ref={canvasRef}
-      className={className}
-      style={{
-        width: "100%",
-        height: "100%",
-      }}
-    />
+    <div className={className}>
+      <Stage
+        ref={stageRef}
+        width={width}
+        height={height}
+        style={{ border: "1px solid #ccc" }}
+      >
+        <Layer>
+          {/* Background */}
+          <Rect x={0} y={0} width={width} height={height} fill="#FFFFFF" />
+
+          {/* Grid (optional) */}
+          {/* Add grid lines here if needed */}
+
+          {/* Sample component */}
+          <Rect
+            x={100}
+            y={100}
+            width={50}
+            height={50}
+            fill="#f0f0f0"
+            stroke="#000"
+            strokeWidth={1}
+          />
+          <Text x={125} y={125} text="Test" fontSize={12} align="center" />
+        </Layer>
+      </Stage>
+    </div>
   );
 }

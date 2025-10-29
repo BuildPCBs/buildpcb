@@ -1,5 +1,5 @@
 export { Canvas } from "./Canvas";
-export { FabricCanvas } from "./FabricCanvas";
+export { KonvaCanvas } from "./FabricCanvas";
 export { IDEFabricCanvas } from "./IDEFabricCanvas";
 export { useCanvasInteraction } from "./useCanvasInteraction";
 export {

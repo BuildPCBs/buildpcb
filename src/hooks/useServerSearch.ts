@@ -13,41 +13,129 @@ import {
 export function useServerSearch() {
   const searchCacheRef = useRef<Map<string, ComponentDisplayData[]>>(new Map());
 
+  // Generate SVG from symbol_data
+  const generateSvgFromSymbolData = (symbolData: any): string | null => {
+    if (!symbolData || !symbolData.graphics) return null;
+
+    const graphics = symbolData.graphics;
+    let svgElements = "";
+
+    // Add rectangles
+    if (graphics.rectangles) {
+      graphics.rectangles.forEach((rect: any) => {
+        const width = Math.abs(rect.end.x - rect.start.x);
+        const height = Math.abs(rect.end.y - rect.start.y);
+        const x = Math.min(rect.start.x, rect.end.x);
+        const y = Math.min(rect.start.y, rect.end.y);
+        const fill = rect.fill?.type === "background" ? "#f0f0f0" : "none";
+        const stroke = rect.stroke?.type === "default" ? "#000" : "#000";
+        const strokeWidth = rect.stroke?.width || 0.254;
+
+        svgElements += `<rect x="${x}" y="${y}" width="${width}" height="${height}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"/>`;
+      });
+    }
+
+    // Add circles
+    if (graphics.circles) {
+      graphics.circles.forEach((circle: any) => {
+        const fill = circle.fill?.type === "background" ? "#f0f0f0" : "none";
+        const stroke = circle.stroke?.type === "default" ? "#000" : "#000";
+        const strokeWidth = circle.stroke?.width || 0.254;
+
+        svgElements += `<circle cx="${circle.center.x}" cy="${circle.center.y}" r="${circle.radius}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"/>`;
+      });
+    }
+
+    // Add polylines
+    if (graphics.polylines) {
+      graphics.polylines.forEach((polyline: any) => {
+        const points = polyline.points
+          .map((p: any) => `${p.x},${p.y}`)
+          .join(" ");
+        const fill = polyline.fill?.type === "none" ? "none" : "#000";
+        const stroke = polyline.stroke?.type === "default" ? "#000" : "#000";
+        const strokeWidth = polyline.stroke?.width || 0.254;
+
+        svgElements += `<polyline points="${points}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"/>`;
+      });
+    }
+
+    if (!svgElements) return null;
+
+    // Calculate viewBox
+    const bounds = calculateBounds(symbolData.graphics);
+    const viewBox = `${bounds.minX - 2} ${bounds.minY - 2} ${
+      bounds.width + 4
+    } ${bounds.height + 4}`;
+
+    return `<svg viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg">${svgElements}</svg>`;
+  };
+
+  // Calculate bounds of graphics elements
+  const calculateBounds = (graphics: any) => {
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
+
+    // Check rectangles
+    if (graphics.rectangles) {
+      graphics.rectangles.forEach((rect: any) => {
+        minX = Math.min(minX, rect.start.x, rect.end.x);
+        minY = Math.min(minY, rect.start.y, rect.end.y);
+        maxX = Math.max(maxX, rect.start.x, rect.end.x);
+        maxY = Math.max(maxY, rect.start.y, rect.end.y);
+      });
+    }
+
+    // Check circles
+    if (graphics.circles) {
+      graphics.circles.forEach((circle: any) => {
+        minX = Math.min(minX, circle.center.x - circle.radius);
+        minY = Math.min(minY, circle.center.y - circle.radius);
+        maxX = Math.max(maxX, circle.center.x + circle.radius);
+        maxY = Math.max(maxY, circle.center.y + circle.radius);
+      });
+    }
+
+    // Check polylines
+    if (graphics.polylines) {
+      graphics.polylines.forEach((polyline: any) => {
+        polyline.points.forEach((point: any) => {
+          minX = Math.min(minX, point.x);
+          minY = Math.min(minY, point.y);
+          maxX = Math.max(maxX, point.x);
+          maxY = Math.max(maxY, point.y);
+        });
+      });
+    }
+
+    return {
+      minX,
+      minY,
+      width: maxX - minX,
+      height: maxY - minY,
+    };
+  };
+
   const getComponentImage = (component: DatabaseComponent): string => {
-    if (component.symbol_svg) {
-      try {
-        // Remove fixed width/height and ensure viewBox for proper scaling
-        let processedSvg = component.symbol_svg;
-        
-        // Remove width and height attributes to allow CSS scaling
-        processedSvg = processedSvg.replace(/\s*width\s*=\s*["'][^"']*["']/gi, '');
-        processedSvg = processedSvg.replace(/\s*height\s*=\s*["'][^"']*["']/gi, '');
-        
-        // If there's no viewBox, try to add one based on removed dimensions
-        if (!processedSvg.includes('viewBox')) {
-          const widthMatch = component.symbol_svg.match(/width\s*=\s*["']([^"']*)["']/i);
-          const heightMatch = component.symbol_svg.match(/height\s*=\s*["']([^"']*)["']/i);
-          
-          if (widthMatch && heightMatch) {
-            const width = parseFloat(widthMatch[1]);
-            const height = parseFloat(heightMatch[1]);
-            if (!isNaN(width) && !isNaN(height)) {
-              processedSvg = processedSvg.replace(
-                /<svg/,
-                `<svg viewBox="0 0 ${width} ${height}"`
-              );
-            }
-          }
+    // Generate SVG from symbol_data if available
+    if (component.symbol_data) {
+      const svgContent = generateSvgFromSymbolData(component.symbol_data);
+      if (svgContent) {
+        try {
+          return `data:image/svg+xml;base64,${btoa(svgContent)}`;
+        } catch (error) {
+          logger.component(
+            "Failed to encode SVG for component",
+            component.name
+          );
         }
-        
-        return `data:image/svg+xml;base64,${btoa(processedSvg)}`;
-      } catch (error) {
-        logger.component("Failed to encode SVG for component", component.name);
       }
     }
 
-    // Fallback placeholder  
-    const icon = component.package_id?.charAt(0) || "C";
+    // Fallback placeholder
+    const icon = component.library?.charAt(0) || "C";
     return `data:image/svg+xml;base64,${btoa(
       `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" fill="#e8e8e8"/><text x="50" y="55" text-anchor="middle" font-size="16" fill="#666" font-family="monospace">${icon}</text></svg>`
     )}`;
@@ -90,7 +178,7 @@ export function useServerSearch() {
 
         // Test with simple ilike first to see if .or() is the issue
         const { data, error } = await supabase
-          .from("components_v2")
+          .from("components")
           .select("*")
           .ilike("name", searchPattern)
           .order("name")
@@ -125,35 +213,18 @@ export function useServerSearch() {
 
         // Transform results to ComponentDisplayData format
         const results: ComponentDisplayData[] = (data || []).map(
-          (comp: DatabaseComponent) => {
-            let pinCount = 0;
-            try {
-              if (comp.symbol_data) {
-                const symbolData =
-                  typeof comp.symbol_data === "string"
-                    ? JSON.parse(comp.symbol_data)
-                    : comp.symbol_data;
-                pinCount = symbolData.pins?.length || 0;
-              }
-            } catch (error) {
-              logger.component(
-                "Failed to parse symbol_data for search result:",
-                comp.name
-              );
-            }
+          (comp: any) => {
+            const pinCount = comp.symbol_data?.pins?.length || 0;
 
             return {
-              id: comp.uid || `search_${Date.now()}_${Math.random()}`,
+              id: comp.id,
               name: comp.name,
-              package_id: comp.package_id,
-              category: comp.package_id || "unknown",
+              library: comp.library,
+              description: comp.description,
+              pin_count: comp.pin_count || pinCount,
+              keywords: comp.keywords,
+              datasheet: comp.datasheet,
               image: getComponentImage(comp),
-              type: comp.package_id || "component",
-              description: `Package: ${comp.package_id}`,
-              manufacturer: "Unknown",
-              partNumber: comp.name,
-              pinCount: pinCount,
-              symbol_svg: comp.symbol_svg,
             };
           }
         );

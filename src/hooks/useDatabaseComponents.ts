@@ -1,33 +1,22 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { logger } from "@/lib/logger";
+import { Component } from "@/types";
 
-export interface DatabaseComponent {
-  idx?: number; // Keep for backward compatibility
-  uid: string; // New primary identifier
-  name: string;
-  package_id: string;
-  unit_id: string;
-  symbol_svg: string;
-  symbol_data: string; // JSON string containing pin data
-  kicad_sym_raw: string;
-  created_at: string;
-  updated_at: string;
-  is_graphical_symbol: boolean;
+export interface DatabaseComponent extends Component {
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface ComponentDisplayData {
   id: string;
   name: string;
-  package_id: string;
-  category: string;
-  image: string;
-  type: string;
+  library: string;
   description?: string;
-  manufacturer?: string;
-  partNumber?: string;
-  pinCount?: number;
-  symbol_svg?: string; // Add raw SVG for fallback rendering
+  pin_count: number;
+  keywords?: string;
+  datasheet?: string;
+  image?: string; // Generated SVG data URL
 }
 
 export function useDatabaseComponents() {
@@ -81,13 +70,13 @@ export function useDatabaseComponents() {
 
         const currentOffset = loadMore ? offset : 0;
         logger.api("Making Supabase query:", {
-          table: "components_v2",
+          table: "components",
           range: [currentOffset, currentOffset + PAGE_SIZE - 1],
           orderBy: "name",
         });
 
         const { data, error: fetchError } = await supabase
-          .from("components_v2")
+          .from("components")
           .select("*")
           .order("name")
           .range(currentOffset, currentOffset + PAGE_SIZE - 1);
@@ -113,51 +102,21 @@ export function useDatabaseComponents() {
           const displayComponents: ComponentDisplayData[] = data.map(
             (comp: DatabaseComponent) => {
               logger.api("Processing component:", {
-                idx: comp.idx,
+                id: comp.id,
                 name: comp.name,
-                package_id: comp.package_id,
-                hasSvg: !!comp.symbol_svg,
-                svgLength: comp.symbol_svg?.length || 0,
+                library: comp.library,
+                pin_count: comp.pin_count,
               });
 
-              // Parse symbol_data to get pin information
-              let pinCount = 0;
-              let pins: any[] = [];
-              try {
-                if (comp.symbol_data) {
-                  let symbolData;
-                  if (typeof comp.symbol_data === "string") {
-                    symbolData = JSON.parse(comp.symbol_data);
-                  } else {
-                    // symbol_data is already an object
-                    symbolData = comp.symbol_data;
-                  }
-                  pins = symbolData.pins || [];
-                  pinCount = pins.length;
-                }
-              } catch (error) {
-                logger.api(
-                  "Failed to parse symbol_data for component:",
-                  comp.name,
-                  error
-                );
-              }
-
               return {
-                id:
-                  comp.uid ||
-                  comp.idx?.toString() ||
-                  `temp_${Date.now()}_${tempIdCounter.current++}`, // Use uid as primary, fallback to idx, then temp
+                id: comp.id,
                 name: comp.name,
-                package_id: comp.package_id,
-                category: comp.package_id || "unknown", // Use package_id as category
+                library: comp.library,
+                description: comp.description,
+                pin_count: comp.pin_count,
+                keywords: comp.keywords,
+                datasheet: comp.datasheet,
                 image: getComponentImage(comp),
-                type: comp.package_id || "component", // Use package_id as type
-                description: `Package: ${comp.package_id}`, // Generate description from package_id
-                manufacturer: "Unknown", // Default value
-                partNumber: comp.name, // Use name as part number
-                pinCount: pinCount,
-                symbol_svg: comp.symbol_svg, // Include raw SVG for fallback
               };
             }
           );
@@ -265,46 +224,12 @@ export function useDatabaseComponents() {
 
   // Helper function to determine component image with memory optimization
   const getComponentImage = (component: DatabaseComponent): string => {
-    // Use actual SVG from database if available
-    if (component.symbol_svg) {
-      // Memory optimization: Use a lightweight placeholder for large SVGs
-      // Only convert to data URL when actually needed for display
-      if (component.symbol_svg.length > 10000) {
-        // For very large SVGs, use a placeholder and lazy load
-        return `data:image/svg+xml;base64,${btoa(
-          '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" fill="#e8e8e8"/><text x="50" y="55" text-anchor="middle" font-size="16" fill="#666">SVG</text></svg>'
-        )}`;
-      }
-
-      // For smaller SVGs, still use memory-efficient encoding
-      try {
-        // Remove fixed width/height and ensure viewBox for proper scaling
-        let processedSvg = component.symbol_svg;
-        
-        // Remove width and height attributes to allow CSS scaling
-        processedSvg = processedSvg.replace(/\s*width\s*=\s*["'][^"']*["']/gi, '');
-        processedSvg = processedSvg.replace(/\s*height\s*=\s*["'][^"']*["']/gi, '');
-        
-        // If there's no viewBox, try to add one based on removed dimensions
-        if (!processedSvg.includes('viewBox')) {
-          // Try to extract original dimensions to create viewBox
-          const widthMatch = component.symbol_svg.match(/width\s*=\s*["']([^"']*)["']/i);
-          const heightMatch = component.symbol_svg.match(/height\s*=\s*["']([^"']*)["']/i);
-          
-          if (widthMatch && heightMatch) {
-            const width = parseFloat(widthMatch[1]);
-            const height = parseFloat(heightMatch[1]);
-            if (!isNaN(width) && !isNaN(height)) {
-              processedSvg = processedSvg.replace(
-                /<svg/,
-                `<svg viewBox="0 0 ${width} ${height}"`
-              );
-            }
-          }
-        }
-        
-        // Use more memory-efficient base64 encoding
-        const svgBytes = new TextEncoder().encode(processedSvg);
+    // Generate SVG from symbol_data graphics
+    try {
+      const svgContent = generateSvgFromSymbolData(component.symbol_data);
+      if (svgContent) {
+        // Use memory-efficient base64 encoding
+        const svgBytes = new TextEncoder().encode(svgContent);
         let binaryString = "";
         const chunkSize = 1024;
 
@@ -318,18 +243,125 @@ export function useDatabaseComponents() {
 
         const base64Data = btoa(binaryString);
         return `data:image/svg+xml;base64,${base64Data}`;
-      } catch (error) {
-        console.warn(
-          `Failed to encode SVG for component ${component.name}:`,
-          error
-        );
-        // Fallback to category icon
-        return getCategoryIcon(component.package_id || "unknown");
       }
+    } catch (error) {
+      console.warn(
+        `Failed to generate SVG for component ${component.name}:`,
+        error
+      );
     }
 
     // Fallback to category icon
-    return getCategoryIcon(component.package_id || "unknown");
+    return getCategoryIcon(component.library || "unknown");
+  };
+
+  // Generate SVG from symbol_data
+  const generateSvgFromSymbolData = (symbolData: any): string | null => {
+    if (!symbolData || !symbolData.graphics) return null;
+
+    const graphics = symbolData.graphics;
+    let svgElements = "";
+
+    // Add rectangles
+    if (graphics.rectangles) {
+      graphics.rectangles.forEach((rect: any) => {
+        const width = Math.abs(rect.end.x - rect.start.x);
+        const height = Math.abs(rect.end.y - rect.start.y);
+        const x = Math.min(rect.start.x, rect.end.x);
+        const y = Math.min(rect.start.y, rect.end.y);
+        const fill = rect.fill?.type === "background" ? "#f0f0f0" : "none";
+        const stroke = rect.stroke?.type === "default" ? "#000" : "#000";
+        const strokeWidth = rect.stroke?.width || 0.254;
+
+        svgElements += `<rect x="${x}" y="${y}" width="${width}" height="${height}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"/>`;
+      });
+    }
+
+    // Add circles
+    if (graphics.circles) {
+      graphics.circles.forEach((circle: any) => {
+        const fill = circle.fill?.type === "background" ? "#f0f0f0" : "none";
+        const stroke = circle.stroke?.type === "default" ? "#000" : "#000";
+        const strokeWidth = circle.stroke?.width || 0.254;
+
+        svgElements += `<circle cx="${circle.center.x}" cy="${circle.center.y}" r="${circle.radius}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"/>`;
+      });
+    }
+
+    // Add polylines
+    if (graphics.polylines) {
+      graphics.polylines.forEach((polyline: any) => {
+        const points = polyline.points
+          .map((p: any) => `${p.x},${p.y}`)
+          .join(" ");
+        const fill = polyline.fill?.type === "none" ? "none" : "#000";
+        const stroke = polyline.stroke?.type === "default" ? "#000" : "#000";
+        const strokeWidth = polyline.stroke?.width || 0.254;
+
+        svgElements += `<polyline points="${points}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"/>`;
+      });
+    }
+
+    if (!svgElements) return null;
+
+    // Calculate viewBox
+    const bounds = calculateBounds(symbolData.graphics);
+    const viewBox = `${bounds.minX - 2} ${bounds.minY - 2} ${
+      bounds.width + 4
+    } ${bounds.height + 4}`;
+
+    return `<svg viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg">${svgElements}</svg>`;
+  };
+
+  // Calculate bounds of graphics elements
+  const calculateBounds = (graphics: any) => {
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
+
+    // Check rectangles
+    if (graphics.rectangles) {
+      graphics.rectangles.forEach((rect: any) => {
+        minX = Math.min(minX, rect.start.x, rect.end.x);
+        minY = Math.min(minY, rect.start.y, rect.end.y);
+        maxX = Math.max(maxX, rect.start.x, rect.end.x);
+        maxY = Math.max(maxY, rect.start.y, rect.end.y);
+      });
+    }
+
+    // Check circles
+    if (graphics.circles) {
+      graphics.circles.forEach((circle: any) => {
+        minX = Math.min(minX, circle.center.x - circle.radius);
+        minY = Math.min(minY, circle.center.y - circle.radius);
+        maxX = Math.max(maxX, circle.center.x + circle.radius);
+        maxY = Math.max(maxY, circle.center.y + circle.radius);
+      });
+    }
+
+    // Check polylines
+    if (graphics.polylines) {
+      graphics.polylines.forEach((polyline: any) => {
+        polyline.points.forEach((point: any) => {
+          minX = Math.min(minX, point.x);
+          minY = Math.min(minY, point.y);
+          maxX = Math.max(maxX, point.x);
+          maxY = Math.max(maxY, point.y);
+        });
+      });
+    }
+
+    return {
+      minX: minX === Infinity ? -10 : minX,
+      minY: minY === Infinity ? -10 : minY,
+      maxX: maxX === -Infinity ? 10 : maxX,
+      maxY: maxY === -Infinity ? 10 : maxY,
+      width:
+        (maxX === -Infinity ? 10 : maxX) - (minX === Infinity ? -10 : minX),
+      height:
+        (maxY === -Infinity ? 10 : maxY) - (minY === Infinity ? -10 : minY),
+    };
   };
 
   // Memory-efficient category icon generator
@@ -399,34 +431,16 @@ export function useDatabaseComponents() {
         const nameMatch = component.name
           .toLowerCase()
           .includes(normalizedQuery);
-        const packageIdMatch =
-          component.package_id?.toLowerCase().includes(normalizedQuery) ??
-          false;
-        const categoryMatch = component.category
+        const libraryMatch = component.library
           .toLowerCase()
           .includes(normalizedQuery);
         const descriptionMatch =
           component.description?.toLowerCase().includes(normalizedQuery) ??
           false;
-        const manufacturerMatch =
-          component.manufacturer?.toLowerCase().includes(normalizedQuery) ??
-          false;
-        const partNumberMatch =
-          component.partNumber?.toLowerCase().includes(normalizedQuery) ??
-          false;
-        const typeMatch = component.type
-          .toLowerCase()
-          .includes(normalizedQuery);
+        const keywordsMatch =
+          component.keywords?.toLowerCase().includes(normalizedQuery) ?? false;
 
-        return (
-          nameMatch ||
-          packageIdMatch ||
-          categoryMatch ||
-          descriptionMatch ||
-          manufacturerMatch ||
-          partNumberMatch ||
-          typeMatch
-        );
+        return nameMatch || libraryMatch || descriptionMatch || keywordsMatch;
       });
 
       // Debug: Show what components we're searching through
@@ -435,10 +449,10 @@ export function useDatabaseComponents() {
           .filter(
             (c) =>
               c.name.toLowerCase().includes("74") ||
-              c.package_id?.toLowerCase().includes("74")
+              c.library?.toLowerCase().includes("74")
           )
           .slice(0, 5)
-          .map((c) => ({ name: c.name, package_id: c.package_id }));
+          .map((c) => ({ name: c.name, library: c.library }));
 
         logger.component("Debug 74au search", {
           query: normalizedQuery,
@@ -454,7 +468,7 @@ export function useDatabaseComponents() {
         totalComponents: components.length,
         sampleResults: results
           .slice(0, 3)
-          .map((r) => ({ name: r.name, package_id: r.package_id })),
+          .map((r) => ({ name: r.name, library: r.library })),
       });
 
       searchCacheRef.current.set(normalizedQuery, {
@@ -471,12 +485,12 @@ export function useDatabaseComponents() {
   ): ComponentDisplayData[] => {
     if (!category) return components;
     return components.filter(
-      (component) => component.category.toLowerCase() === category.toLowerCase()
+      (component) => component.library.toLowerCase() === category.toLowerCase()
     );
   };
 
   const getCategories = (): string[] => {
-    const categories = [...new Set(components.map((comp) => comp.category))];
+    const categories = [...new Set(components.map((comp) => comp.library))];
     return categories.sort();
   };
 
@@ -498,8 +512,10 @@ export function useDatabaseComponents() {
       estimatedMemoryUsage: components.reduce((total, comp) => {
         return (
           total +
-          (comp.symbol_svg?.length || 0) +
-          (comp.image?.length || 0) +
+          (comp.name?.length || 0) +
+          (comp.description?.length || 0) +
+          (comp.keywords?.length || 0) +
+          JSON.stringify(comp).length +
           1000
         ); // Rough estimate
       }, 0),

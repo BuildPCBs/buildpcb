@@ -1,436 +1,352 @@
-import * as fabric from "fabric";
+import React, { useState } from "react";
+import { Rect, Circle, Text, Group, Line } from "react-konva";
+import Konva from "konva";
 import { logger } from "@/lib/logger";
+import { Component } from "@/types";
 
-// Component styling configuration
-const componentStyles = {
-  resistor: {
-    width: 60,
-    height: 20,
-    fill: "#F59E0B",
-    stroke: "#D97706",
-    shape: "rect",
-    pinDistance: 35,
-  },
-  capacitor: {
-    width: 40,
-    height: 35,
-    fill: "#6366F1",
-    stroke: "#4F46E5",
-    shape: "rect",
-    pinDistance: 25,
-  },
-  led: {
-    width: 30,
-    height: 30,
-    fill: "#EF4444",
-    stroke: "#DC2626",
-    shape: "circle",
-    pinDistance: 20,
-  },
-  transistor: {
-    width: 45,
-    height: 35,
-    fill: "#8B5CF6",
-    stroke: "#7C3AED",
-    shape: "rect",
-    pinDistance: 25,
-  },
-  diode: {
-    width: 50,
-    height: 25,
-    fill: "#10B981",
-    stroke: "#059669",
-    shape: "rect",
-    pinDistance: 30,
-  },
-  default: {
-    width: 60,
-    height: 30,
-    fill: "#2563EB",
-    stroke: "#1E40AF",
-    shape: "rect",
-    pinDistance: 35,
-  },
+// Component factory that creates Konva components from database symbol_data
+export const SimpleComponent: React.FC<{
+  component: Component;
+  x: number;
+  y: number;
+  scale?: number;
+  showPins?: boolean;
+  onDragEnd?: (componentId: string, newPos: { x: number; y: number }) => void;
+  onDragMove?: (componentId: string, newPos: { x: number; y: number }) => void;
+  onPinClick?: (pinNumber: string, pinX: number, pinY: number) => void;
+  isWireMode?: boolean;
+  isSelected?: boolean;
+  onClick?: () => void;
+}> = ({
+  component,
+  x,
+  y,
+  scale = 10,
+  showPins = false, // 'showPins' now controls the clickable hotspot
+  onDragEnd,
+  onDragMove,
+  onPinClick,
+  isWireMode = false,
+  isSelected = false,
+  onClick,
+}) => {
+  const handlePinClick = (pinNumber: string, pinX: number, pinY: number) => {
+    if (onPinClick) {
+      onPinClick(pinNumber, pinX, pinY);
+    }
+  };
+
+  const renderGraphics = () => {
+    const elements: React.JSX.Element[] = [];
+    const graphics = component.symbol_data.graphics;
+
+    // KiCad to Konva coordinate transformation (centered)
+    // Get component bounds to center it
+    let minX = Infinity,
+      maxX = -Infinity,
+      minY = Infinity,
+      maxY = -Infinity;
+
+    // Calculate bounds from all graphics elements
+    if (graphics.rectangles) {
+      graphics.rectangles.forEach((rect) => {
+        minX = Math.min(minX, rect.start.x, rect.end.x);
+        maxX = Math.max(maxX, rect.start.x, rect.end.x);
+        minY = Math.min(minY, rect.start.y, rect.end.y);
+        maxY = Math.max(maxY, rect.start.y, rect.end.y);
+      });
+    }
+    if (graphics.polylines) {
+      graphics.polylines.forEach((polyline) => {
+        polyline.points.forEach((point) => {
+          minX = Math.min(minX, point.x);
+          maxX = Math.max(maxX, point.x);
+          minY = Math.min(minY, point.y);
+          maxY = Math.max(maxY, point.y);
+        });
+      });
+    }
+
+    // Default bounds if no graphics
+    if (minX === Infinity) {
+      minX = -5;
+      maxX = 5;
+      minY = -5;
+      maxY = 5;
+    }
+
+    // Center offsets (assuming a reasonable display size)
+    const displayWidth = 200; // Reasonable display width
+    const displayHeight = 150; // Reasonable display height
+    const offsetX = displayWidth / 2;
+    const offsetY = displayHeight / 2;
+
+    const toKonva = (x: number, y: number) => ({
+      x: offsetX + x * scale,
+      y: offsetY - y * scale, // Flip Y axis
+    });
+
+    // Render rectangles (package outlines)
+    if (graphics.rectangles) {
+      graphics.rectangles.forEach((rect, index) => {
+        const start = toKonva(rect.start.x, rect.start.y);
+        const end = toKonva(rect.end.x, rect.end.y);
+
+        const konvaRect = (
+          <Rect
+            key={`rect-${index}`}
+            x={Math.min(start.x, end.x)}
+            y={Math.min(start.y, end.y)}
+            width={Math.abs(end.x - start.x)}
+            height={Math.abs(end.y - start.y)}
+            fill={rect.fill?.type === "background" ? "#f0f0f0" : "transparent"}
+            stroke="#000000"
+            strokeWidth={0.254 * scale * 0.5}
+          />
+        );
+        elements.push(konvaRect);
+      });
+    }
+
+    // Render circles
+    if (graphics.circles) {
+      graphics.circles.forEach((circle, index) => {
+        const center = toKonva(circle.center.x, circle.center.y);
+
+        const konvaCircle = (
+          <Circle
+            key={`circle-${index}`}
+            x={center.x}
+            y={center.y}
+            radius={circle.radius * scale}
+            fill={
+              circle.fill?.type === "background" ? "#f0f0f0" : "transparent"
+            }
+            stroke="#000000"
+            strokeWidth={0.254 * scale * 0.5}
+          />
+        );
+        elements.push(konvaCircle);
+      });
+    }
+
+    // Render polylines (logic symbols like NOR gates - open shapes)
+    if (graphics.polylines) {
+      graphics.polylines.forEach((polyline, index) => {
+        // Convert each point from KiCad to Konva coordinates
+        const konvaPoints = polyline.points.flatMap((point) => {
+          const konvaPoint = toKonva(point.x, point.y);
+          return [konvaPoint.x, konvaPoint.y];
+        });
+
+        const konvaLine = (
+          <Line
+            key={`polyline-${index}`}
+            points={konvaPoints}
+            stroke="#000000"
+            strokeWidth={0.254 * scale * 0.5}
+            closed={false} // NOR gates and logic symbols are open shapes
+          />
+        );
+        elements.push(konvaLine);
+      });
+    }
+
+    // Render text (component labels inside symbols)
+    if (graphics.text) {
+      graphics.text.forEach((textItem, index) => {
+        const position = toKonva(textItem.position.x, textItem.position.y);
+
+        const konvaText = (
+          <Text
+            key={`text-${index}`}
+            x={position.x}
+            y={position.y}
+            text={textItem.text}
+            fontSize={(textItem.size || 1.27) * scale}
+            rotation={textItem.rotation || 0}
+            fontFamily="DM Sans" // Apply DM Sans font to graphics text
+            fill="#000000"
+            align="center"
+            verticalAlign="middle"
+          />
+        );
+        elements.push(konvaText);
+      });
+    }
+
+    return elements;
+  };
+
+  const renderPins = () => {
+    // Use same coordinate transformation as graphics
+    const displayWidth = 200;
+    const displayHeight = 150;
+    const offsetX = displayWidth / 2;
+    const offsetY = displayHeight / 2;
+
+    const toKonva = (x: number, y: number) => ({
+      x: offsetX + x * scale,
+      y: offsetY - y * scale,
+    });
+
+    return component.symbol_data.pins.map((pin) => {
+      const pos = toKonva(pin.position.x, pin.position.y);
+      const length = pin.length * scale;
+      const angle = ((pin.position.angle || 0) * Math.PI) / 180;
+
+      // Calculate pin line end point (extends outward from pin position)
+      const endX = pos.x + length * Math.cos(angle);
+      const endY = pos.y - length * Math.sin(angle);
+
+      // Pin number label (at end of pin line)
+      const pinNumberX = endX + 8;
+      const pinNumberY = endY - 5;
+
+      // Pin name label (near pin position)
+      const nameOffset = 12;
+      const nameX = pos.x - nameOffset * Math.cos(angle);
+      const nameY = pos.y + nameOffset * Math.sin(angle);
+
+      return (
+        <Group key={`pin-group-${component.id}-${pin.number}`}>
+          {/* Pin Line */}
+          <Line
+            points={[pos.x, pos.y, endX, endY]}
+            stroke="#000000"
+            strokeWidth={1}
+          />
+          {/* Pin Number (at end of line) */}
+          <Text
+            x={pinNumberX}
+            y={pinNumberY}
+            text={pin.number}
+            fontSize={10}
+            fill="#000000"
+            fontFamily="DM Sans"
+          />
+          {/* Pin Name (near pin position) */}
+          <Text
+            x={nameX}
+            y={nameY}
+            text={pin.name}
+            fontSize={10}
+            fill="#000000"
+            fontFamily="DM Sans"
+          />
+          {/* Pin Hotspot (Clickable Circle) */}
+          <Circle
+            x={pos.x}
+            y={pos.y}
+            radius={scale * 0.4}
+            fill="#10B981"
+            stroke="#059669"
+            strokeWidth={1}
+            visible={showPins || isWireMode}
+            onClick={() => handlePinClick(pin.number, pos.x, pos.y)}
+            onMouseEnter={() => {
+              if (isWireMode) {
+                document.body.style.cursor = "crosshair";
+              }
+            }}
+            onMouseLeave={() => {
+              document.body.style.cursor = "default";
+            }}
+            name={`pin-${pin.number}`}
+            ref={(node) => {
+              if (node) {
+                (node as any).data = { pinNumber: pin.number };
+              }
+            }}
+          />
+        </Group>
+      );
+    });
+  };
+
+  const handleDragEnd = (e: any) => {
+    if (onDragEnd) {
+      const newPos = { x: e.target.x(), y: e.target.y() };
+      onDragEnd(component.id, newPos);
+    }
+  };
+
+  const handleDragMove = (e: any) => {
+    if (onDragMove) {
+      const newPos = { x: e.target.x(), y: e.target.y() };
+      onDragMove(component.id, newPos);
+    }
+  };
+
+  // Get dimensions for selection box (using centered coordinates)
+  const mainRect = component.symbol_data.graphics?.rectangles?.[0];
+  const displayWidth = 200;
+  const displayHeight = 150;
+  const offsetX = displayWidth / 2;
+  const offsetY = displayHeight / 2;
+
+  const rectX = mainRect
+    ? offsetX + Math.min(mainRect.start.x, mainRect.end.x) * scale
+    : offsetX - 10 * scale;
+  const rectY = mainRect
+    ? offsetY - Math.max(mainRect.start.y, mainRect.end.y) * scale // Note: Y is flipped
+    : offsetY - 10 * scale;
+  const rectWidth = mainRect
+    ? Math.abs(mainRect.end.x - mainRect.start.x) * scale
+    : 20 * scale;
+  const rectHeight = mainRect
+    ? Math.abs(mainRect.end.y - mainRect.start.y) * scale
+    : 20 * scale;
+
+  return (
+    <Group
+      x={x}
+      y={y}
+      draggable={!!onDragEnd && !isWireMode} // Only draggable if not in wire mode
+      onDragEnd={handleDragEnd}
+      onDragMove={handleDragMove}
+      onClick={onClick}
+      ref={(node) => {
+        if (node) {
+          (node as any).data = { componentId: component.id };
+        }
+      }}
+    >
+      {/* Selection highlight (invisible for easier dragging) */}
+      {isSelected && (
+        <Rect
+          x={rectX - scale * 0.5} // Position relative to the main rect
+          y={rectY - scale * 0.5}
+          width={rectWidth + scale} // Add padding
+          height={rectHeight + scale}
+          fill="transparent" // Make invisible
+          stroke="transparent" // Make invisible
+          strokeWidth={0} // No border
+          cornerRadius={2}
+        />
+      )}
+      {renderGraphics()}
+      {renderPins()}
+    </Group>
+  );
 };
 
-// ENHANCED COMPONENT FACTORY WITH FUNCTIONAL PINS
-export const createSimpleComponent = (
-  fabricCanvas: fabric.Canvas,
-  componentInfo: {
-    type: string;
-    svgPath: string;
-    name: string;
-    x?: number;
-    y?: number;
-    id?: string; // Add optional id parameter
-  }
-) => {
-  logger.canvas(`Creating ${componentInfo.name} on canvas:`, !!fabricCanvas);
-  logger.canvas(`Canvas type:`, fabricCanvas?.constructor?.name);
-
-  if (!fabricCanvas) {
-    logger.canvas("No fabric canvas provided to createSimpleComponent");
-    return;
-  }
-
-  // Get component-specific styling
-  const style =
-    componentStyles[componentInfo.type as keyof typeof componentStyles] ||
-    componentStyles.default;
-
-  // Create component shape based on type
-  let componentShape: fabric.Object;
-
-  if (style.shape === "circle") {
-    componentShape = new fabric.Circle({
-      radius: style.width / 2,
-      fill: style.fill,
-      stroke: style.stroke,
-      strokeWidth: 2,
-      originX: "center",
-      originY: "center",
-    });
-  } else {
-    componentShape = new fabric.Rect({
-      width: style.width,
-      height: style.height,
-      fill: style.fill,
-      stroke: style.stroke,
-      strokeWidth: 2,
-      rx: 4, // Rounded corners
-      ry: 4,
-      originX: "center",
-      originY: "center",
-    });
-  }
-
-  // Add component label with better styling
-  const label = new fabric.Text(componentInfo.name.substring(0, 6), {
-    fontSize: 9,
-    fill: "white",
-    fontFamily: "Arial, sans-serif",
-    fontWeight: "bold",
-    originX: "center",
-    originY: "center",
-  });
-
-  // Create FUNCTIONAL connection pins with metadata
+// Function to create simple component data for serialization
+export const createSimpleComponentData = (componentInfo: {
+  type: string;
+  svgPath: string;
+  name: string;
+  x?: number;
+  y?: number;
+  id?: string;
+}) => {
   const componentId = componentInfo.id || `component_${Date.now()}`;
-
-  const pin1 = new fabric.Circle({
-    radius: 4,
-    fill: "#10B981", // Green pins
-    stroke: "#059669",
-    strokeWidth: 1,
-    originX: "center",
-    originY: "center",
-    left: -style.pinDistance,
-    top: 0,
-    // Add pin metadata that the wiring tool expects
-    pin: true, // This is what the wiring tool looks for!
-    data: {
-      type: "pin",
-      componentId: componentId,
-      pinId: "pin1",
-      pinNumber: 1,
-      isConnectable: true,
-    },
-  });
-  logger.canvas("Pin1 created with pin=true and metadata");
-
-  const pin2 = new fabric.Circle({
-    radius: 4,
-    fill: "#10B981", // Green pins
-    stroke: "#059669",
-    strokeWidth: 1,
-    originX: "center",
-    originY: "center",
-    left: style.pinDistance,
-    top: 0,
-    // Add pin metadata that the wiring tool expects
-    pin: true, // This is what the wiring tool looks for!
-    data: {
-      type: "pin",
-      componentId: componentId,
-      pinId: "pin2",
-      pinNumber: 2,
-      isConnectable: true,
-    },
-  });
-  logger.canvas("Pin2 created with pin=true and metadata");
-
-  // Group all parts with component metadata
-  const component = new fabric.Group([componentShape, label, pin1, pin2], {
-    left: componentInfo.x || fabricCanvas.getVpCenter().x,
-    top: componentInfo.y || fabricCanvas.getVpCenter().y,
-  });
-
-  // Add component metadata that the wiring tool expects
-  component.set("componentType", componentInfo.type); // This is what the wiring tool looks for!
-  component.set("id", componentInfo.id || `component_${Date.now()}`); // Set the component ID for wire connections
-  component.set("data", {
+  return {
+    id: componentId,
     type: "component",
     componentType: componentInfo.type,
     componentName: componentInfo.name,
-    pins: ["pin1", "pin2"],
-  });
-
-  // Make component selectable and movable
-  component.set({
-    selectable: true,
-    evented: true,
-    lockUniScaling: true,
-    hasControls: true,
-    hasBorders: true,
-    centeredRotation: true, // Enable smooth rotation around center
-  });
-
-  // Add hover event handlers to show/hide pins
-  logger.canvas(`🎯 Setting up pin hover handlers for ${componentInfo.name}`);
-
-  // Function to show pins on component hover
-  const showPins = () => {
-    pin1.set({
-      visible: true,
-      opacity: 1,
-      evented: true,
-    });
-    pin2.set({
-      visible: true,
-      opacity: 1,
-      evented: true,
-    });
-    fabricCanvas.renderAll();
+    x: componentInfo.x || 100,
+    y: componentInfo.y || 100,
   };
-
-  // Function to hide pins when not hovering
-  const hidePins = () => {
-    pin1.set({
-      visible: false,
-      opacity: 0,
-      evented: false,
-    });
-    pin2.set({
-      visible: false,
-      opacity: 0,
-      evented: false,
-    });
-    fabricCanvas.renderAll();
-  };
-
-  // Add hover event handlers to the component group
-  component.on("mouseover", showPins);
-  component.on("mouseout", hidePins);
-
-  // Also add hover handlers to individual pins to keep them visible when hovering directly on pins
-  pin1.on("mouseover", showPins);
-  pin1.on("mouseout", (e: any) => {
-    // Only hide pins if mouse is not over the component group
-    const pointer = fabricCanvas.getPointer(e.e);
-    const componentBounds = component.getBoundingRect();
-    const isOverComponent =
-      pointer.x >= componentBounds.left &&
-      pointer.x <= componentBounds.left + componentBounds.width &&
-      pointer.y >= componentBounds.top &&
-      pointer.y <= componentBounds.top + componentBounds.height;
-
-    if (!isOverComponent) {
-      hidePins();
-    }
-  });
-
-  pin2.on("mouseover", showPins);
-  pin2.on("mouseout", (e: any) => {
-    // Only hide pins if mouse is not over the component group
-    const pointer = fabricCanvas.getPointer(e.e);
-    const componentBounds = component.getBoundingRect();
-    const isOverComponent =
-      pointer.x >= componentBounds.left &&
-      pointer.x <= componentBounds.left + componentBounds.width &&
-      pointer.y >= componentBounds.top &&
-      pointer.y <= componentBounds.top + componentBounds.height;
-
-    if (!isOverComponent) {
-      hidePins();
-    }
-  });
-
-  fabricCanvas.renderAll();
-
-  logger.canvas(`Added ${componentInfo.name} with functional pins!`);
-};
-
-// Function to recreate pins for pasted simple components
-export const recreateSimpleComponentPins = (
-  component: fabric.Group,
-  fabricCanvas: fabric.Canvas
-): fabric.Group => {
-  if (!component || !fabricCanvas) return component;
-
-  const componentData = (component as any).data;
-  const componentType = (component as any).componentType;
-
-  if (!componentData || componentData.type !== "component" || !componentType) {
-    logger.canvas("Not a simple component, skipping pin recreation");
-    return component;
-  }
-
-  logger.canvas(
-    `Recreating simple pins for ${componentData.componentName || componentType}`
-  );
-
-  const style =
-    componentStyles[componentType as keyof typeof componentStyles] ||
-    componentStyles.resistor;
-  const newComponentId = `component_${Date.now()}_${Math.random()
-    .toString(36)
-    .substr(2, 9)}`;
-
-  // Get existing objects from the component (excluding old pins)
-  const existingObjects = component.getObjects().filter((obj: any) => {
-    // Keep everything except old pins
-    return !obj.pin && !(obj.data && obj.data.type === "pin");
-  });
-
-  // Create new functional pins
-  const pin1 = new fabric.Circle({
-    radius: 5,
-    fill: "#10B981",
-    stroke: "#059669",
-    strokeWidth: 2,
-    originX: "center",
-    originY: "center",
-    left: -style.pinDistance,
-    top: 0,
-  });
-
-  pin1.set("pin", true);
-  pin1.set("data", {
-    type: "pin",
-    componentId: newComponentId,
-    pinId: "pin1",
-    pinNumber: 1,
-    isConnectable: true,
-  });
-
-  const pin2 = new fabric.Circle({
-    radius: 5,
-    fill: "#10B981",
-    stroke: "#059669",
-    strokeWidth: 2,
-    originX: "center",
-    originY: "center",
-    left: style.pinDistance,
-    top: 0,
-  });
-
-  pin2.set("pin", true);
-  pin2.set("data", {
-    type: "pin",
-    componentId: newComponentId,
-    pinId: "pin2",
-    pinNumber: 2,
-    isConnectable: true,
-  });
-
-  // Create new component group with existing objects + new pins
-  const newComponent = new fabric.Group([...existingObjects, pin1, pin2], {
-    left: component.left,
-    top: component.top,
-    angle: component.angle,
-    scaleX: component.scaleX,
-    scaleY: component.scaleY,
-  });
-
-  // Restore component metadata with new ID
-  newComponent.set("componentType", componentType);
-  newComponent.set("data", {
-    type: "component",
-    componentType: componentType,
-    componentName: componentData.componentName,
-    pins: ["pin1", "pin2"],
-  });
-
-  // Restore component properties
-  newComponent.set({
-    selectable: true,
-    evented: true,
-    lockUniScaling: true,
-    hasControls: true,
-    hasBorders: true,
-    centeredRotation: true,
-  });
-
-  // Add hover event handlers to the recreated component
-  logger.canvas(`🎯 Setting up pin hover handlers for recreated component`);
-
-  // Function to show pins on component hover
-  const showPins = () => {
-    pin1.set({
-      visible: true,
-      opacity: 1,
-      evented: true,
-    });
-    pin2.set({
-      visible: true,
-      opacity: 1,
-      evented: true,
-    });
-    fabricCanvas.renderAll();
-  };
-
-  // Function to hide pins when not hovering
-  const hidePins = () => {
-    pin1.set({
-      visible: false,
-      opacity: 0,
-      evented: false,
-    });
-    pin2.set({
-      visible: false,
-      opacity: 0,
-      evented: false,
-    });
-    fabricCanvas.renderAll();
-  };
-
-  // Add hover event handlers to the component group
-  newComponent.on("mouseover", showPins);
-  newComponent.on("mouseout", hidePins);
-
-  // Also add hover handlers to individual pins
-  pin1.on("mouseover", showPins);
-  pin1.on("mouseout", (e: any) => {
-    const pointer = fabricCanvas.getPointer(e.e);
-    const componentBounds = newComponent.getBoundingRect();
-    const isOverComponent =
-      pointer.x >= componentBounds.left &&
-      pointer.x <= componentBounds.left + componentBounds.width &&
-      pointer.y >= componentBounds.top &&
-      pointer.y <= componentBounds.top + componentBounds.height;
-
-    if (!isOverComponent) {
-      hidePins();
-    }
-  });
-
-  pin2.on("mouseover", showPins);
-  pin2.on("mouseout", (e: any) => {
-    const pointer = fabricCanvas.getPointer(e.e);
-    const componentBounds = newComponent.getBoundingRect();
-    const isOverComponent =
-      pointer.x >= componentBounds.left &&
-      pointer.x <= componentBounds.left + componentBounds.width &&
-      pointer.y >= componentBounds.top &&
-      pointer.y <= componentBounds.top + componentBounds.height;
-
-    if (!isOverComponent) {
-      hidePins();
-    }
-  });
-
-  logger.canvas(
-    `Simple pin recreation: Added functional pins to pasted component`
-  );
-  return newComponent;
 };

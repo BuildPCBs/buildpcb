@@ -193,14 +193,16 @@ function LazyImage({
 interface ComponentPickerOverlayProps {
   isVisible: boolean;
   onClose: () => void;
+  onAddComponent?: (componentData: any) => void;
 }
 
 interface ComponentPreviewProps {
   component: ComponentDisplayData | null;
   onClose: () => void;
+  onAddComponent?: (componentData: any) => void;
 }
 
-function ComponentPreview({ component, onClose }: ComponentPreviewProps) {
+function ComponentPreview({ component, onClose, onAddComponent }: ComponentPreviewProps) {
   if (!component) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-6 text-gray-400">
@@ -220,7 +222,7 @@ function ComponentPreview({ component, onClose }: ComponentPreviewProps) {
           {component.image ? (
             <img
               src={component.image}
-              alt={component.package_id}
+              alt={component.library}
               className="object-contain"
               style={{
                 width: "100%",
@@ -237,7 +239,7 @@ function ComponentPreview({ component, onClose }: ComponentPreviewProps) {
           ) : null}
           <div className="w-full h-full bg-gray-100 rounded flex flex-col items-center justify-center text-gray-500 hidden">
             <div className="text-2xl font-semibold mb-1">
-              {component.package_id.charAt(0)}
+              {component.library.charAt(0)}
             </div>
             <p className="text-xs">No image available</p>
           </div>
@@ -245,9 +247,9 @@ function ComponentPreview({ component, onClose }: ComponentPreviewProps) {
 
         <div className="text-center">
           <h3 className="font-semibold text-gray-900 text-base mb-1">
-            {cleanComponentName(component.package_id)}
+            {cleanComponentName(component.library)}
           </h3>
-          <p className="text-sm text-gray-500">{component.category}</p>
+          <p className="text-sm text-gray-500">{component.library}</p>
         </div>
       </div>
 
@@ -266,32 +268,19 @@ function ComponentPreview({ component, onClose }: ComponentPreviewProps) {
           )}
 
           <div className="grid grid-cols-2 gap-3">
-            {component.manufacturer && (
-              <div>
-                <h4 className="text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">
-                  Manufacturer
-                </h4>
-                <p className="text-sm text-gray-600">
-                  {component.manufacturer}
-                </p>
-              </div>
-            )}
-
-            {component.partNumber && (
-              <div>
-                <h4 className="text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">
-                  Part Number
-                </h4>
-                <p className="text-sm text-gray-600">{component.partNumber}</p>
-              </div>
-            )}
+            <div>
+              <h4 className="text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">
+                Part Number
+              </h4>
+              <p className="text-sm text-gray-600">{component.name}</p>
+            </div>
 
             <div>
               <h4 className="text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">
                 Pins
               </h4>
               <p className="text-sm text-gray-600">
-                {component.pinCount || 0} pins
+                {component.pin_count || 0} pins
               </p>
             </div>
 
@@ -299,7 +288,7 @@ function ComponentPreview({ component, onClose }: ComponentPreviewProps) {
               <h4 className="text-xs font-semibold text-gray-700 mb-1.5 uppercase tracking-wide">
                 Type
               </h4>
-              <p className="text-sm text-gray-600">{component.type}</p>
+              <p className="text-sm text-gray-600">{component.library}</p>
             </div>
           </div>
         </div>
@@ -307,60 +296,36 @@ function ComponentPreview({ component, onClose }: ComponentPreviewProps) {
 
       <button
         onClick={() => {
-          logger.component("Add to Canvas clicked for:", component.package_id);
+          if (!onAddComponent) {
+            logger.component("No onAddComponent handler provided");
+            return;
+          }
+
+          logger.component("Add to Canvas clicked for:", component.library);
           logger.component("Component data:", {
             id: component.id,
-            type: component.type,
+            library: component.library,
             image: component.image,
             name: component.name,
-            package_id: component.package_id,
-            category: component.category,
             description: component.description,
-            manufacturer: component.manufacturer,
-            partNumber: component.partNumber,
-            pinCount: component.pinCount,
+            pin_count: component.pin_count,
           });
-          logger.component(
-            "Image starts with:",
-            component.image.substring(0, 50) + "..."
-          );
-          logger.component("Image length:", component.image.length);
-
-          const timestamp = new Date().toISOString();
-          logger.component(`Adding ${component.name} to canvas from overlay`);
 
           try {
-            logger.component(
-              "Canvas command manager canvas:",
-              canvasCommandManager.getCanvas()
-            );
-            const result = canvasCommandManager.executeCommand(
-              "component:add",
-              {
-                id: component.id,
-                type: component.type,
-                svgPath: component.image,
-                name: component.name,
-                category: component.category,
-                description: component.description,
-                manufacturer: component.manufacturer,
-                partNumber: component.partNumber,
-                pinCount: component.pinCount,
-              }
-            );
+            // Call the provided handler to add component to canvas
+            onAddComponent({
+              id: component.id,
+              type: component.library,
+              library: component.library,
+              name: component.name,
+              description: component.description,
+              pinCount: component.pin_count,
+            });
 
-            logger.component("Command execution result:", result);
-
-            if (result) {
-              logger.component("Component added successfully");
-              onClose();
-            } else {
-              console.error(
-                "❌ Failed to add component - command returned false"
-              );
-            }
+            logger.component("Component added successfully");
+            onClose();
           } catch (error) {
-            console.error("❌ Error executing component:add command:", error);
+            console.error("❌ Error adding component:", error);
           }
         }}
         className="w-full mt-4 px-4 py-2.5 bg-[#0038DF] text-white rounded-lg hover:bg-[#0038DF]/90 transition-colors focus:outline-none focus:ring-2 focus:ring-[#0038DF]/50 font-medium text-sm"
@@ -374,6 +339,7 @@ function ComponentPreview({ component, onClose }: ComponentPreviewProps) {
 export function ComponentPickerOverlay({
   isVisible,
   onClose,
+  onAddComponent,
 }: ComponentPickerOverlayProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebounce(searchQuery, 0); // Instant search
@@ -784,24 +750,23 @@ export function ComponentPickerOverlay({
             logger.component(`Selected component data:`, {
               id: selectedComponent.id,
               name: selectedComponent.name,
-              package_id: selectedComponent.package_id,
-              type: selectedComponent.type,
+              library: selectedComponent.library,
               hasImage: !!selectedComponent.image,
               imageLength: selectedComponent.image?.length,
-              pinCount: selectedComponent.pinCount,
+              pin_count: selectedComponent.pin_count,
               imagePreview: selectedComponent.image?.substring(0, 200) + "...",
             });
 
             canvasCommandManager.executeCommand("component:add", {
               id: selectedComponent.id,
-              type: selectedComponent.type,
+              type: selectedComponent.library,
               svgPath: selectedComponent.image,
               name: selectedComponent.name,
-              category: selectedComponent.category,
+              category: selectedComponent.library,
               description: selectedComponent.description,
-              manufacturer: selectedComponent.manufacturer,
-              partNumber: selectedComponent.partNumber,
-              pinCount: selectedComponent.pinCount,
+              manufacturer: "Unknown",
+              partNumber: selectedComponent.name,
+              pinCount: selectedComponent.pin_count,
             });
             onClose();
           }
@@ -1029,13 +994,13 @@ export function ComponentPickerOverlay({
                       <div className="flex items-center gap-3">
                         <div className="w-14 h-14 bg-gray-50 rounded-lg flex items-center justify-center flex-shrink-0">
                           <LazyImage
-                            src={component.image}
+                            src={component.image || ""}
                             alt={cleanComponentName(component.name)}
                             className="w-12 h-12 object-contain"
                             placeholder={
                               <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center text-sm font-medium text-gray-600">
                                 {cleanComponentName(
-                                  component.name ?? component.package_id ?? "?"
+                                  component.name ?? component.library ?? "?"
                                 )
                                   .charAt(0)
                                   .toUpperCase()}
@@ -1048,12 +1013,12 @@ export function ComponentPickerOverlay({
                             {cleanComponentName(component.name)}
                           </div>
                           <div className="text-xs text-gray-500 flex flex-wrap gap-1.5 mt-1">
-                            {component.package_id && (
+                            {component.library && (
                               <span className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">
-                                {component.package_id}
+                                {component.library}
                               </span>
                             )}
-                            <span>{component.pinCount ?? 0} pins</span>
+                            <span>{component.pin_count ?? 0} pins</span>
                           </div>
                         </div>
                       </div>
@@ -1076,7 +1041,7 @@ export function ComponentPickerOverlay({
           </div>
 
           <div className="w-3/5 p-5 bg-gray-50">
-            <ComponentPreview component={selectedComponent} onClose={onClose} />
+            <ComponentPreview component={selectedComponent} onClose={onClose} onAddComponent={onAddComponent} />
           </div>
         </div>
       </div>

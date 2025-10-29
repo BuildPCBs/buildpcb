@@ -29,18 +29,76 @@ export interface Project {
 export interface Component {
   id: string;
   name: string;
-  type: string;
-  category: string;
+  library: string;
   description?: string;
-  specifications: Record<string, any>;
-  footprint?: string;
-  symbol?: string;
   datasheet?: string;
-  manufacturer?: string;
-  partNumber?: string;
-  price?: number;
-  availability: "in-stock" | "out-of-stock" | "discontinued";
-  image?: string;
+  keywords?: string;
+  pin_count: number;
+  symbol_data: SymbolData;
+  footprint_filter: string[];
+}
+
+export interface SymbolData {
+  pins: PinData[];
+  graphics: GraphicsData;
+}
+
+export interface PinData {
+  type: string;
+  shape: string;
+  name: string;
+  number: string;
+  position: {
+    x: number;
+    y: number;
+    angle: number;
+  };
+  length: number;
+}
+
+export interface GraphicsData {
+  rectangles: RectangleData[];
+  circles: CircleData[];
+  polylines: PolylineData[];
+  arcs: ArcData[];
+  text: TextData[];
+}
+
+export interface RectangleData {
+  start: { x: number; y: number };
+  end: { x: number; y: number };
+  stroke: { width: number; type: string };
+  fill: { type: string };
+}
+
+export interface CircleData {
+  center: { x: number; y: number };
+  radius: number;
+  stroke: { width: number; type: string };
+  fill: { type: string };
+}
+
+export interface PolylineData {
+  points: { x: number; y: number }[];
+  stroke: { width: number; type: string };
+  fill: { type: string };
+}
+
+export interface ArcData {
+  center: { x: number; y: number };
+  radius: number;
+  startAngle: number;
+  endAngle: number;
+  stroke: { width: number; type: string };
+  fill: { type: string };
+}
+
+export interface TextData {
+  text: string;
+  position: { x: number; y: number };
+  size: number;
+  rotation: number;
+  font: string;
 }
 
 export interface Schema {

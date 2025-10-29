@@ -382,15 +382,9 @@ export function SchemaPanel() {
                           `CLICK: Adding ${component.name} to canvas`
                         );
                         canvasCommandManager.executeCommand("component:add", {
-                          id: component.id,
-                          type: component.type,
+                          type: component.library,
                           svgPath: component.image,
                           name: component.name,
-                          category: component.category,
-                          description: component.description,
-                          manufacturer: component.manufacturer,
-                          partNumber: component.partNumber,
-                          pinCount: component.pinCount,
                         });
                       }}
                     />
@@ -440,15 +434,9 @@ export function SchemaPanel() {
                               canvasCommandManager.executeCommand(
                                 "component:add",
                                 {
-                                  id: component.id,
-                                  type: component.type,
+                                  type: component.library,
                                   svgPath: component.image,
                                   name: component.name,
-                                  category: component.category,
-                                  description: component.description,
-                                  manufacturer: component.manufacturer,
-                                  partNumber: component.partNumber,
-                                  pinCount: component.pinCount,
                                 }
                               );
                             }}

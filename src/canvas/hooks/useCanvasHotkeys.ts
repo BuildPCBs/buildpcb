@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect } from "react";
-import * as fabric from "fabric";
+import Konva from "konva";
 
 interface UseCanvasHotkeysProps {
-  canvas?: fabric.Canvas | null;
+  canvas?: Konva.Stage | null;
   enabled?: boolean;
   // PART 2: Direct function props for debugging
   // NOTE: Group/Ungroup removed - doesn't make sense for PCB schematics

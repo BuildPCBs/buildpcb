@@ -465,19 +465,19 @@ async function addComponentToCanvas(
   }
 
   // Import component factory dynamically to avoid circular dependencies
-  const { createSimpleComponent } = await import(
+  const { createSimpleComponentData } = await import(
     "../canvas/SimpleComponentFactory"
   );
 
-  logger.api("Calling createSimpleComponent with:", {
+  logger.api("Calling createSimpleComponentData with:", {
     type: operation.componentType,
     name: operation.value || operation.componentType,
     x: operation.position.x,
     y: operation.position.y,
   });
 
-  // Create component using factory (it adds to canvas internally)
-  createSimpleComponent(canvas, {
+  // Create component data using factory
+  const componentData = createSimpleComponentData({
     type: operation.componentType,
     svgPath: "", // We'll use the default styling
     name: operation.value || operation.componentType,
@@ -486,10 +486,11 @@ async function addComponentToCanvas(
     id: operation.componentId, // Pass the component ID for wire connections
   });
 
-  logger.api("Component created and added to canvas");
+  logger.api("Component data created:", componentData);
 
-  // The function adds to canvas internally, so we just need to render
-  canvas.renderAll();
+  // TODO: Add component to Konva canvas instead of Fabric canvas
+  // For now, this is a placeholder during the conversion
+  // canvas.add(component);
 }
 
 /**
