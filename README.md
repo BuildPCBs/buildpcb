@@ -2,13 +2,13 @@
 
 <div align="center">
 
-![BuildPCBs Logo](https://buildpcbs.com/logo.png)
+![BuildPCBs Logo](https://buildpcbs.com/link-preview.png)
 
 **🚀 AI-Powered PCB Design IDE**
 
 _The future of electronic circuit design - intuitive, intelligent, and collaborative_
 
-[![Live Demo](https://img.shields.io/badge/🌐_Live_Demo-ide.buildpcbs.com-blue?style=for-the-badge)](https://ide.buildpcbs.com)
+[![Live Demo](https://img.shields.io/badge/🌐_Live_Demo-app.buildpcbs.com-blue?style=for-the-badge)](https://app.buildpcbs.com)
 [![Website](https://img.shields.io/badge/🏠_Website-buildpcbs.com-green?style=for-the-badge)](https://buildpcbs.com)
 [![GitHub](https://img.shields.io/badge/GitHub-Mbdulrohim-black?style=for-the-badge&logo=github)](https://github.com/Mbdulrohim)
 

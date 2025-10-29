@@ -1,0 +1,314 @@
+.
+├── .DS_Store
+├── .env
+├── .env.example
+├── .env.local
+├── .github
+│   ├── copilot-instructions.md
+│   ├── gemini.md
+│   └── workflows
+├── .gitignore
+├── .idea
+│   ├── aws.xml
+│   ├── buildpcb.iml
+│   ├── inspectionProfiles
+│   │   └── Project_Default.xml
+│   ├── modules.xml
+│   ├── vcs.xml
+│   └── workspace.xml
+├── .vercel
+│   ├── project.json
+│   └── README.txt
+├── blueprint.md
+├── buildpcb
+├── components_v2.txt
+├── eslint.config.mjs
+├── fix-vercel.sh
+├── loc_details.txt
+├── next-env.d.ts
+├── next.config.ts
+├── package.json
+├── pnpm-lock.yaml
+├── postcss.config.mjs
+├── project_structure.txt
+├── public
+│   ├── .well-known
+│   │   └── security.txt
+│   ├── ads.txt
+│   ├── browserconfig.xml
+│   ├── components
+│   │   ├── arduino.svg
+│   │   ├── battery.svg
+│   │   ├── buzzer.svg
+│   │   ├── capacitor.svg
+│   │   ├── connector.svg
+│   │   ├── crystal.svg
+│   │   ├── diode.svg
+│   │   ├── display-lcd.svg
+│   │   ├── fuse.svg
+│   │   ├── inductor.svg
+│   │   ├── led.svg
+│   │   ├── microcontroller.svg
+│   │   ├── motor.svg
+│   │   ├── opamp.svg
+│   │   ├── photo-resistor.svg
+│   │   ├── potentiometer.svg
+│   │   ├── pushbutton.svg
+│   │   ├── relay.svg
+│   │   ├── resistor.svg
+│   │   ├── sensor.svg
+│   │   ├── servo-motor.svg
+│   │   ├── switch.svg
+│   │   ├── temperature-sensor.svg
+│   │   ├── transistor.svg
+│   │   └── voltage_regulator.svg
+│   ├── favicon.svg
+│   ├── file.svg
+│   ├── globe.svg
+│   ├── humans.txt
+│   ├── link-preview.png
+│   ├── logo.png
+│   ├── manifest.json
+│   ├── robots.txt
+│   ├── sitemap.xml
+│   └── window.svg
+├── README.md
+├── src
+│   ├── agent
+│   │   ├── agent.md
+│   │   ├── AgentService.ts
+│   │   ├── AgentServiceInit.tsx
+│   │   ├── ai-agent-architecture.md
+│   │   ├── AIAgent.ts
+│   │   ├── capabilities.ts
+│   │   ├── capability-handlers.ts
+│   │   ├── handlers
+│   │   │   └── priority1
+│   │   │       ├── addComponent.ts
+│   │   │       └── readComponent.ts
+│   │   ├── index.ts
+│   │   ├── LLMOrchestrator.ts
+│   │   ├── notes.txt
+│   │   ├── README.md
+│   │   ├── StreamingHandler.ts
+│   │   ├── tools
+│   │   │   └── index.ts
+│   │   ├── types.ts
+│   │   └── utils
+│   ├── app
+│   │   ├── .DS_Store
+│   │   ├── api
+│   │   │   ├── agent
+│   │   │   │   └── execute
+│   │   │   │       └── route.ts
+│   │   │   ├── ai-agent
+│   │   │   │   └── route.ts
+│   │   │   ├── debug-metadata
+│   │   │   │   └── route.ts
+│   │   │   ├── generate-schematic
+│   │   │   ├── projects
+│   │   │   │   └── [id]
+│   │   │   │       └── save
+│   │   │   └── semantic-search
+│   │   │       └── route.ts
+│   │   ├── apple-icon.png
+│   │   ├── dashboard
+│   │   │   ├── .DS_Store
+│   │   │   ├── layout.tsx
+│   │   │   └── page.tsx
+│   │   ├── fabric-test
+│   │   │   ├── FabricTestComponent.tsx
+│   │   │   └── page.tsx
+│   │   ├── globals.css
+│   │   ├── icon.png
+│   │   ├── ide
+│   │   ├── layout.tsx
+│   │   ├── login
+│   │   │   └── page.tsx
+│   │   ├── not-found.tsx
+│   │   ├── opengraph-image.png
+│   │   ├── page.tsx
+│   │   ├── profile
+│   │   ├── project
+│   │   │   ├── [id]
+│   │   │   │   └── page.tsx
+│   │   │   ├── layout.tsx
+│   │   │   └── new
+│   │   │       └── page.tsx
+│   │   ├── responsive.css
+│   │   ├── test-dashboard-protection
+│   │   │   └── page.tsx
+│   │   └── twitter-image.png
+│   ├── canvas
+│   │   ├── BasicComponentFactory.tsx
+│   │   ├── canvas-command-manager.ts
+│   │   ├── Canvas.tsx
+│   │   ├── componentHandlerSetup.ts
+│   │   ├── ComponentLibrary.ts
+│   │   ├── components
+│   │   │   └── GridToolbar.tsx
+│   │   ├── FabricCanvas.tsx
+│   │   ├── hooks
+│   │   │   ├── ElasticWire.test.ts
+│   │   │   ├── ElasticWire.ts
+│   │   │   ├── ElasticWireExample.tsx
+│   │   │   ├── index.ts
+│   │   │   ├── useCanvasAutoSave.ts.backup
+│   │   │   ├── useCanvasGrid.ts
+│   │   │   ├── useCanvasHotkeys.ts
+│   │   │   ├── useCanvasPan.ts
+│   │   │   ├── useCanvasViewport.tsx
+│   │   │   ├── useCanvasZoom.ts
+│   │   │   ├── useElasticWire.ts
+│   │   │   ├── useHistoryStack.ts
+│   │   │   ├── useNetlist.ts
+│   │   │   └── useSimpleWiringTool.ts
+│   │   ├── IDEFabricCanvas.tsx
+│   │   ├── index.ts
+│   │   ├── IntelligentComponentFactory.tsx
+│   │   ├── SimpleComponentFactory.tsx
+│   │   ├── SVGComponentFactory.tsx
+│   │   ├── ui
+│   │   │   ├── ComponentPickerOverlay.tsx
+│   │   │   ├── ContextMenu.tsx
+│   │   │   ├── HorizontalRuler.tsx
+│   │   │   └── VerticalRuler.tsx
+│   │   ├── undo-redo.ts
+│   │   ├── useCanvasInteraction.ts
+│   │   ├── useCanvasViewport.ts
+│   │   └── utils
+│   │       ├── canvasSerializer.ts
+│   │       ├── gridUtils.ts
+│   │       └── logicalSerializer.ts
+│   ├── components
+│   │   ├── agent
+│   │   │   ├── AgentStreamDisplay.tsx
+│   │   │   ├── ChatUIConfig.ts
+│   │   │   └── ChatUIContainer.tsx
+│   │   ├── ai
+│   │   │   ├── .DS_Store
+│   │   │   ├── AIChatInterface.tsx
+│   │   │   └── MarkdownMessage.tsx
+│   │   ├── auth
+│   │   │   ├── .DS_Store
+│   │   │   ├── AuthGuard.tsx
+│   │   │   ├── AuthOverlay.tsx
+│   │   │   ├── AuthOverlayWrapper.tsx
+│   │   │   ├── AuthTest.tsx
+│   │   │   ├── index.ts
+│   │   │   ├── ProtectedRoute.tsx
+│   │   │   └── RouteGuard.tsx
+│   │   ├── debug
+│   │   │   ├── CanvasDebug.tsx
+│   │   │   └── ComponentVisibilityTest.tsx
+│   │   ├── icons
+│   │   │   ├── ChartIcon.tsx
+│   │   │   ├── ChevronDownIcon.tsx
+│   │   │   ├── CloudIcon.tsx
+│   │   │   ├── DotsIcon.tsx
+│   │   │   ├── EditIcon.tsx
+│   │   │   ├── ExportIcon.tsx
+│   │   │   ├── HomeIcon.tsx
+│   │   │   ├── index.ts
+│   │   │   ├── MicIcon.tsx
+│   │   │   ├── NotificationIcon.tsx
+│   │   │   ├── PlusIcon.tsx
+│   │   │   ├── SearchIcon.tsx
+│   │   │   ├── SendIcon.tsx
+│   │   │   ├── UserIcon.tsx
+│   │   │   └── WindowIcon.tsx
+│   │   ├── layout
+│   │   │   ├── ActivityAnalyticsPanel.tsx
+│   │   │   ├── AIPromptPanel.tsx
+│   │   │   ├── DashboardHeader.tsx
+│   │   │   ├── DeviceRestriction.tsx
+│   │   │   ├── IDECanvas.tsx
+│   │   │   ├── PromptEntry.tsx
+│   │   │   ├── ResponsiveContainer.tsx
+│   │   │   ├── SchemaPanel.tsx
+│   │   │   ├── ThinkingIndicator.tsx
+│   │   │   └── TopToolbar.tsx
+│   │   ├── project
+│   │   │   ├── EditableProjectName.tsx
+│   │   │   ├── ProjectRenameDialog.tsx
+│   │   │   └── ProjectStatusBar.tsx
+│   │   └── ui
+│   │       └── ProjectItem.tsx
+│   ├── contexts
+│   │   ├── AIChatContext.tsx
+│   │   ├── CanvasContext.tsx
+│   │   └── ProjectContext.tsx
+│   ├── core
+│   │   ├── command-manager.ts
+│   │   ├── error-manager.ts
+│   │   ├── event-manager.ts
+│   │   ├── file-system.ts
+│   │   ├── index.ts
+│   │   ├── keyboard.ts
+│   │   ├── panel-shortcuts.ts
+│   │   ├── plugin-manager.ts
+│   │   └── state-manager.ts
+│   ├── hooks
+│   │   ├── index.ts
+│   │   ├── useAuth.tsx
+│   │   ├── useCanvasState.ts
+│   │   ├── useClickOutside.ts
+│   │   ├── useDatabase.ts
+│   │   ├── useDatabaseComponents.ts
+│   │   ├── useDebounce.ts
+│   │   ├── useError.ts
+│   │   ├── useLoading.ts
+│   │   ├── useOverrideBrowserControls.ts
+│   │   ├── usePreventBrowserZoom.ts
+│   │   ├── useServerSearch.ts
+│   │   ├── useStateManager.ts
+│   │   └── useUtils.ts
+│   ├── lib
+│   │   ├── .DS_Store
+│   │   ├── api-auth.ts
+│   │   ├── api.ts
+│   │   ├── auth-debug.ts
+│   │   ├── auth-storage.ts
+│   │   ├── circuitResponseParser.test.ts
+│   │   ├── circuitResponseParser.ts
+│   │   ├── constants.ts
+│   │   ├── database.ts
+│   │   ├── debouncedSave.ts
+│   │   ├── env.ts
+│   │   ├── fallback-project-service.ts
+│   │   ├── kicad_symbol
+│   │   ├── logger.ts
+│   │   ├── memory-monitor.ts
+│   │   ├── metadata.ts
+│   │   ├── project-service.ts
+│   │   ├── promptLogger.ts
+│   │   ├── refdes-service.ts
+│   │   ├── responsive.ts
+│   │   ├── responsive.ts.backup
+│   │   ├── schemas
+│   │   │   └── circuit.ts
+│   │   ├── session-manager.ts
+│   │   ├── site-config.ts
+│   │   ├── supabase.ts
+│   │   ├── thumbnail-generator.ts
+│   │   ├── utils.ts
+│   │   └── WorkflowTestSuite.ts
+│   ├── store
+│   │   ├── componentStore.ts
+│   │   ├── index.ts
+│   │   └── projectStore.ts
+│   └── types
+│       ├── auth.ts
+│       └── index.ts
+├── supabase
+│   ├── .gitignore
+│   ├── .temp
+│   │   └── cli-latest
+│   ├── config.toml
+│   └── migrations
+│       ├── 20250911160000_add_component_metadata_columns.sql
+│       └── 20251010_add_project_thumbnails.sql
+├── tsconfig.json
+└── version.sh
+
+61 directories, 251 files
