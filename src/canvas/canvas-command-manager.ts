@@ -1,7 +1,9 @@
-import * as fabric from "fabric";
+import Konva from "konva";
+import { logger } from "@/lib/logger";
 
 export type CanvasCommandHandler = (
-  canvas: fabric.Canvas,
+  stage: Konva.Stage,
+  layer: Konva.Layer,
   params?: any
 ) => void;
 
@@ -13,17 +15,35 @@ export interface CanvasCommand {
 
 class CanvasCommandManager {
   private commands: Map<string, CanvasCommand> = new Map();
-  private canvas: fabric.Canvas | null = null;
+  private stage: Konva.Stage | null = null;
+  private layer: Konva.Layer | null = null;
   private isWorkspaceCreated: boolean = false;
   private eventListeners: Map<string, Set<Function>> = new Map();
 
-  setCanvas(canvas: fabric.Canvas | null) {
-    this.canvas = canvas;
-    this.isWorkspaceCreated = false; // Reset workspace state when canvas changes
+  setStage(stage: Konva.Stage | null, layer: Konva.Layer | null = null) {
+    this.stage = stage;
+    this.layer = layer;
+    this.isWorkspaceCreated = false; // Reset workspace state when stage changes
   }
 
-  getCanvas(): fabric.Canvas | null {
-    return this.canvas;
+  getStage(): Konva.Stage | null {
+    return this.stage;
+  }
+
+  getLayer(): Konva.Layer | null {
+    return this.layer;
+  }
+
+  // Legacy method for backwards compatibility
+  setCanvas(canvas: any) {
+    logger.warn("setCanvas is deprecated, use setStage instead");
+    this.setStage(canvas);
+  }
+
+  // Legacy method for backwards compatibility
+  getCanvas(): any {
+    logger.warn("getCanvas is deprecated, use getStage instead");
+    return this.stage;
   }
 
   // Event system methods
@@ -49,43 +69,41 @@ class CanvasCommandManager {
         try {
           callback(...args);
         } catch (error) {
-          console.error(`Error in event listener for ${event}:`, error);
+          logger.error(`Error in event listener for ${event}`, { error });
         }
       });
     }
   }
 
   execute(command: string, ...args: any[]): void {
-    console.log(`Executing command: ${command}`);
+    logger.canvas(`Executing command: ${command}`);
     this.emit(command, ...args);
   }
 
-  createWorkspace(canvas: fabric.Canvas) {
+  createWorkspace(stage: Konva.Stage, layer: Konva.Layer) {
     if (this.isWorkspaceCreated) return;
 
     // Create a large white workspace rectangle
-    const workspace = new fabric.Rect({
+    const workspace = new Konva.Rect({
       width: 5000,
       height: 3000,
       fill: "#FFFFFF",
       stroke: "#E0E0E0",
       strokeWidth: 1,
-      left: 0,
-      top: 0,
-      originX: "center",
-      originY: "center",
-      selectable: false,
-      evented: false,
+      x: 0,
+      y: 0,
+      offsetX: 2500,
+      offsetY: 1500,
       name: "workspace", // Add name for identification
+      listening: false,
     });
 
-    // Add workspace to canvas and send to back
-    canvas.add(workspace);
-    canvas.sendObjectToBack(workspace);
-    canvas.renderAll();
+    // Add workspace to layer
+    layer.add(workspace);
+    workspace.moveToBottom();
 
     this.isWorkspaceCreated = true;
-    console.log("Workspace created");
+    logger.canvas("Workspace created");
   }
 
   registerCommand(command: CanvasCommand) {
@@ -94,21 +112,23 @@ class CanvasCommandManager {
 
   executeCommand(commandId: string, params?: any): boolean {
     const command = this.commands.get(commandId);
-    if (!command || !this.canvas) {
-      console.warn(`Command ${commandId} not found or canvas not available`);
+    if (!command || !this.stage || !this.layer) {
+      logger.warn(
+        `Command ${commandId} not found or stage/layer not available`
+      );
       return false;
     }
 
     try {
       // Create workspace before executing any component command
       if (commandId.startsWith("add_")) {
-        this.createWorkspace(this.canvas);
+        this.createWorkspace(this.stage, this.layer);
       }
 
-      command.handler(this.canvas, params);
+      command.handler(this.stage, this.layer, params);
       return true;
     } catch (error) {
-      console.error(`Error executing command ${commandId}:`, error);
+      logger.error(`Error executing command ${commandId}`, { error });
       return false;
     }
   }
@@ -131,99 +151,89 @@ export const builtInCanvasCommands = {
     id: "add_resistor",
     name: "Add Resistor",
     handler: async (
-      canvas: fabric.Canvas,
+      stage: Konva.Stage,
+      layer: Konva.Layer,
       params?: { x?: number; y?: number }
     ) => {
       try {
-        // Create a simple resistor representation using rectangles
-        const resistorBody = new fabric.Rect({
+        // Create a simple resistor representation using Konva shapes
+        const group = new Konva.Group({
+          x: params?.x ?? stage.width() / 2,
+          y: params?.y ?? stage.height() / 2,
+          draggable: true,
+          name: "resistor",
+        });
+
+        const resistorBody = new Konva.Rect({
           width: 60,
           height: 20,
           fill: "#E8E8E8",
           stroke: "#333333",
           strokeWidth: 2,
+          offsetX: 30,
+          offsetY: 10,
         });
 
-        const leftLead = new fabric.Rect({
+        const leftLead = new Konva.Rect({
           width: 20,
           height: 2,
           fill: "#333333",
-          left: -40,
-          top: 9,
+          x: -50,
+          y: -1,
+          offsetX: 0,
+          offsetY: 0,
         });
 
-        const rightLead = new fabric.Rect({
+        const rightLead = new Konva.Rect({
           width: 20,
           height: 2,
           fill: "#333333",
-          left: 60,
-          top: 9,
+          x: 30,
+          y: -1,
+          offsetX: 0,
+          offsetY: 0,
         });
 
-        // Create invisible pin objects at connection points
-        const leftPin = new fabric.Circle({
+        // Create pin markers at connection points
+        const leftPin = new Konva.Circle({
           radius: 4,
           fill: "transparent",
           stroke: "#0038DF",
           strokeWidth: 0, // Initially invisible
-          left: -50,
-          top: 10,
-          originX: "center",
-          originY: "center",
-          selectable: false,
-          evented: false,
-          pin: true, // Special property to identify pins
-          pinType: "left", // Identifier for this specific pin
-        } as any);
+          x: -50,
+          y: 0,
+          listening: false,
+          name: "pin-left",
+        });
 
-        const rightPin = new fabric.Circle({
+        const rightPin = new Konva.Circle({
           radius: 4,
           fill: "transparent",
           stroke: "#0038DF",
           strokeWidth: 0, // Initially invisible
-          left: 70,
-          top: 10,
-          originX: "center",
-          originY: "center",
-          selectable: false,
-          evented: false,
-          pin: true, // Special property to identify pins
-          pinType: "right", // Identifier for this specific pin
-        } as any);
+          x: 40,
+          y: 0,
+          listening: false,
+          name: "pin-right",
+        });
 
-        // Group the resistor parts including pins
-        const resistorGroup = new fabric.Group(
-          [leftLead, resistorBody, rightLead, leftPin, rightPin],
-          {
-            left: params?.x ?? canvas.getWidth() / 2,
-            top: params?.y ?? canvas.getHeight() / 2,
-            originX: "center",
-            originY: "center",
-            selectable: true,
-            evented: true,
-            hoverCursor: "move",
-            moveCursor: "move",
-            componentType: "resistor", // Identify as component
-          } as any
-        );
+        group.add(leftLead, resistorBody, rightLead, leftPin, rightPin);
+        layer.add(group);
 
-        // Add to canvas
-        canvas.add(resistorGroup);
-        canvas.renderAll();
-
-        console.log("Resistor added to canvas");
+        logger.canvas("Resistor added to canvas");
       } catch (error) {
-        console.error("Error creating resistor:", error);
+        logger.error("Error creating resistor", { error });
       }
     },
   } as CanvasCommand,
 
-  // NEW: Simple command that forwards to foolproof component factory in IDEFabricCanvas
+  // Command that forwards to component factory
   COMPONENT_ADD: {
     id: "component:add",
     name: "Add Component",
     handler: async (
-      canvas: fabric.Canvas,
+      stage: Konva.Stage,
+      layer: Konva.Layer,
       params?: {
         type: string;
         svgPath: string;
@@ -232,23 +242,27 @@ export const builtInCanvasCommands = {
         y?: number;
       }
     ) => {
-      // Forward to the foolproof component factory by emitting the event
-      console.log(
-        `🎯 Command manager: Forwarding "component:add" for ${params?.name}`
+      // Forward to the component factory by emitting the event
+      logger.canvas(
+        `Command manager: Forwarding "component:add" for ${params?.name}`,
+        {
+          hasStage: !!stage,
+          hasLayer: !!layer,
+          params,
+        }
       );
-      console.log(`🎯 Command manager: Canvas available: ${!!canvas}`);
-      console.log(`🎯 Command manager: Params:`, params);
       canvasCommandManager.emit("component:add", params);
-      console.log(`🎯 Command manager: Event emitted for ${params?.name}`);
+      logger.canvas(`Command manager: Event emitted for ${params?.name}`);
     },
   } as CanvasCommand,
 
-  // NEW: Command to add a wire between two components
+  // Command to add a wire between two components
   WIRE_ADD: {
     id: "wire:add",
     name: "Add Wire",
     handler: async (
-      canvas: fabric.Canvas,
+      stage: Konva.Stage,
+      layer: Konva.Layer,
       params?: {
         fromComponentId: string;
         fromPinNumber: string;
@@ -259,7 +273,7 @@ export const builtInCanvasCommands = {
       }
     ) => {
       if (!params) {
-        console.error("❌ wire:add: Missing parameters");
+        logger.error("wire:add: Missing parameters");
         return;
       }
 
@@ -272,48 +286,33 @@ export const builtInCanvasCommands = {
         path,
       } = params;
 
-      console.log(
-        `🔗 wire:add: Creating wire from ${fromComponentId}:${fromPinNumber} to ${toComponentId}:${toPinNumber}`
+      logger.canvas(
+        `wire:add: Creating wire from ${fromComponentId}:${fromPinNumber} to ${toComponentId}:${toPinNumber}`
       );
 
       // Find the pin objects
       const findPinByComponentAndNumber = (
         componentId: string,
         pinNumber: string
-      ): fabric.Object | null => {
-        const objects = canvas.getObjects();
-        for (const obj of objects) {
-          if (obj.type === "group") {
-            // CRITICAL FIX: Check if THIS GROUP is the right component first
-            // This prevents wires from connecting to the wrong instance when multiple components exist
-            const isTargetComponent =
-              (obj as any).id === componentId ||
-              (obj as any).data?.componentId === componentId;
+      ): Konva.Node | null => {
+        const nodes = layer.find(".component");
+        for (const node of nodes) {
+          // Check if this is the right component
+          const isTargetComponent =
+            node.getAttr("id") === componentId ||
+            node.getAttr("componentId") === componentId;
 
-            if (!isTargetComponent) {
-              continue; // Skip this group - it's not the component we're looking for
-            }
+          if (!isTargetComponent) {
+            continue;
+          }
 
-            const groupObjects = (obj as fabric.Group).getObjects();
-            for (const groupObj of groupObjects) {
-              const pinData = (groupObj as any).data;
-              if (
-                pinData &&
-                pinData.type === "pin" &&
-                pinData.pinNumber === pinNumber
-              ) {
-                return groupObj;
+          // Find the pin within this component (groups have children)
+          if (node instanceof Konva.Group) {
+            const pins = node.find(".pin");
+            for (const pin of pins) {
+              if (pin.getAttr("pinNumber") === pinNumber) {
+                return pin;
               }
-            }
-          } else {
-            const pinData = (obj as any).data;
-            if (
-              pinData &&
-              pinData.type === "pin" &&
-              pinData.componentId === componentId &&
-              pinData.pinNumber === pinNumber
-            ) {
-              return obj;
             }
           }
         }
@@ -327,79 +326,73 @@ export const builtInCanvasCommands = {
       const toPin = findPinByComponentAndNumber(toComponentId, toPinNumber);
 
       if (!fromPin || !toPin) {
-        console.error(
-          `❌ wire:add: Could not find pins - fromPin: ${!!fromPin}, toPin: ${!!toPin}`
-        );
+        logger.error("wire:add: Could not find pins", {
+          hasFromPin: !!fromPin,
+          hasToPin: !!toPin,
+        });
         return;
       }
 
       // Get pin positions
-      const fromPoint = fromPin.getCenterPoint();
-      const toPoint = toPin.getCenterPoint();
+      const fromPoint = fromPin.getAbsolutePosition();
+      const toPoint = toPin.getAbsolutePosition();
 
       // Create wire points
-      let points: fabric.Point[];
+      let points: number[];
       if (path && Array.isArray(path)) {
         // Use saved path if available
-        points = path.map((p: any) => new fabric.Point(p.x, p.y));
+        points = path.flatMap((p: any) => [p.x, p.y]);
       } else {
         // Create simple straight line
-        points = [fromPoint, toPoint];
+        points = [fromPoint.x, fromPoint.y, toPoint.x, toPoint.y];
       }
 
       // Create the wire
-      const wire = new fabric.Polyline(points, {
-        fill: "transparent",
+      const wire = new Konva.Line({
+        points: points,
         stroke: "#888888",
         strokeWidth: 2,
-        strokeLineCap: "round",
-        strokeLineJoin: "round",
-        selectable: true,
-        evented: true,
-        lockMovementX: true,
-        lockMovementY: true,
-        lockRotation: true,
-        lockScalingX: true,
-        lockScalingY: true,
-        hasControls: false,
-        hasBorders: true,
+        lineCap: "round",
+        lineJoin: "round",
+        draggable: false,
+        name: "wire",
+      });
+
+      // Set custom attributes for wire metadata
+      (wire as any).setAttrs({
         wireType: "connection",
         startComponentId: fromComponentId,
         startPinIndex: fromPinNumber,
         endComponentId: toComponentId,
         endPinIndex: toPinNumber,
         netId: netId || `net_${Date.now()}`,
-        objectCaching: false,
-      } as any);
+      });
 
-      canvas.add(wire);
+      layer.add(wire);
 
       // Add endpoint dots
-      const fromDot = new fabric.Circle({
+      const fromDot = new Konva.Circle({
         radius: 3,
         fill: "#888888",
-        left: fromPoint.x - 3,
-        top: fromPoint.y - 3,
-        selectable: false,
-        evented: false,
-        wireEndpoint: true,
+        x: fromPoint.x,
+        y: fromPoint.y,
+        listening: false,
+        name: "wire-endpoint",
       });
 
-      const toDot = new fabric.Circle({
+      const toDot = new Konva.Circle({
         radius: 3,
         fill: "#888888",
-        left: toPoint.x - 3,
-        top: toPoint.y - 3,
-        selectable: false,
-        evented: false,
-        wireEndpoint: true,
+        x: toPoint.x,
+        y: toPoint.y,
+        listening: false,
+        name: "wire-endpoint",
       });
 
-      canvas.add(fromDot);
-      canvas.add(toDot);
+      layer.add(fromDot);
+      layer.add(toDot);
 
-      canvas.renderAll();
-      console.log(`✅ wire:add: Wire created successfully`);
+      logger.canvas("wire:add: Wire created successfully");
     },
   } as CanvasCommand,
 };

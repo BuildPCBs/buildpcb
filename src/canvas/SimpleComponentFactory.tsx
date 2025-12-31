@@ -3,6 +3,17 @@ import { Rect, Circle, Text, Group, Line } from "react-konva";
 import Konva from "konva";
 import { logger } from "@/lib/logger";
 import { Component } from "@/types";
+import type {
+  KiCadComponent,
+  SymbolData,
+  Graphics,
+  Pin,
+  Rectangle,
+  Circle as KiCadCircle,
+  Polyline,
+  Arc,
+  getComponentBounds,
+} from "@/types/kicad";
 
 // Component factory that creates Konva components from database symbol_data
 export const SimpleComponent: React.FC<{
@@ -40,100 +51,91 @@ export const SimpleComponent: React.FC<{
     const elements: React.JSX.Element[] = [];
     const graphics = component.symbol_data.graphics;
 
-    // KiCad to Konva coordinate transformation (centered)
-    // Get component bounds to center it
-    let minX = Infinity,
-      maxX = -Infinity,
-      minY = Infinity,
-      maxY = -Infinity;
+    // Helper function matching index.html's getGraphicsColor
+    const getGraphicsColor = (
+      stroke: any,
+      fill: any,
+      elementType: string
+    ) => {
+      const defaults = {
+        stroke: "black",
+        fill: elementType === "rectangle" ? "#FFFFE0" : "transparent",
+      };
 
-    // Calculate bounds from all graphics elements
-    if (graphics.rectangles) {
-      graphics.rectangles.forEach((rect) => {
-        minX = Math.min(minX, rect.start.x, rect.end.x);
-        maxX = Math.max(maxX, rect.start.x, rect.end.x);
-        minY = Math.min(minY, rect.start.y, rect.end.y);
-        maxY = Math.max(maxY, rect.start.y, rect.end.y);
-      });
-    }
-    if (graphics.polylines) {
-      graphics.polylines.forEach((polyline) => {
-        polyline.points.forEach((point) => {
-          minX = Math.min(minX, point.x);
-          maxX = Math.max(maxX, point.x);
-          minY = Math.min(minY, point.y);
-          maxY = Math.max(maxY, point.y);
-        });
-      });
-    }
+      if (fill && fill.type === "background") {
+        return {
+          stroke: stroke ? "black" : defaults.stroke,
+          fill: elementType === "polyline" ? "transparent" : "#FFFFE0",
+        };
+      }
 
-    // Default bounds if no graphics
-    if (minX === Infinity) {
-      minX = -5;
-      maxX = 5;
-      minY = -5;
-      maxY = 5;
-    }
+      if (fill && fill.type === "none") {
+        return {
+          stroke: stroke ? "black" : defaults.stroke,
+          fill: "transparent",
+        };
+      }
 
-    // Center offsets (assuming a reasonable display size)
-    const displayWidth = 200; // Reasonable display width
-    const displayHeight = 150; // Reasonable display height
-    const offsetX = displayWidth / 2;
-    const offsetY = displayHeight / 2;
+      return {
+        stroke: defaults.stroke,
+        fill: defaults.fill,
+      };
+    };
 
+    // Use raw KiCad coordinates (Y-flip at Group level)
     const toKonva = (x: number, y: number) => ({
-      x: offsetX + x * scale,
-      y: offsetY - y * scale, // Flip Y axis
+      x: x * scale,
+      y: y * scale,
     });
 
-    // Render rectangles (package outlines)
+    // Render rectangles - EXACTLY matching index.html
     if (graphics.rectangles) {
       graphics.rectangles.forEach((rect, index) => {
-        const start = toKonva(rect.start.x, rect.start.y);
-        const end = toKonva(rect.end.x, rect.end.y);
+        if (!rect.start || !rect.end) return;
+
+        const width = Math.abs(rect.end.x - rect.start.x);
+        const height = Math.abs(rect.end.y - rect.start.y);
+        if (width <= 10.16 && height <= 10.16) return; // Skip small rectangles
+
+        const x = rect.start.x;
+        const y = rect.start.y;
+        const drawHeight = rect.end.y - rect.start.y; // Can be negative
+
+        const colors = getGraphicsColor(rect.stroke, rect.fill, "rectangle");
+        const start = toKonva(x, y);
+        const strokeWidth = rect.stroke ? rect.stroke.width || 0.254 : 0.254;
 
         const konvaRect = (
           <Rect
             key={`rect-${index}`}
-            x={Math.min(start.x, end.x)}
-            y={Math.min(start.y, end.y)}
-            width={Math.abs(end.x - start.x)}
-            height={Math.abs(end.y - start.y)}
-            fill={rect.fill?.type === "background" ? "#f0f0f0" : "transparent"}
-            stroke="#000000"
-            strokeWidth={0.254 * scale * 0.5}
+            x={start.x}
+            y={start.y}
+            width={width * scale}
+            height={drawHeight * scale}
+            fill={colors.fill}
+            stroke={colors.stroke}
+            strokeWidth={strokeWidth * scale}
+            cornerRadius={1.0 * scale}
           />
         );
         elements.push(konvaRect);
       });
     }
 
-    // Render circles
-    if (graphics.circles) {
-      graphics.circles.forEach((circle, index) => {
-        const center = toKonva(circle.center.x, circle.center.y);
-
-        const konvaCircle = (
-          <Circle
-            key={`circle-${index}`}
-            x={center.x}
-            y={center.y}
-            radius={circle.radius * scale}
-            fill={
-              circle.fill?.type === "background" ? "#f0f0f0" : "transparent"
-            }
-            stroke="#000000"
-            strokeWidth={0.254 * scale * 0.5}
-          />
-        );
-        elements.push(konvaCircle);
-      });
-    }
-
-    // Render polylines (logic symbols like NOR gates - open shapes)
+    // Render polylines - EXACTLY matching index.html
     if (graphics.polylines) {
       graphics.polylines.forEach((polyline, index) => {
-        // Convert each point from KiCad to Konva coordinates
+        if (!polyline.points || polyline.points.length < 2) return;
+
+        const colors = getGraphicsColor(
+          polyline.stroke,
+          polyline.fill,
+          "polyline"
+        );
+        const strokeWidth = polyline.stroke
+          ? polyline.stroke.width || 0.254
+          : 0.254;
+
         const konvaPoints = polyline.points.flatMap((point) => {
           const konvaPoint = toKonva(point.x, point.y);
           return [konvaPoint.x, konvaPoint.y];
@@ -143,32 +145,130 @@ export const SimpleComponent: React.FC<{
           <Line
             key={`polyline-${index}`}
             points={konvaPoints}
-            stroke="#000000"
-            strokeWidth={0.254 * scale * 0.5}
-            closed={false} // NOR gates and logic symbols are open shapes
+            stroke={colors.stroke}
+            strokeWidth={strokeWidth * scale}
+            closed={false}
           />
         );
         elements.push(konvaLine);
       });
     }
 
-    // Render text (component labels inside symbols)
+    // Render circles - EXACTLY matching index.html
+    if (graphics.circles) {
+      graphics.circles.forEach((circle, index) => {
+        if (!circle.center || !circle.radius) return;
+
+        const colors = getGraphicsColor(circle.stroke, circle.fill, "circle");
+        const center = toKonva(circle.center.x, circle.center.y);
+        const strokeWidth = circle.stroke
+          ? circle.stroke.width || 0.254
+          : 0.254;
+
+        const konvaCircle = (
+          <Circle
+            key={`circle-${index}`}
+            x={center.x}
+            y={center.y}
+            radius={circle.radius * scale}
+            fill={colors.fill !== "transparent" ? colors.fill : undefined}
+            stroke={colors.stroke}
+            strokeWidth={strokeWidth * scale}
+          />
+        );
+        elements.push(konvaCircle);
+      });
+    }
+
+    // Render arcs - handle both arc types (start/mid/end OR center/radius/angles)
+    if (graphics.arcs) {
+      graphics.arcs.forEach((arc: any, index) => {
+        // Type 1: start/mid/end points (like index.html expects)
+        if (arc.start && arc.mid && arc.end) {
+          const colors = getGraphicsColor(arc.stroke, arc.fill, "arc");
+          const strokeWidth = arc.stroke ? arc.stroke.width || 0.254 : 0.254;
+
+          const start = toKonva(arc.start.x, arc.start.y);
+          const mid = toKonva(arc.mid.x, arc.mid.y);
+          const end = toKonva(arc.end.x, arc.end.y);
+
+          const konvaArc = (
+            <Line
+              key={`arc-${index}`}
+              points={[start.x, start.y, mid.x, mid.y, end.x, end.y]}
+              stroke={colors.stroke}
+              strokeWidth={strokeWidth * scale}
+              tension={0.5}
+              bezier={true}
+            />
+          );
+          elements.push(konvaArc);
+        }
+        // Type 2: center/radius/angles
+        else if (arc.center && arc.radius) {
+          const colors = getGraphicsColor(arc.stroke, arc.fill, "arc");
+          const strokeWidth = arc.stroke ? arc.stroke.width || 0.254 : 0.254;
+          const center = toKonva(arc.center.x, arc.center.y);
+
+          const points: number[] = [];
+          const steps = 20;
+          const startAngle = arc.startAngle || 0;
+          const endAngle = arc.endAngle || 360;
+          for (let i = 0; i <= steps; i++) {
+            const t = i / steps;
+            const angle = startAngle + (endAngle - startAngle) * t;
+            const radians = (angle * Math.PI) / 180;
+            const px = center.x + arc.radius * scale * Math.cos(radians);
+            const py = center.y + arc.radius * scale * Math.sin(radians);
+            points.push(px, py);
+          }
+
+          const konvaArc = (
+            <Line
+              key={`arc-${index}`}
+              points={points}
+              stroke={colors.stroke}
+              strokeWidth={strokeWidth * scale}
+            />
+          );
+          elements.push(konvaArc);
+        }
+      });
+    }
+
+    // Render text - handle both text and content properties
     if (graphics.text) {
-      graphics.text.forEach((textItem, index) => {
-        const position = toKonva(textItem.position.x, textItem.position.y);
+      graphics.text.forEach((textElement: any, index) => {
+        const content = textElement.content || textElement.text;
+        if (!content || !textElement.position) return;
+
+        const pos = textElement.position;
+        const angle = pos.angle || textElement.rotation || 0;
+        const position = toKonva(pos.x, pos.y);
+
+        let hAlign: "left" | "center" | "right" = "center";
+        let vAlign: "top" | "middle" | "bottom" = "middle";
+        if (textElement.effects && textElement.effects.justify) {
+          const justify = textElement.effects.justify.toLowerCase();
+          if (justify.includes("left")) hAlign = "left";
+          else if (justify.includes("right")) hAlign = "right";
+          if (justify.includes("top")) vAlign = "top";
+          else if (justify.includes("bottom")) vAlign = "bottom";
+        }
 
         const konvaText = (
           <Text
             key={`text-${index}`}
             x={position.x}
             y={position.y}
-            text={textItem.text}
-            fontSize={(textItem.size || 1.27) * scale}
-            rotation={textItem.rotation || 0}
-            fontFamily="DM Sans" // Apply DM Sans font to graphics text
-            fill="#000000"
-            align="center"
-            verticalAlign="middle"
+            text={content}
+            fontSize={(textElement.size || 2.0) * scale}
+            rotation={angle}
+            fontFamily="sans-serif"
+            fill="black"
+            align={hAlign}
+            verticalAlign={vAlign}
+            scaleY={-1}
           />
         );
         elements.push(konvaText);
@@ -179,71 +279,221 @@ export const SimpleComponent: React.FC<{
   };
 
   const renderPins = () => {
-    // Use same coordinate transformation as graphics
-    const displayWidth = 200;
-    const displayHeight = 150;
-    const offsetX = displayWidth / 2;
-    const offsetY = displayHeight / 2;
+    // Constants from index.html
+    const PIN_TEXT_SIZE = 1.0;
+    const PADDING = 0.5;
 
+    // Use raw KiCad coordinates
     const toKonva = (x: number, y: number) => ({
-      x: offsetX + x * scale,
-      y: offsetY - y * scale,
+      x: x * scale,
+      y: y * scale,
     });
 
+    // Get stroke width from rectangles like index.html does
+    let strokeWidth = 0.152; // Default thinner width for pins
+    if (
+      component.symbol_data.graphics &&
+      component.symbol_data.graphics.rectangles &&
+      component.symbol_data.graphics.rectangles.length > 0 &&
+      component.symbol_data.graphics.rectangles[0].stroke
+    ) {
+      strokeWidth = Math.min(
+        component.symbol_data.graphics.rectangles[0].stroke.width,
+        0.254
+      );
+    }
+
     return component.symbol_data.pins.map((pin) => {
-      const pos = toKonva(pin.position.x, pin.position.y);
-      const length = pin.length * scale;
-      const angle = ((pin.position.angle || 0) * Math.PI) / 180;
+      if (!pin.position) return null;
+      if (pin.name === "Unused") return null;
 
-      // Calculate pin line end point (extends outward from pin position)
-      const endX = pos.x + length * Math.cos(angle);
-      const endY = pos.y - length * Math.sin(angle);
+      const p_start = pin.position;
+      const p_len = pin.length;
+      let p_end = { x: p_start.x, y: p_start.y };
 
-      // Pin number label (at end of pin line)
-      const pinNumberX = endX + 8;
-      const pinNumberY = endY - 5;
+      const startPos = toKonva(p_start.x, p_start.y);
+      let pinNameElement = null;
+      let pinNumberElement = null;
 
-      // Pin name label (near pin position)
-      const nameOffset = 12;
-      const nameX = pos.x - nameOffset * Math.cos(angle);
-      const nameY = pos.y + nameOffset * Math.sin(angle);
+      // EXACTLY matching index.html switch statement
+      switch (pin.position.angle) {
+        case 0.0: // Left-side pins
+          p_end.x += p_len;
+          if (pin.name !== "~") {
+            const namePos = toKonva(p_end.x + PADDING, p_end.y);
+            pinNameElement = (
+              <Text
+                x={namePos.x}
+                y={namePos.y}
+                text={pin.name}
+                fontSize={PIN_TEXT_SIZE * scale}
+                fill="#00008B"
+                fontFamily="sans-serif"
+                align="left"
+                verticalAlign="middle"
+                scaleY={-1}
+              />
+            );
+          }
+          const numPos0 = toKonva(
+            (p_start.x + p_end.x) / 2,
+            p_start.y + PADDING * 2
+          );
+          pinNumberElement = (
+            <Text
+              x={numPos0.x}
+              y={numPos0.y}
+              text={pin.number}
+              fontSize={PIN_TEXT_SIZE * scale}
+              fill="#666"
+              fontFamily="sans-serif"
+              align="center"
+              verticalAlign="top"
+              scaleY={-1}
+            />
+          );
+          break;
+
+        case 180.0: // Right-side pins
+          p_end.x -= p_len;
+          if (pin.name !== "~") {
+            const namePos = toKonva(p_end.x - PADDING, p_end.y);
+            pinNameElement = (
+              <Text
+                x={namePos.x}
+                y={namePos.y}
+                text={pin.name}
+                fontSize={PIN_TEXT_SIZE * scale}
+                fill="#00008B"
+                fontFamily="sans-serif"
+                align="right"
+                verticalAlign="middle"
+                scaleY={-1}
+              />
+            );
+          }
+          const numPos180 = toKonva(
+            (p_start.x + p_end.x) / 2,
+            p_start.y + PADDING * 2
+          );
+          pinNumberElement = (
+            <Text
+              x={numPos180.x}
+              y={numPos180.y}
+              text={pin.number}
+              fontSize={PIN_TEXT_SIZE * scale}
+              fill="#666"
+              fontFamily="sans-serif"
+              align="center"
+              verticalAlign="top"
+              scaleY={-1}
+            />
+          );
+          break;
+
+        case 90.0: // Bottom-side pins
+          p_end.y += p_len;
+          if (pin.name !== "~") {
+            const namePos = toKonva(p_end.x + PADDING, p_end.y + PADDING * 3);
+            pinNameElement = (
+              <Text
+                x={namePos.x}
+                y={namePos.y}
+                text={pin.name}
+                fontSize={PIN_TEXT_SIZE * scale}
+                fill="#00008B"
+                fontFamily="sans-serif"
+                align="center"
+                verticalAlign="middle"
+                rotation={90}
+                scaleY={-1}
+              />
+            );
+          }
+          const numPos90 = toKonva(
+            p_start.x + PADDING * 2,
+            (p_start.y + p_end.y) / 2
+          );
+          pinNumberElement = (
+            <Text
+              x={numPos90.x}
+              y={numPos90.y}
+              text={pin.number}
+              fontSize={PIN_TEXT_SIZE * scale}
+              fill="#666"
+              fontFamily="sans-serif"
+              align="center"
+              verticalAlign="middle"
+              rotation={90}
+              scaleY={-1}
+            />
+          );
+          break;
+
+        case 270.0: // Top-side pins
+          p_end.y -= p_len;
+          if (pin.name !== "~") {
+            const namePos = toKonva(p_end.x + PADDING, p_end.y - PADDING * 3);
+            pinNameElement = (
+              <Text
+                x={namePos.x}
+                y={namePos.y}
+                text={pin.name}
+                fontSize={PIN_TEXT_SIZE * scale}
+                fill="#00008B"
+                fontFamily="sans-serif"
+                align="center"
+                verticalAlign="middle"
+                rotation={90}
+                scaleY={-1}
+              />
+            );
+          }
+          const numPos270 = toKonva(
+            p_start.x + PADDING * 2,
+            (p_start.y + p_end.y) / 2
+          );
+          pinNumberElement = (
+            <Text
+              x={numPos270.x}
+              y={numPos270.y}
+              text={pin.number}
+              fontSize={PIN_TEXT_SIZE * scale}
+              fill="#666"
+              fontFamily="sans-serif"
+              align="center"
+              verticalAlign="middle"
+              rotation={90}
+              scaleY={-1}
+            />
+          );
+          break;
+      }
+
+      const endPos = toKonva(p_end.x, p_end.y);
 
       return (
         <Group key={`pin-group-${component.id}-${pin.number}`}>
           {/* Pin Line */}
           <Line
-            points={[pos.x, pos.y, endX, endY]}
-            stroke="#000000"
-            strokeWidth={1}
+            points={[startPos.x, startPos.y, endPos.x, endPos.y]}
+            stroke="black"
+            strokeWidth={strokeWidth * scale}
           />
-          {/* Pin Number (at end of line) */}
-          <Text
-            x={pinNumberX}
-            y={pinNumberY}
-            text={pin.number}
-            fontSize={10}
-            fill="#000000"
-            fontFamily="DM Sans"
-          />
-          {/* Pin Name (near pin position) */}
-          <Text
-            x={nameX}
-            y={nameY}
-            text={pin.name}
-            fontSize={10}
-            fill="#000000"
-            fontFamily="DM Sans"
-          />
-          {/* Pin Hotspot (Clickable Circle) */}
+
+          {pinNameElement}
+          {pinNumberElement}
+
+          {/* Pin Hotspot */}
           <Circle
-            x={pos.x}
-            y={pos.y}
-            radius={scale * 0.4}
-            fill="#10B981"
+            x={startPos.x}
+            y={startPos.y}
+            radius={3}
+            fill="rgba(0, 255, 0, 0.7)"
             stroke="#059669"
-            strokeWidth={1}
+            strokeWidth={0.4}
             visible={showPins || isWireMode}
-            onClick={() => handlePinClick(pin.number, pos.x, pos.y)}
+            onClick={() => handlePinClick(pin.number, startPos.x, startPos.y)}
             onMouseEnter={() => {
               if (isWireMode) {
                 document.body.style.cursor = "crosshair";
@@ -278,30 +528,23 @@ export const SimpleComponent: React.FC<{
     }
   };
 
-  // Get dimensions for selection box (using centered coordinates)
+  // Get dimensions for selection box (using raw coordinates now)
   const mainRect = component.symbol_data.graphics?.rectangles?.[0];
-  const displayWidth = 200;
-  const displayHeight = 150;
-  const offsetX = displayWidth / 2;
-  const offsetY = displayHeight / 2;
 
-  const rectX = mainRect
-    ? offsetX + Math.min(mainRect.start.x, mainRect.end.x) * scale
-    : offsetX - 10 * scale;
-  const rectY = mainRect
-    ? offsetY - Math.max(mainRect.start.y, mainRect.end.y) * scale // Note: Y is flipped
-    : offsetY - 10 * scale;
+  const rectX = mainRect ? mainRect.start.x * scale : -50;
+  const rectY = mainRect ? mainRect.start.y * scale : -50;
   const rectWidth = mainRect
     ? Math.abs(mainRect.end.x - mainRect.start.x) * scale
-    : 20 * scale;
+    : 100;
   const rectHeight = mainRect
     ? Math.abs(mainRect.end.y - mainRect.start.y) * scale
-    : 20 * scale;
+    : 100;
 
   return (
     <Group
       x={x}
       y={y}
+      scaleY={-1} // Flip Y-axis to match index.html's ctx.scale(1, -1)
       draggable={!!onDragEnd && !isWireMode} // Only draggable if not in wire mode
       onDragEnd={handleDragEnd}
       onDragMove={handleDragMove}

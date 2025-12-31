@@ -40,8 +40,14 @@ export function Canvas({
         width={width}
         height={height}
         style={{ border: "1px solid #ccc" }}
+        // Performance optimizations
+        pixelRatio={window.devicePixelRatio || 1}
       >
-        <Layer>
+        <Layer
+          // Enable performance optimizations for many objects
+          listening={true}
+          imageSmoothingEnabled={true}
+        >
           {/* Background */}
           <Rect x={0} y={0} width={width} height={height} fill="#FFFFFF" />
 

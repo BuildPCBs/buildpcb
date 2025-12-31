@@ -45,3 +45,18 @@ then at end bunder vectors found, data and send back to LLM for deciding and the
 
 
 ///when i draw a wire from -48v , and i mive, the wire somehow changed to another -48v
+
+
+
+------
+rules for constructing components
+1.
+
+rules for wiring
+1.
+
+rules for component texts (name and values of pins)
+1.
+
+rules for pin id (R1, R)
+1.

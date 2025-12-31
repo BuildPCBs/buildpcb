@@ -1,5 +1,8 @@
 // Base types for the application
 
+// Export KiCad component types
+export * from "./kicad";
+
 export interface User {
   id: string;
   email: string;

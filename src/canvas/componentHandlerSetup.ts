@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { canvasCommandManager } from "./canvas-command-manager";
 import { logger } from "@/lib/logger";
 import { refDesService } from "@/lib/refdes-service";
+import type { KiCadComponent, SymbolData, Graphics } from "@/types/kicad";
 
 // Define a type for the payload for better code quality and clarity
 interface ComponentPayload {
@@ -12,7 +13,7 @@ interface ComponentPayload {
   type: string;
   svgPath: string;
   name: string;
-  databaseComponent?: any;
+  databaseComponent?: KiCadComponent;
   x?: number;
   y?: number;
   preservedComponentId?: string; // For maintaining component IDs during restoration
@@ -22,42 +23,58 @@ let isComponentHandlerSetup = false;
 let componentEventUnsubscribe: (() => void) | null = null;
 // Removed isProcessingComponent - allowing concurrent component creation during restoration
 
-// TODO: Remove this SVG generation - create Fabric objects directly from symbol_data
-// This is a temporary solution until we fully convert to Konva.js
+// TODO: Migrate this entire file from Fabric.js to Konva
+// This file still uses Fabric.js (fabric.Canvas, fabric.Group, fabric.Circle, etc.)
+// Need to:
+// 1. Replace Fabric imports with Konva imports
+// 2. Convert fabric.Canvas → Konva.Stage + Konva.Layer
+// 3. Convert Fabric objects (fabric.Group, fabric.Circle, fabric.Text) → Konva equivalents
+// 4. Create Konva shapes directly from symbol_data (skip SVG generation for better performance)
+// 5. Update event handlers to use Konva's event system
+// Status: canvas-command-manager.ts already migrated to Konva ✅
 
-// Generate SVG from symbol_data
-function generateSvgFromSymbolData(symbolData: any): string | null {
-  console.log(`🔧 Generating SVG from symbol_data:`, symbolData);
+// Generate SVG from component
+function generateSvgFromSymbolData(component: KiCadComponent): string | null {
+  logger.canvas("Generating SVG from component", { component: component.name });
 
+  const symbolData = component.symbol_data;
   if (!symbolData || !symbolData.graphics) {
-    console.warn(`⚠️ Invalid symbol_data structure:`, symbolData);
+    logger.warn("Invalid symbol_data structure", { component: component.name });
     return null;
   }
 
-  const graphics = symbolData.graphics;
+  const graphics: Graphics = symbolData.graphics;
   let svgElements = "";
   let hasElements = false;
 
-  // Add rectangles
+  // Add rectangles - EXACTLY matching index.html logic
   if (graphics.rectangles && Array.isArray(graphics.rectangles)) {
     graphics.rectangles.forEach((rect: any, index: number) => {
       if (rect && rect.start && rect.end) {
+        // EXACT index.html logic:
+        const x = rect.start.x;
+        const y = rect.start.y;
         const width = Math.abs(rect.end.x - rect.start.x);
-        const height = Math.abs(rect.end.y - rect.start.y);
-        const x = Math.min(rect.start.x, rect.end.x);
-        const y = Math.min(rect.start.y, rect.end.y);
+        const drawHeight = rect.end.y - rect.start.y; // Can be NEGATIVE like index.html
+
         const fill = rect.fill?.type === "background" ? "#f0f0f0" : "none";
         const stroke = rect.stroke?.type === "default" ? "#000" : "#000";
         const strokeWidth = rect.stroke?.width || 0.254;
 
-        svgElements += `<rect x="${x}" y="${y}" width="${width}" height="${height}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"/>`;
+        // For SVG: convert negative height to positive and adjust y
+        const svgY = drawHeight < 0 ? y + drawHeight : y;
+        const svgHeight = Math.abs(drawHeight);
+
+        svgElements += `<rect x="${x}" y="${-svgY}" width="${width}" height="${svgHeight}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"/>`;
         hasElements = true;
-        console.log(`✅ Added rectangle ${index}:`, rect);
+        console.log(
+          `✅ Added rectangle ${index}: x=${x}, y=${y}, width=${width}, drawHeight=${drawHeight}`
+        );
       }
     });
   }
 
-  // Add circles
+  // Add circles - EXACTLY matching index.html logic
   if (graphics.circles && Array.isArray(graphics.circles)) {
     graphics.circles.forEach((circle: any, index: number) => {
       if (circle && circle.center && typeof circle.radius === "number") {
@@ -65,40 +82,191 @@ function generateSvgFromSymbolData(symbolData: any): string | null {
         const stroke = circle.stroke?.type === "default" ? "#000" : "#000";
         const strokeWidth = circle.stroke?.width || 0.254;
 
-        svgElements += `<circle cx="${circle.center.x}" cy="${circle.center.y}" r="${circle.radius}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"/>`;
+        // EXACT index.html: ctx.arc(circle.center.x, circle.center.y, circle.radius, ...)
+        // For SVG, we need to flip Y
+        svgElements += `<circle cx="${circle.center.x}" cy="${-circle.center
+          .y}" r="${
+          circle.radius
+        }" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"/>`;
         hasElements = true;
-        console.log(`✅ Added circle ${index}:`, circle);
+        console.log(
+          `✅ Added circle ${index}: cx=${circle.center.x}, cy=${circle.center.y}, r=${circle.radius}`
+        );
       }
     });
   }
 
-  // Add polylines
+  // Add polylines - EXACTLY matching index.html logic
   if (graphics.polylines && Array.isArray(graphics.polylines)) {
     graphics.polylines.forEach((polyline: any, index: number) => {
       if (polyline && polyline.points && Array.isArray(polyline.points)) {
+        // EXACT index.html: ctx.lineTo(polyline.points[i].x, polyline.points[i].y)
+        // For SVG, flip Y coordinates
         const points = polyline.points
-          .map((p: any) => `${p.x},${p.y}`)
+          .map((p: any) => `${p.x},${-p.y}`)
           .join(" ");
-        const fill = polyline.fill?.type === "none" ? "none" : "#000";
+        const fill = polyline.fill?.type === "none" ? "none" : "none"; // index.html doesn't fill polylines
         const stroke = polyline.stroke?.type === "default" ? "#000" : "#000";
         const strokeWidth = polyline.stroke?.width || 0.254;
 
         svgElements += `<polyline points="${points}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"/>`;
         hasElements = true;
-        console.log(`✅ Added polyline ${index}:`, polyline);
+        console.log(
+          `✅ Added polyline ${index}: ${polyline.points.length} points`
+        );
       }
     });
   }
 
+  // Add pins as visual line elements - EXACTLY matching index.html logic
+  if (symbolData.pins && Array.isArray(symbolData.pins)) {
+    symbolData.pins.forEach((pin: any, index: number) => {
+      if (!pin.position || pin.name === "Unused") return;
+
+      // EXACT index.html logic
+      const p_start = pin.position; // Connection point (outside)
+      const p_len = pin.length || 2.54;
+      let p_end = { x: p_start.x, y: p_start.y }; // Body point (inside)
+
+      // Calculate pin end point based on angle - EXACT index.html switch statement
+      switch (pin.position.angle) {
+        case 0.0: // Left-side pins (extend right)
+          p_end.x += p_len;
+          break;
+        case 180.0: // Right-side pins (extend left)
+          p_end.x -= p_len;
+          break;
+        case 90.0: // Bottom-side pins (extend up in data coords)
+          p_end.y += p_len;
+          break;
+        case 270.0: // Top-side pins (extend down in data coords)
+          p_end.y -= p_len;
+          break;
+      }
+
+      // Add pin line (flip Y coordinates for SVG since we don't have ctx.scale(1,-1))
+      svgElements += `<line x1="${p_start.x}" y1="${-p_start.y}" x2="${
+        p_end.x
+      }" y2="${-p_end.y}" stroke="#000" stroke-width="0.152"/>`;
+
+      // Add pin name text (if not "~") - matching index.html positioning
+      if (pin.name !== "~") {
+        let textX = p_end.x;
+        let textY = p_end.y;
+        let textAnchor = "middle";
+        const PADDING = 0.5; // index.html constant
+
+        switch (pin.position.angle) {
+          case 0.0: // Left-side pins
+            textX = p_end.x + PADDING;
+            textAnchor = "left";
+            break;
+          case 180.0: // Right-side pins
+            textX = p_end.x - PADDING;
+            textAnchor = "right";
+            break;
+          case 90.0: // Bottom-side pins
+            textX = p_end.x + PADDING;
+            textY = p_end.y + PADDING * 3;
+            break;
+          case 270.0: // Top-side pins
+            textX = p_end.x + PADDING;
+            textY = p_end.y - PADDING * 3;
+            break;
+        }
+
+        svgElements += `<text x="${textX}" y="${-textY}" font-size="1.0" fill="#00008B" text-anchor="${textAnchor}" dominant-baseline="middle">${
+          pin.name
+        }</text>`;
+      }
+
+      // Add pin number text - matching index.html positioning
+      let numTextX = (p_start.x + p_end.x) / 2;
+      let numTextY = p_start.y;
+      const PADDING = 0.5;
+
+      switch (pin.position.angle) {
+        case 0.0: // Left-side pins
+        case 180.0: // Right-side pins
+          numTextY = p_start.y + PADDING * 2;
+          break;
+        case 90.0: // Bottom-side pins
+        case 270.0: // Top-side pins
+          numTextX = p_start.x + PADDING * 2;
+          numTextY = (p_start.y + p_end.y) / 2;
+          break;
+      }
+
+      svgElements += `<text x="${numTextX}" y="${-numTextY}" font-size="1.0" fill="#666" text-anchor="middle" dominant-baseline="middle">${
+        pin.number
+      }</text>`;
+
+      hasElements = true;
+      console.log(
+        `✅ Added pin ${index}: ${pin.name} at (${p_start.x}, ${p_start.y}), angle=${pin.position.angle}`
+      );
+    });
+  }
+
+  // Add component fields (reference and value) - EXACTLY matching index.html logic
+  if (component.fields) {
+    const NAME_TEXT_SIZE = 1.5; // index.html constant
+    const DESC_TEXT_SIZE = 2.0; // index.html constant
+
+    // Draw reference field (component name/ID)
+    if (component.fields.reference && component.fields.reference.position) {
+      const refPos = component.fields.reference.position;
+      const refValue = component.fields.reference.value || component.name;
+      const refAngle = refPos.angle || 0;
+
+      // EXACT index.html: ctx.translate(refPos.x, refPos.y) then ctx.rotate(angle) then drawText(0, 0)
+      const refTransform = refAngle
+        ? `transform="rotate(${refAngle} ${refPos.x} ${-refPos.y})"`
+        : "";
+      svgElements += `<text x="${
+        refPos.x
+      }" y="${-refPos.y}" font-size="${NAME_TEXT_SIZE}" fill="blue" text-anchor="center" dominant-baseline="middle" ${refTransform}>${refValue}</text>`;
+      hasElements = true;
+      logger.canvas(`Added reference field: ${refValue}`, { position: refPos });
+    }
+
+    // Draw value field (component value/description)
+    if (component.fields.value && component.fields.value.position) {
+      const valuePos = component.fields.value.position;
+      const valueText = component.fields.value.value || component.name;
+      const valueAngle = valuePos.angle || 0;
+
+      // Only draw if different from reference to avoid duplication - EXACT index.html logic
+      const refValue = component.fields.reference?.value || component.name;
+      if (valueText !== refValue) {
+        const valueTransform = valueAngle
+          ? `transform="rotate(${valueAngle} ${valuePos.x} ${-valuePos.y})"`
+          : "";
+        svgElements += `<text x="${
+          valuePos.x
+        }" y="${-valuePos.y}" font-size="${DESC_TEXT_SIZE}" fill="green" text-anchor="center" dominant-baseline="middle" ${valueTransform}>${valueText}</text>`;
+        hasElements = true;
+        logger.canvas(`Added value field: ${valueText}`, {
+          position: valuePos,
+        });
+      }
+    }
+  }
+
   if (!hasElements) {
-    console.warn(`⚠️ No valid graphics elements found in symbol_data`);
+    logger.warn("No valid graphics elements found in symbol_data");
     return null;
   }
 
   // Calculate viewBox
-  const bounds = calculateBounds(symbolData.graphics);
+  const bounds = calculateBounds(
+    symbolData.graphics,
+    symbolData.pins,
+    symbolData.graphics?.text,
+    component.fields
+  );
   if (bounds.width === 0 || bounds.height === 0) {
-    console.warn(`⚠️ Invalid bounds calculated:`, bounds);
+    logger.warn("Invalid bounds calculated", { bounds });
     // Fallback viewBox
     const viewBox = "-10 -10 20 20";
     return `<svg viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg">${svgElements}</svg>`;
@@ -113,18 +281,24 @@ function generateSvgFromSymbolData(symbolData: any): string | null {
   return result;
 }
 
-// Calculate bounds of graphics elements
-function calculateBounds(graphics: any) {
+// Calculate bounds of graphics elements - EXACTLY matching index.html fitToView logic
+function calculateBounds(
+  graphics: any,
+  pins?: any[],
+  textElements?: any[],
+  fields?: any
+) {
   let minX = Infinity,
     minY = Infinity,
     maxX = -Infinity,
     maxY = -Infinity;
   let hasBounds = false;
 
-  // Check rectangles
+  // Check rectangles - EXACT index.html logic
   if (graphics.rectangles && Array.isArray(graphics.rectangles)) {
     graphics.rectangles.forEach((rect: any) => {
       if (rect && rect.start && rect.end) {
+        // index.html: Math.min(minX, rect.start.x, rect.end.x)
         minX = Math.min(minX, rect.start.x, rect.end.x);
         minY = Math.min(minY, rect.start.y, rect.end.y);
         maxX = Math.max(maxX, rect.start.x, rect.end.x);
@@ -134,20 +308,24 @@ function calculateBounds(graphics: any) {
     });
   }
 
-  // Check circles
+  // Check circles - EXACT index.html logic
   if (graphics.circles && Array.isArray(graphics.circles)) {
     graphics.circles.forEach((circle: any) => {
       if (circle && circle.center && typeof circle.radius === "number") {
-        minX = Math.min(minX, circle.center.x - circle.radius);
-        minY = Math.min(minY, circle.center.y - circle.radius);
-        maxX = Math.max(maxX, circle.center.x + circle.radius);
-        maxY = Math.max(maxY, circle.center.y + circle.radius);
+        // index.html uses original coordinates (no Y flip in bounds calculation)
+        const cx = circle.center.x;
+        const cy = circle.center.y;
+        const r = circle.radius;
+        minX = Math.min(minX, cx - r);
+        minY = Math.min(minY, cy - r);
+        maxX = Math.max(maxX, cx + r);
+        maxY = Math.max(maxY, cy + r);
         hasBounds = true;
       }
     });
   }
 
-  // Check polylines
+  // Check polylines - EXACT index.html logic
   if (graphics.polylines && Array.isArray(graphics.polylines)) {
     graphics.polylines.forEach((polyline: any) => {
       if (polyline && polyline.points && Array.isArray(polyline.points)) {
@@ -157,6 +335,7 @@ function calculateBounds(graphics: any) {
             typeof point.x === "number" &&
             typeof point.y === "number"
           ) {
+            // index.html uses original coordinates
             minX = Math.min(minX, point.x);
             minY = Math.min(minY, point.y);
             maxX = Math.max(maxX, point.x);
@@ -168,16 +347,126 @@ function calculateBounds(graphics: any) {
     });
   }
 
+  // Check pins - EXACT index.html logic
+  if (pins && Array.isArray(pins)) {
+    pins.forEach((pin: any) => {
+      if (!pin.position) return;
+
+      // Skip unused pins from bounds calculation
+      if (pin.name === "Unused") return;
+
+      const pos = pin.position;
+      const length = pin.length || 2.54;
+
+      // EXACT index.html calculation
+      const endX =
+        pos.x +
+        (pin.position.angle === 0
+          ? length
+          : pin.position.angle === 180
+          ? -length
+          : 0);
+      const endY =
+        pos.y +
+        (pin.position.angle === 90
+          ? length
+          : pin.position.angle === 270
+          ? -length
+          : 0);
+
+      // index.html uses original coordinates
+      minX = Math.min(minX, pos.x, endX);
+      minY = Math.min(minY, pos.y, endY);
+      maxX = Math.max(maxX, pos.x, endX);
+      maxY = Math.max(maxY, pos.y, endY);
+      hasBounds = true;
+    });
+  }
+
+  // Check text elements - EXACT index.html logic
+  if (textElements && Array.isArray(textElements)) {
+    textElements.forEach((textElement: any) => {
+      if (textElement.position && textElement.content) {
+        // Estimate text bounds (rough approximation) - matching index.html
+        const textWidth = textElement.content.length * 1.5;
+        const textHeight = 2.5;
+
+        const pos = textElement.position;
+        const angle = pos.angle || 0;
+        const angleRad = (angle * Math.PI) / 180;
+
+        // Calculate corners of text bounding box
+        const corners = [
+          { x: -textWidth / 2, y: -textHeight / 2 },
+          { x: textWidth / 2, y: -textHeight / 2 },
+          { x: textWidth / 2, y: textHeight / 2 },
+          { x: -textWidth / 2, y: textHeight / 2 },
+        ];
+
+        corners.forEach((corner) => {
+          const rotatedX =
+            corner.x * Math.cos(angleRad) - corner.y * Math.sin(angleRad);
+          const rotatedY =
+            corner.x * Math.sin(angleRad) + corner.y * Math.cos(angleRad);
+
+          // index.html uses original coordinates (no Y flip)
+          const worldX = pos.x + rotatedX;
+          const worldY = pos.y + rotatedY;
+
+          minX = Math.min(minX, worldX);
+          minY = Math.min(minY, worldY);
+          maxX = Math.max(maxX, worldX);
+          maxY = Math.max(maxY, worldY);
+        });
+        hasBounds = true;
+      }
+    });
+  }
+
+  // Check component fields
+  if (fields) {
+    // Reference field
+    if (fields.reference && fields.reference.position) {
+      const pos = fields.reference.position;
+      const textWidth = (fields.reference.value || "").length * 1.5;
+      const textHeight = 1.5;
+      minX = Math.min(minX, pos.x - textWidth / 2);
+      minY = Math.min(minY, pos.y - textHeight / 2);
+      maxX = Math.max(maxX, pos.x + textWidth / 2);
+      maxY = Math.max(maxY, pos.y + textHeight / 2);
+      hasBounds = true;
+    }
+
+    // Value field
+    if (fields.value && fields.value.position) {
+      const pos = fields.value.position;
+      const textWidth = (fields.value.value || "").length * 2.0;
+      const textHeight = 2.0;
+      minX = Math.min(minX, pos.x - textWidth / 2);
+      minY = Math.min(minY, pos.y - textHeight / 2);
+      maxX = Math.max(maxX, pos.x + textWidth / 2);
+      maxY = Math.max(maxY, pos.y + textHeight / 2);
+      hasBounds = true;
+    }
+  }
+
   if (!hasBounds) {
     console.warn(`⚠️ No valid bounds found, using defaults`);
     return { minX: -10, minY: -10, width: 20, height: 20 };
   }
 
+  // Now convert to SVG viewBox (Y-down)
+  // SVG viewBox needs: x, y (top-left), width, height
+  const width = maxX - minX;
+  const height = maxY - minY;
+
+  // For SVG: flip the Y-axis
+  // Top in data coords (maxY) becomes top in SVG (-maxY)
   return {
     minX,
-    minY,
-    width: maxX - minX,
-    height: maxY - minY,
+    minY: -maxY, // Flip Y: use negative of max Y
+    width,
+    height,
   };
 }
 
@@ -236,11 +525,13 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
         }
 
         try {
-          // 1. Fetch component's symbol_data from the database
+          // 1. Fetch component data from the database
           console.log(`🔍 Fetching component: ${payload.name}`);
           const { data: dbComponent, error: fetchError } = await supabase
             .from("components")
-            .select("symbol_data")
+            .select(
+              "id, name, library, description, datasheet, keywords, pin_count, symbol_data, footprint_filter, fields"
+            )
             .eq("name", payload.name)
             .single();
 
@@ -260,12 +551,14 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
           }
 
           console.log(
-            `✅ Found symbol_data for ${payload.name}:`,
-            dbComponent.symbol_data
+            `✅ Found component data for ${payload.name}:`,
+            dbComponent
           );
 
-          // Generate SVG from symbol_data
-          const svgString = generateSvgFromSymbolData(dbComponent.symbol_data);
+          // Generate SVG from component
+          const svgString = generateSvgFromSymbolData(
+            dbComponent as KiCadComponent
+          );
           if (!svgString) {
             console.error(
               `❌ SVG generation failed for ${payload.name}, symbol_data:`,
@@ -465,44 +758,40 @@ export function setupComponentHandler(canvas: fabric.Canvas) {
           // We also separate the main symbol parts from the pin markers
           const symbolParts: fabric.Object[] = [];
 
+          // Create interactive pins from database pin data (not from SVG markers)
+          dbPins.forEach((pin: any) => {
+            if (!pin.position || pin.name === "Unused") return;
+
+            // The connection point is at pin.position (the outer end of the pin line)
+            const connectionPoint = pin.position;
+
+            const interactivePin = new fabric.Circle({
+              radius: 3, // Visual size of the connectable point
+              fill: "rgba(0, 255, 0, 0.7)",
+              stroke: "#059669",
+              strokeWidth: 0.4,
+              left: connectionPoint.x,
+              top: connectionPoint.y,
+              originX: "center",
+              originY: "center",
+              opacity: 0, // Hidden until mouse hover
+              visible: false, // Initially not visible
+            });
+
+            interactivePin.set("data", {
+              type: "pin",
+              componentId: componentId,
+              pinNumber: pin.number,
+              pinName: pin.name || `Pin ${pin.number}`,
+              electricalType: pin.electrical_type || "unknown",
+              isConnectable: true,
+            });
+
+            interactivePins.push(interactivePin);
+          });
+
+          // Add all SVG objects to symbol parts (no pin markers to filter out)
           allSvgObjects.forEach((obj) => {
-            // Check for the "signpost" ID added by the Python script
-            // We cast `obj` to `any` to access the `id` property which is not in the default FabricObject type
-            if (obj && (obj as any).id && (obj as any).id.startsWith("pin-")) {
-              const pinNumber = (obj as any).id.split("-")[1];
-              const pinDataFromDb =
-                dbPins.find((p) => p.number === pinNumber) || {};
-
-              const center = obj.getCenterPoint();
-
-              const interactivePin = new fabric.Circle({
-                radius: 3, // Visual size of the connectable point
-                fill: "rgba(0, 255, 0, 0.7)",
-                stroke: "#059669",
-                strokeWidth: 0.4,
-                left: center.x,
-                top: center.y,
-                originX: "center",
-                originY: "center",
-                opacity: 0, // Hidden until mouse hover
-                visible: false, // Initially not visible
-              });
-
-              interactivePin.set("data", {
-                type: "pin",
-                componentId: componentId,
-                pinNumber: pinNumber,
-                pinName: pinDataFromDb.name || `Pin ${pinNumber}`,
-                electricalType: pinDataFromDb.electrical_type || "unknown",
-                isConnectable: true,
-              });
-
-              interactivePins.push(interactivePin);
-
-              // Hide the original SVG path for the pin line itself
-              obj.visible = false;
-            }
-
             if (obj) {
               symbolParts.push(obj);
             }

@@ -464,10 +464,10 @@ export const getCanvasStateTool: Tool = {
 
         // Find component names for better readability
         const fromComponent = componentList.find(
-          (c) => c.id === connData.fromComponentId
+          (c: any) => c.id === connData.fromComponentId
         );
         const toComponent = componentList.find(
-          (c) => c.id === connData.toComponentId
+          (c: any) => c.id === connData.toComponentId
         );
 
         return {

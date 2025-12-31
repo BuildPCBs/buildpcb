@@ -63,7 +63,11 @@ export function useServerSearch() {
     if (!svgElements) return null;
 
     // Calculate viewBox
-    const bounds = calculateBounds(symbolData.graphics);
+    const bounds = calculateBounds(
+      symbolData.graphics,
+      symbolData.pins,
+      symbolData.graphics?.text
+    );
     const viewBox = `${bounds.minX - 2} ${bounds.minY - 2} ${
       bounds.width + 4
     } ${bounds.height + 4}`;
@@ -72,7 +76,11 @@ export function useServerSearch() {
   };
 
   // Calculate bounds of graphics elements
-  const calculateBounds = (graphics: any) => {
+  const calculateBounds = (
+    graphics: any,
+    pins?: any[],
+    textElements?: any[]
+  ) => {
     let minX = Infinity,
       minY = Infinity,
       maxX = -Infinity,
@@ -107,6 +115,81 @@ export function useServerSearch() {
           maxX = Math.max(maxX, point.x);
           maxY = Math.max(maxY, point.y);
         });
+      });
+    }
+
+    // Check pins - include pin line endpoints based on position and angle
+    if (pins && Array.isArray(pins)) {
+      pins.forEach((pin: any) => {
+        if (!pin.position) return;
+
+        // Skip unused pins from bounds calculation
+        if (pin.name === "Unused") return;
+
+        const pos = pin.position;
+        const length = pin.length || 2.54;
+
+        // Calculate pin endpoint based on angle
+        const endX =
+          pos.x +
+          (pin.position.angle === 0
+            ? length
+            : pin.position.angle === 180
+            ? -length
+            : 0);
+        const endY =
+          pos.y +
+          (pin.position.angle === 90
+            ? length
+            : pin.position.angle === 270
+            ? -length
+            : 0);
+
+        minX = Math.min(minX, pos.x, endX);
+        minY = Math.min(minY, pos.y, endY);
+        maxX = Math.max(maxX, pos.x, endX);
+        maxY = Math.max(maxY, pos.y, endY);
+      });
+    }
+
+    // Check text elements - estimate bounds and account for rotation
+    if (textElements && Array.isArray(textElements)) {
+      textElements.forEach((textElement: any) => {
+        if (textElement.position && textElement.content) {
+          // Estimate text bounds (rough approximation)
+          const textWidth = textElement.content.length * 1.5; // Rough character width estimate
+          const textHeight = 2.5; // Text height estimate
+
+          // Account for rotation by expanding bounds
+          const pos = textElement.position;
+          const angle = pos.angle || 0;
+          const angleRad = (angle * Math.PI) / 180;
+
+          // Calculate corners of text bounding box
+          const corners = [
+            { x: -textWidth / 2, y: -textHeight / 2 },
+            { x: textWidth / 2, y: -textHeight / 2 },
+            { x: textWidth / 2, y: textHeight / 2 },
+            { x: -textWidth / 2, y: textHeight / 2 },
+          ];
+
+          corners.forEach((corner) => {
+            // Rotate corner around origin
+            const rotatedX =
+              corner.x * Math.cos(angleRad) - corner.y * Math.sin(angleRad);
+            const rotatedY =
+              corner.x * Math.sin(angleRad) + corner.y * Math.cos(angleRad);
+
+            // Translate to text position
+            const worldX = pos.x + rotatedX;
+            const worldY = pos.y + rotatedY;
+
+            minX = Math.min(minX, worldX);
+            minY = Math.min(minY, worldY);
+            maxX = Math.max(maxX, worldX);
+            maxY = Math.max(maxY, worldY);
+          });
+        }
       });
     }
 

@@ -99,8 +99,14 @@ export function KonvaCanvas({
         style={{ backgroundColor: "#f8f9fa", border: "1px solid #d1d5db" }}
         scaleX={zoom}
         scaleY={zoom}
+        // Performance optimizations
+        pixelRatio={window.devicePixelRatio || 1}
       >
-        <Layer>
+        <Layer
+          // Enable performance optimizations
+          listening={true}
+          imageSmoothingEnabled={true}
+        >
           {/* Sample shapes - will be converted to dynamic components */}
           <Rect x={100} y={100} width={100} height={100} fill="#ff6b6b" />
           <Circle x={350} y={250} radius={50} fill="#4ecdc4" />
