@@ -1,0 +1,64 @@
+name: Notify on Push
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get commit info
+        id: commit
+        run: |
+          echo "message=$(git log -1 --pretty=%B)" >> $GITHUB_OUTPUT
+          echo "author=$(git log -1 --pretty=%an)" >> $GITHUB_OUTPUT
+          echo "sha=$(git log -1 --pretty=%h)" >> $GITHUB_OUTPUT
+
+      - name: Send Telegram notification
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          # Get commit stats
+          FILES_CHANGED=$(git diff-tree --no-commit-id --name-only -r ${{ steps.commit.outputs.sha }} | wc -l | xargs)
+          ADDITIONS=$(git show --stat ${{ steps.commit.outputs.sha }} | tail -1 | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo "0")
+          DELETIONS=$(git show --stat ${{ steps.commit.outputs.sha }} | tail -1 | grep -oE '[0-9]+ deletion' | grep -oE '[0-9]+' || echo "0")
+          BRANCH="${GITHUB_REF#refs/heads/}"
+
+          # Truncate commit message if too long
+          COMMIT_MSG="${{ steps.commit.outputs.message }}"
+          if [ ${#COMMIT_MSG} -gt 100 ]; then
+            COMMIT_MSG="${COMMIT_MSG:0:100}..."
+          fi
+
+          # Build message (using printf to handle multiline properly)
+          MESSAGE=$(printf "🚀 *BuildPCB Web Update*\n\n\`%s\`\n\n🌿 \`%s\` • 👤 [%s](https://github.com/%s)\n📊 %s files • +%s -%s" \
+            "$COMMIT_MSG" \
+            "$BRANCH" \
+            "${{ github.actor }}" \
+            "${{ github.actor }}" \
+            "$FILES_CHANGED" \
+            "$ADDITIONS" \
+            "$DELETIONS")
+
+          # Build inline keyboard with buttons
+          KEYBOARD='{"inline_keyboard":[[{"text":"📝 View Commit","url":"https://github.com/BuildPCBc/buildpcb/commit/${{ steps.commit.outputs.sha }}"},{"text":"📂 Repository","url":"https://github.com/BuildPCBc/buildpcb"}]]}'
+
+          # Escape message for JSON
+          MESSAGE=$(echo "$MESSAGE" | jq -Rs .)
+
+          # Send message
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d "{\"chat_id\":\"${TELEGRAM_CHAT_ID}\",\"text\":${MESSAGE},\"parse_mode\":\"Markdown\",\"reply_markup\":${KEYBOARD},\"disable_web_page_preview\":true}"
+
+          echo "✅ Telegram notification sent!"
