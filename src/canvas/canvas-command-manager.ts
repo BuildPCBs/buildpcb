@@ -161,7 +161,7 @@ export const builtInCanvasCommands = {
           x: params?.x ?? stage.width() / 2,
           y: params?.y ?? stage.height() / 2,
           draggable: true,
-          name: "resistor",
+          name: "component resistor",
         });
 
         const resistorBody = new Konva.Rect({
@@ -242,17 +242,28 @@ export const builtInCanvasCommands = {
         y?: number;
       }
     ) => {
-      // Forward to the component factory by emitting the event
+      if (!params || !params.svgPath) {
+        logger.error("COMPONENT_ADD: Missing params or svgPath", params);
+        return;
+      }
+
       logger.canvas(
-        `Command manager: Forwarding "component:add" for ${params?.name}`,
-        {
-          hasStage: !!stage,
-          hasLayer: !!layer,
-          params,
-        }
+        `Command manager: Executing "component:add" for ${params?.name} via Konva Factory`
       );
-      canvasCommandManager.emit("component:add", params);
-      logger.canvas(`Command manager: Event emitted for ${params?.name}`);
+
+      try {
+        const { createIntelligentComponent } = await import(
+          "./IntelligentComponentFactory"
+        );
+
+        await createIntelligentComponent(stage, layer, params);
+
+        logger.canvas(
+          `Command manager: Component ${params.name} added successfully`
+        );
+      } catch (error) {
+        logger.error("Error adding component via factory", { error });
+      }
     },
   } as CanvasCommand,
 

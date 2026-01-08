@@ -1,4 +1,4 @@
-import * as fabric from "fabric";
+import Konva from "konva";
 import { canvasCommandManager } from "@/canvas/canvas-command-manager";
 import { Project } from "@/types";
 
@@ -23,8 +23,8 @@ export interface AgentStreamer {
  * It's the "world view" for the AI agent.
  */
 export interface AgentContext {
-  /** The Fabric.js canvas instance for direct manipulation. */
-  canvas: fabric.Canvas;
+  /** The Konva Stage instance for direct manipulation. */
+  canvas: Konva.Stage;
   /** The command manager for executing and tracking canvas changes (undo/redo). */
   commandManager: typeof canvasCommandManager;
   /** The currently active project's data. */

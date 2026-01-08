@@ -13,7 +13,7 @@ import { Circuit } from "@/lib/schemas/circuit";
 import { ProjectService, ProjectLoadResult } from "@/lib/project-service";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
-import { loadCanvasFromLogicalCircuit } from "@/canvas/utils/logicalSerializer";
+import { loadCanvasFromCircuit } from "@/canvas/utils/canvasSerializer";
 import { useProjectStore } from "@/store/projectStore";
 import { useAutoSave } from "@/hooks/useDatabase"; // Add this import
 
@@ -362,12 +362,11 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
         const { serializeCanvasToCircuit } = await import(
           "@/canvas/utils/canvasSerializer"
         );
-
         // Get the current canvas from the canvas command manager
         const { canvasCommandManager } = await import(
           "@/canvas/canvas-command-manager"
         );
-        const canvasInstance = canvasCommandManager.getCanvas();
+        const canvasInstance = canvasCommandManager.getStage(); // Changed from getCanvas to getStage
 
         // Serialize canvas to circuit format instead of raw data
         const circuitFromCanvas = serializeCanvasToCircuit(canvasInstance);
@@ -510,7 +509,7 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
             // Extract netlist from canvas data (saved by serializeCanvasData)
             const netlistData = currentProject.canvas_settings.netlist;
 
-            await loadCanvasFromLogicalCircuit(
+            await loadCanvasFromCircuit(
               canvas,
               currentCircuit as any,
               netlistData, // Pass netlist for wire restoration

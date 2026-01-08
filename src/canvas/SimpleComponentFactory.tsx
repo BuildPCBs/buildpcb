@@ -52,11 +52,7 @@ export const SimpleComponent: React.FC<{
     const graphics = component.symbol_data.graphics;
 
     // Helper function matching index.html's getGraphicsColor
-    const getGraphicsColor = (
-      stroke: any,
-      fill: any,
-      elementType: string
-    ) => {
+    const getGraphicsColor = (stroke: any, fill: any, elementType: string) => {
       const defaults = {
         stroke: "black",
         fill: elementType === "rectangle" ? "#FFFFE0" : "transparent",
@@ -493,14 +489,26 @@ export const SimpleComponent: React.FC<{
             stroke="#059669"
             strokeWidth={0.4}
             visible={showPins || isWireMode}
+            // Store angle for smart wiring
+            angle={pin.position.angle}
             onClick={() => handlePinClick(pin.number, startPos.x, startPos.y)}
-            onMouseEnter={() => {
+            onMouseEnter={(e) => {
               if (isWireMode) {
+                // Make pin larger and more visible on hover
+                const circle = e.target as Konva.Circle;
+                circle.radius(5);
+                circle.fill("rgba(0, 255, 0, 0.9)");
+                circle.strokeWidth(1);
                 document.body.style.cursor = "crosshair";
               }
             }}
-            onMouseLeave={() => {
-              document.body.style.cursor = "default";
+            onMouseLeave={(e) => {
+              // Reset pin size
+              const circle = e.target as Konva.Circle;
+              circle.radius(3);
+              circle.fill("rgba(0, 255, 0, 0.7)");
+              circle.strokeWidth(0.4);
+              document.body.style.cursor = isWireMode ? "crosshair" : "default";
             }}
             name={`pin-${pin.number}`}
             ref={(node) => {
@@ -549,23 +557,48 @@ export const SimpleComponent: React.FC<{
       onDragEnd={handleDragEnd}
       onDragMove={handleDragMove}
       onClick={onClick}
+      // CRITICAL for Agent Discovery:
+      name="component"
+      id={component.id}
+      componentName={component.componentName || component.name || "Unknown"}
+      componentType={component.componentType || component.type || "component"}
       ref={(node) => {
         if (node) {
-          (node as any).data = { componentId: component.id };
+          (node as any).data = {
+            componentId: component.id,
+            componentName: component.name || "Unknown Component",
+            componentType: component.type || "generic",
+            uid: component.id,
+          };
         }
       }}
     >
-      {/* Selection highlight (invisible for easier dragging) */}
+      {/* HIT AREA - Always present but invisible */}
+      {/* This ensures users can click anywhere in the component bounds to select/drag it */}
+      <Rect
+        x={rectX}
+        y={rectY}
+        width={rectWidth}
+        height={rectHeight}
+        fill="transparent"
+        stroke="transparent"
+        strokeWidth={0}
+        listening={true}
+      />
+
+      {/* Selection highlight (visual only) */}
       {isSelected && (
         <Rect
           x={rectX - scale * 0.5} // Position relative to the main rect
           y={rectY - scale * 0.5}
           width={rectWidth + scale} // Add padding
           height={rectHeight + scale}
-          fill="transparent" // Make invisible
-          stroke="transparent" // Make invisible
-          strokeWidth={0} // No border
+          fill="transparent"
+          stroke={isSelected ? "#0038DF" : "transparent"} // Blue highlight
+          strokeWidth={scale * 0.3} // Visible border
+          dash={[scale, scale]} // Dashed line style
           cornerRadius={2}
+          listening={false} // Let the hit area handle events
         />
       )}
       {renderGraphics()}

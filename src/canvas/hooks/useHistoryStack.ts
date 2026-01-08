@@ -11,11 +11,13 @@ interface HistoryState {
 interface UseHistoryStackProps {
   stage: Konva.Stage | null;
   maxHistorySize?: number;
+  onRestore?: (stage: Konva.Stage) => void;
 }
 
 export function useHistoryStack({
   stage,
   maxHistorySize = 50,
+  onRestore,
 }: UseHistoryStackProps) {
   const [history, setHistory] = useState<HistoryState[]>([]);
   const [historyIndex, setHistoryIndex] = useState(0);
@@ -33,7 +35,7 @@ export function useHistoryStack({
         timestamp: Date.now(),
       };
 
-      setHistory(prev => {
+      setHistory((prev) => {
         // Remove any history after current index (for when user made changes after undo)
         const newHistory = prev.slice(0, historyIndex + 1);
         // Add new state
@@ -46,7 +48,7 @@ export function useHistoryStack({
         return newHistory;
       });
 
-      setHistoryIndex(prev => Math.min(prev + 1, maxHistorySize - 1));
+      setHistoryIndex((prev) => Math.min(prev + 1, maxHistorySize - 1));
     } catch (error) {
       console.error("Failed to save state to history:", error);
     }
@@ -63,12 +65,24 @@ export function useHistoryStack({
       const targetState = history[targetIndex];
 
       if (targetState) {
-        // Load the stage state from JSON
-        const stageData = JSON.parse(targetState.stageState);
-        stage.clear();
-        // Reconstruct stage from JSON data
-        // Note: This is a simplified version - in practice you might need more complex reconstruction
+        // Clear current stage children (layers)
+        stage.destroyChildren();
+
+        // Create temp stage from JSON to extract layers
+        // We do this to avoid replacing the actual Stage instance which React holds
+        const tempStage = Konva.Node.create(targetState.stageState);
+
+        // Move children from temp stage to actual stage
+        const children = tempStage.getChildren().toArray();
+        children.forEach((child: any) => {
+          child.moveTo(stage);
+        });
+
         setHistoryIndex(targetIndex);
+        stage.batchDraw();
+
+        // Notify restoration
+        if (onRestore) onRestore(stage);
       }
     } catch (error) {
       console.error("Failed to undo:", error);
@@ -88,11 +102,17 @@ export function useHistoryStack({
       const targetState = history[targetIndex];
 
       if (targetState) {
-        // Load the stage state from JSON
-        const stageData = JSON.parse(targetState.stageState);
-        stage.clear();
-        // Reconstruct stage from JSON data
+        stage.destroyChildren();
+
+        const tempStage = Konva.Node.create(targetState.stageState);
+
+        const children = tempStage.getChildren().toArray();
+        children.forEach((child: any) => {
+          child.moveTo(stage);
+        });
+
         setHistoryIndex(targetIndex);
+        stage.batchDraw();
       }
     } catch (error) {
       console.error("Failed to redo:", error);
@@ -105,9 +125,12 @@ export function useHistoryStack({
   const initializeHistory = useCallback(() => {
     if (!stage || hasInitialized.current) return;
 
-    hasInitialized.current = true;
-    saveState();
-  }, [stage, saveState]);
+    // Only initialize if history is empty
+    if (history.length === 0) {
+      hasInitialized.current = true;
+      saveState();
+    }
+  }, [stage, history.length, saveState]);
 
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < history.length - 1;

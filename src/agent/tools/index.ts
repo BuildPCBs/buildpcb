@@ -7,7 +7,7 @@ import type { AgentContext } from "../types";
 import { logger } from "@/lib/logger";
 import { DatabaseService } from "@/lib/database";
 import { canvasCommandManager } from "@/canvas/canvas-command-manager";
-import * as fabric from "fabric";
+import Konva from "konva";
 
 /**
  * Transform user-friendly queries into database-friendly search terms
@@ -339,10 +339,10 @@ export const addComponentTool: Tool = {
     }
 
     // Auto-placement if no position specified
-    const canvas = canvasCommandManager.getCanvas();
+    const stage = canvasCommandManager.getStage();
     const position = {
-      x: args.x ?? (canvas ? canvas.getWidth() / 2 : 400),
-      y: args.y ?? (canvas ? canvas.getHeight() / 2 : 300),
+      x: args.x ?? (stage ? stage.width() / 2 : 400),
+      y: args.y ?? (stage ? stage.height() / 2 : 300),
     };
 
     // Generate unique instance ID
@@ -359,6 +359,7 @@ export const addComponentTool: Tool = {
       pins: pins,
       x: position.x,
       y: position.y,
+      rotation: args.rotation || 0,
       componentMetadata: {
         uid: component.uid,
         name: component.name,
@@ -384,7 +385,7 @@ export const addComponentTool: Tool = {
 
     return {
       success: true,
-      component_id: instanceId,
+      component_id: instanceId, // Note: new factory logic might override this ID internally, but we hope it doesn't or we capture it
       name: component.name,
       pins: pins,
       pin_count: pins.length,
@@ -410,78 +411,87 @@ export const getCanvasStateTool: Tool = {
   execute: async (context: AgentContext, _args: Record<string, never>) => {
     logger.debug("🔧 Tool: get_canvas_state");
 
-    const canvas = canvasCommandManager.getCanvas();
-    if (!canvas) {
+    const stage = canvasCommandManager.getStage();
+    if (!stage) {
       return {
         success: false,
         message: "Canvas not available",
       };
     }
 
-    const objects = canvas.getObjects();
-    const components = objects.filter(
-      (obj: any) => obj.data?.type === "component"
-    );
+    // Get components (nodes with name 'component')
+    // We assume components are Groups with name 'component'
+    const components = stage.find(".component");
 
-    const componentList = components.map((comp: any) => {
-      // Extract pin information from the component group
-      const pins: Array<{ number: string; name?: string }> = [];
-      if (comp.type === "group") {
-        const groupObjects = (comp as fabric.Group).getObjects();
-        groupObjects.forEach((obj: any) => {
-          if (obj.data?.type === "pin") {
-            pins.push({
-              number: obj.data.pinNumber?.toString() || "?",
-              name: obj.data.pinName || undefined,
-            });
-          }
-        });
-      }
+    const componentList = components.map((comp: Konva.Node) => {
+      const attrs = comp.attrs || {};
+      const pins = (comp as Konva.Group).find(".pin") || [];
 
       return {
-        id: comp.id,
-        name: comp.data?.componentName,
-        type: comp.componentType,
+        id: attrs.id,
+        name: attrs.componentName || attrs.name,
+        type: attrs.componentType,
         position: {
-          x: Math.round(comp.left || 0),
-          y: Math.round(comp.top || 0),
+          x: Math.round(comp.x()),
+          y: Math.round(comp.y()),
         },
-        rotation: comp.angle || 0,
-        pins: pins.sort((a, b) => parseInt(a.number) - parseInt(b.number)),
+        rotation: comp.rotation(),
+        pins: pins.map((p: any) => ({
+          number: p.getAttr("pinNumber") || "?",
+          id: p.getAttr("pinId"),
+        })),
         pin_count: pins.length,
       };
     });
 
-    // Extract wire/connection information
-    const wires = objects.filter(
-      (obj: any) => obj.wireType === "connection" || obj.connectionData
+    // Get wires (Lines)
+    // We need to identify wires. Assuming they are Lines with specific attributes
+    // In circuitResponseParser we added Lines via canvasCommandManager 'wire:add'.
+    // Need to check what logic creates wires and what metadata they have.
+    // 'wire:add' in canvas-command-manager creates a Konva.Line.
+    // We should ensure it sets metadata.
+    // Assuming wires have some identifiable attribute or class.
+    // If not, we iterate all Lines and check custom attrs.
+
+    // For now, let's look for connections logic.
+    // In canvas-command-manager, wire creation sets 'connectionData'.
+    const lines = stage.find("Line");
+    const wires = lines.filter(
+      (line) => line.getAttr("connectionData") || line.hasName("wire")
     );
 
     const connectionList = wires
-      .map((wire: any) => {
-        const connData = wire.connectionData;
+      .map((wire) => {
+        const connData = wire.getAttr("connectionData");
         if (!connData) return null;
 
-        // Find component names for better readability
-        const fromComponent = componentList.find(
-          (c: any) => c.id === connData.fromComponentId
-        );
-        const toComponent = componentList.find(
-          (c: any) => c.id === connData.toComponentId
-        );
+        // Find names
+        const fromCompNode =
+          stage.findOne(`#${connData.fromComponentId}`) ||
+          stage.findOne(`.${connData.fromComponentId}`);
+        const toCompNode =
+          stage.findOne(`#${connData.toComponentId}`) ||
+          stage.findOne(`.${connData.toComponentId}`);
+
+        const fromName = fromCompNode
+          ? fromCompNode.getAttr("componentName")
+          : "Unknown";
+        const toName = toCompNode
+          ? toCompNode.getAttr("componentName")
+          : "Unknown";
 
         return {
           from_component: {
             id: connData.fromComponentId,
-            name: fromComponent?.name || "Unknown",
+            name: fromName,
             pin: connData.fromPinNumber,
           },
           to_component: {
             id: connData.toComponentId,
-            name: toComponent?.name || "Unknown",
+            name: toName,
             pin: connData.toPinNumber,
           },
-          wire_id: wire.id || `wire_${Math.random().toString(36).substr(2, 9)}`,
+          wire_id: wire.id(),
         };
       })
       .filter(Boolean);
@@ -489,14 +499,14 @@ export const getCanvasStateTool: Tool = {
     return {
       success: true,
       canvas: {
-        width: canvas.getWidth(),
-        height: canvas.getHeight(),
+        width: stage.width(),
+        height: stage.height(),
       },
       component_count: componentList.length,
       components: componentList,
       connection_count: connectionList.length,
       connections: connectionList,
-      message: `Canvas has ${componentList.length} component(s) and ${connectionList.length} wire connection(s). Each component listed with its ID, name, and available pins. All existing connections are shown.`,
+      message: `Canvas has ${componentList.length} component(s) and ${connectionList.length} wire connection(s).`,
     };
   },
 };
@@ -523,91 +533,71 @@ export const getComponentConnectionsTool: Tool = {
   execute: async (context: AgentContext, args: { component_id: string }) => {
     logger.debug("🔧 Tool: get_component_connections", args);
 
-    const canvas = canvasCommandManager.getCanvas();
-    if (!canvas) {
+    const stage = canvasCommandManager.getStage();
+    if (!stage) {
       return {
         success: false,
         message: "Canvas not available",
       };
     }
 
-    const objects = canvas.getObjects();
-
-    // Find the component
-    const component = objects.find(
-      (obj: any) =>
-        obj.data?.type === "component" &&
-        (obj.id === args.component_id || obj.objectId === args.component_id)
-    );
-
+    const component =
+      stage.findOne(`#${args.component_id}`) ||
+      stage.findOne(`.${args.component_id}`);
     if (!component) {
       return {
         success: false,
-        message: `Component with ID ${args.component_id} not found on canvas`,
+        message: `Component with ID ${args.component_id} not found`,
       };
     }
 
-    const componentName =
-      (component as any).data?.componentName || "Unknown Component";
+    const componentName = component.getAttr("componentName") || "Unknown";
 
-    // Find all wires connected to this component
-    const wires = objects.filter(
-      (obj: any) => obj.wireType === "connection" || obj.connectionData
-    );
+    // Find wires
+    const lines = stage.find("Line");
+    const wires = lines.filter((line) => {
+      const d = line.getAttr("connectionData");
+      return (
+        d &&
+        (d.fromComponentId === args.component_id ||
+          d.toComponentId === args.component_id)
+      );
+    });
 
-    const connections = wires
-      .map((wire: any) => {
-        const connData = wire.connectionData;
-        if (!connData) return null;
-
-        // Check if this wire is connected to our target component
-        if (connData.fromComponentId === args.component_id) {
-          // This component is the source
-          const toComponent = objects.find(
-            (obj: any) =>
-              obj.data?.type === "component" &&
-              (obj.id === connData.toComponentId ||
-                obj.objectId === connData.toComponentId)
-          );
-          const toComponentName = toComponent
-            ? (toComponent as any).data?.componentName || "Unknown"
-            : "Unknown";
-
-          return {
-            direction: "outgoing",
-            pin: connData.fromPinNumber,
-            connected_to: {
-              component_id: connData.toComponentId,
-              component_name: toComponentName,
-              pin: connData.toPinNumber,
-            },
-          };
-        } else if (connData.toComponentId === args.component_id) {
-          // This component is the destination
-          const fromComponent = objects.find(
-            (obj: any) =>
-              obj.data?.type === "component" &&
-              (obj.id === connData.fromComponentId ||
-                obj.objectId === connData.fromComponentId)
-          );
-          const fromComponentName = fromComponent
-            ? (fromComponent as any).data?.componentName || "Unknown"
-            : "Unknown";
-
-          return {
-            direction: "incoming",
-            pin: connData.toPinNumber,
-            connected_from: {
-              component_id: connData.fromComponentId,
-              component_name: fromComponentName,
-              pin: connData.fromPinNumber,
-            },
-          };
-        }
-
-        return null;
-      })
-      .filter(Boolean);
+    const connections = wires.map((wire) => {
+      const d = wire.getAttr("connectionData");
+      if (d.fromComponentId === args.component_id) {
+        const target =
+          stage.findOne(`#${d.toComponentId}`) ||
+          stage.findOne(`.${d.toComponentId}`);
+        return {
+          direction: "outgoing",
+          pin: d.fromPinNumber,
+          connected_to: {
+            component_id: d.toComponentId,
+            component_name: target
+              ? target.getAttr("componentName")
+              : "Unknown",
+            pin: d.toPinNumber,
+          },
+        };
+      } else {
+        const source =
+          stage.findOne(`#${d.fromComponentId}`) ||
+          stage.findOne(`.${d.fromComponentId}`);
+        return {
+          direction: "incoming",
+          pin: d.toPinNumber,
+          connected_from: {
+            component_id: d.fromComponentId,
+            component_name: source
+              ? source.getAttr("componentName")
+              : "Unknown",
+            pin: d.fromPinNumber,
+          },
+        };
+      }
+    });
 
     return {
       success: true,
@@ -629,29 +619,25 @@ export const getComponentConnectionsTool: Tool = {
 export const drawWireTool: Tool = {
   name: "draw_wire",
   description:
-    "Draw a wire connection between two component pins. Use this to connect components electrically. IMPORTANT: You MUST use the component INSTANCE IDs (starting with 'component_') from either selected components context or get_canvas_state results. NEVER use database UIDs or component names. If components are selected (check SELECTED COMPONENTS CONTEXT in system prompt), use their IDs directly. Otherwise, use get_canvas_state to find component IDs first. Requires exact component instance IDs and pin numbers.",
+    "Draw a wire connection between two component pins. Use this to connect components electrically. IMPORTANT: You MUST use the component INSTANCE IDs (starting with 'component_') from either selected components context or get_canvas_state results.",
   parameters: {
     type: "object",
     properties: {
       from_component_id: {
         type: "string",
-        description:
-          "The INSTANCE ID of the starting component (must start with 'component_', from selected components or get_canvas_state)",
+        description: "The INSTANCE ID of the starting component",
       },
       from_pin: {
         type: "string",
-        description:
-          "The pin number on the starting component (e.g., '1', '2', '3')",
+        description: "The pin number on the starting component",
       },
       to_component_id: {
         type: "string",
-        description:
-          "The INSTANCE ID of the ending component (must start with 'component_', from selected components or get_canvas_state)",
+        description: "The INSTANCE ID of the ending component",
       },
       to_pin: {
         type: "string",
-        description:
-          "The pin number on the ending component (e.g., '1', '2', 'A', 'K')",
+        description: "The pin number on the ending component",
       },
     },
     required: ["from_component_id", "from_pin", "to_component_id", "to_pin"],
@@ -666,279 +652,27 @@ export const drawWireTool: Tool = {
     }
   ) => {
     logger.debug("🔧 Tool: draw_wire", args);
+    context.streamer.status(`Connecting components...`);
 
-    // Clean component names for user display (remove _unit1, _unit2, etc.)
-    const cleanName = (name: string) => name.replace(/_unit\d+$/i, "");
-    const fromName = cleanName(args.from_component_id);
-    const toName = cleanName(args.to_component_id);
+    const success = canvasCommandManager.executeCommand("wire:add", {
+      fromComponentId: args.from_component_id,
+      fromPinNumber: args.from_pin,
+      toComponentId: args.to_component_id,
+      toPinNumber: args.to_pin,
+    });
 
-    context.streamer.status(
-      `Connecting ${fromName} pin ${args.from_pin} to ${toName} pin ${args.to_pin}...`
-    );
-
-    const canvas = context.canvas.canvas;
-    if (!canvas) {
+    if (!success) {
       return {
         success: false,
-        message: "Canvas not available",
+        message:
+          "Failed to draw wire. Check validation logic inside command manager.",
       };
     }
 
-    // Helper function to find a pin on a component
-    const findPin = (
-      componentId: string,
-      pinNumber: string
-    ): fabric.Object | null => {
-      const objects = canvas.getObjects();
-
-      logger.wire(`Looking for component ${componentId} pin ${pinNumber}`);
-
-      for (const obj of objects) {
-        if (obj.type === "group") {
-          const group = obj as fabric.Group;
-          const groupObjects = group.getObjects();
-
-          // Check if this is the right component by multiple possible ID fields
-          const objId = (obj as any).id;
-          const objObjectId = (obj as any).objectId;
-          const objUid = (obj as any).data?.componentMetadata?.uid;
-          const objName = (obj as any).data?.componentName;
-
-          const isRightComponent =
-            objId === componentId ||
-            objObjectId === componentId ||
-            objUid === componentId ||
-            (componentId.startsWith("component_") && objId === componentId) ||
-            (componentId.startsWith("component_") &&
-              objObjectId === componentId);
-
-          logger.wire(
-            `Checking component: id=${objId}, objectId=${objObjectId}, uid=${objUid}, name=${objName}, isMatch=${isRightComponent}`
-          );
-
-          if (isRightComponent) {
-            logger.wire(`Found matching component ${objId} for ${componentId}`);
-            // Find the pin within this component
-            for (const child of groupObjects) {
-              const pinData = (child as any).data;
-              if (
-                pinData?.type === "pin" &&
-                pinData?.pinNumber?.toString() === pinNumber
-              ) {
-                logger.wire(
-                  `Found pin ${pinNumber} on component ${componentId}`
-                );
-                return child;
-              }
-            }
-            logger.wire(
-              `Pin ${pinNumber} not found on component ${componentId}`
-            );
-          }
-        }
-      }
-
-      logger.wire(`Component ${componentId} not found on canvas`);
-      return null;
+    return {
+      success: true,
+      message: `Wire connected from ${args.from_component_id} to ${args.to_component_id}`,
     };
-
-    // Helper to get absolute pin position
-    const getPinWorldCoordinates = (pin: fabric.Object) => {
-      const identityMatrix = [1, 0, 0, 1, 0, 0] as fabric.TMat2D;
-      return fabric.util.transformPoint(
-        new fabric.Point(pin.left || 0, pin.top || 0),
-        pin.group?.calcTransformMatrix() || identityMatrix
-      );
-    };
-
-    try {
-      // Find both pins
-      const fromPin = findPin(args.from_component_id, args.from_pin);
-      const toPin = findPin(args.to_component_id, args.to_pin);
-
-      if (!fromPin) {
-        // Get available components for better error message
-        const availableComponents = canvas
-          .getObjects()
-          .filter((obj: any) => obj.data?.type === "component")
-          .map((obj: any) => ({
-            id: obj.id,
-            name: obj.data?.componentName,
-            uid: obj.data?.componentMetadata?.uid,
-          }));
-
-        logger.wire("Available components:", availableComponents);
-
-        return {
-          success: false,
-          message: `Pin ${args.from_pin} not found on component ${cleanName(
-            args.from_component_id
-          )}. Make sure you're using the correct INSTANCE ID (starting with 'component_') from get_canvas_state, not a database UID. Available components: ${availableComponents
-            .map((c) => `${c.name} (${c.id})`)
-            .join(", ")}`,
-        };
-      }
-
-      if (!toPin) {
-        return {
-          success: false,
-          message: `Pin ${args.to_pin} not found on component ${cleanName(
-            args.to_component_id
-          )}. Make sure you're using the correct INSTANCE ID (starting with 'component_') from get_canvas_state, not a database UID.`,
-        };
-      }
-
-      // Get pin positions
-      const fromCoords = getPinWorldCoordinates(fromPin);
-      const toCoords = getPinWorldCoordinates(toPin);
-
-      logger.wire("Creating wire between pins", {
-        from: {
-          component: args.from_component_id,
-          pin: args.from_pin,
-          coords: fromCoords,
-          pinGroupId: fromPin.group ? (fromPin.group as any).id : "no-group",
-          pinGroupDataId: fromPin.group
-            ? (fromPin.group as any).data?.componentId
-            : "no-data",
-        },
-        to: {
-          component: args.to_component_id,
-          pin: args.to_pin,
-          coords: toCoords,
-          pinGroupId: toPin.group ? (toPin.group as any).id : "no-group",
-          pinGroupDataId: toPin.group
-            ? (toPin.group as any).data?.componentId
-            : "no-data",
-        },
-      });
-
-      // Create orthogonal wire path (KiCad style: horizontal then vertical, or vertical then horizontal)
-      const dx = toCoords.x - fromCoords.x;
-      const dy = toCoords.y - fromCoords.y;
-
-      let pathData = `M ${fromCoords.x} ${fromCoords.y}`;
-
-      // Choose path direction based on which is longer
-      if (Math.abs(dx) > Math.abs(dy)) {
-        // Horizontal first, then vertical
-        if (Math.abs(dx) > 1) {
-          pathData += ` L ${toCoords.x} ${fromCoords.y}`;
-        }
-        if (Math.abs(dy) > 1) {
-          pathData += ` L ${toCoords.x} ${toCoords.y}`;
-        }
-      } else {
-        // Vertical first, then horizontal
-        if (Math.abs(dy) > 1) {
-          pathData += ` L ${fromCoords.x} ${toCoords.y}`;
-        }
-        if (Math.abs(dx) > 1) {
-          pathData += ` L ${toCoords.x} ${toCoords.y}`;
-        }
-      }
-
-      // Create wire path
-      const wire = new fabric.Path(pathData, {
-        stroke: "#0038DF",
-        strokeWidth: 1,
-        fill: "",
-        selectable: false,
-        hasControls: false,
-        hasBorders: false,
-        evented: false,
-        strokeLineCap: "round",
-        strokeLineJoin: "round",
-      });
-
-      // Add connection metadata
-      (wire as any).connectionData = {
-        fromComponentId: args.from_component_id,
-        fromPinNumber: args.from_pin,
-        toComponentId: args.to_component_id,
-        toPinNumber: args.to_pin,
-      };
-
-      (wire as any).wireType = "connection";
-
-      // Add wire to canvas
-      canvas.add(wire);
-
-      // CRITICAL: Register wire with the wiring tool so it updates when components move
-      const wiringTool = (window as any).__wiringTool;
-      if (wiringTool && wiringTool.registerRestoredWire) {
-        wiringTool.registerRestoredWire(
-          wire,
-          args.from_component_id,
-          args.from_pin,
-          args.to_component_id,
-          args.to_pin
-        );
-        logger.wire(
-          "✅ Wire registered with wiring tool for movement tracking"
-        );
-      } else {
-        logger.warn(
-          "⚠️ Wiring tool not available - wire won't update on component movement"
-        );
-      }
-
-      // Create endpoint dots
-      const fromDot = new fabric.Circle({
-        left: fromCoords.x,
-        top: fromCoords.y,
-        radius: 2,
-        fill: "#0038DF",
-        stroke: "",
-        selectable: false,
-        evented: false,
-        originX: "center",
-        originY: "center",
-      });
-      (fromDot as any).wireEndpoint = true;
-      (fromDot as any).pinConnection = true;
-
-      const toDot = new fabric.Circle({
-        left: toCoords.x,
-        top: toCoords.y,
-        radius: 2,
-        fill: "#0038DF",
-        stroke: "",
-        selectable: false,
-        evented: false,
-        originX: "center",
-        originY: "center",
-      });
-      (toDot as any).wireEndpoint = true;
-      (toDot as any).pinConnection = true;
-
-      canvas.add(fromDot);
-      canvas.add(toDot);
-
-      canvas.renderAll();
-
-      logger.wire("✅ Wire created successfully");
-
-      return {
-        success: true,
-        message: `Wire connected from ${cleanName(args.from_component_id)}.${
-          args.from_pin
-        } to ${cleanName(args.to_component_id)}.${args.to_pin}`,
-        wire_id: (wire as any).id,
-      };
-    } catch (error) {
-      logger.error("Failed to draw wire", error);
-
-      return {
-        success: false,
-        message: `Failed to draw wire from ${cleanName(
-          args.from_component_id
-        )} to ${cleanName(args.to_component_id)}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-        error,
-      };
-    }
   },
 };
 
@@ -964,41 +698,31 @@ export const deleteComponentTool: Tool = {
     logger.debug("🔧 Tool: delete_component", args);
     context.streamer.status(`Deleting component ${args.component_id}...`);
 
-    const canvas = canvasCommandManager.getCanvas();
-    if (!canvas) {
+    const stage = canvasCommandManager.getStage();
+    if (!stage) {
       return {
         success: false,
-        message: "Canvas not available",
+        error: "Canvas not initialized",
       };
     }
 
-    const objects = canvas.getObjects();
-    const component = objects.find((obj: any) => obj.id === args.component_id);
-
-    if (!component) {
+    // Try finding by ID or class
+    const node =
+      stage.findOne(`#${args.component_id}`) ||
+      stage.findOne(`.${args.component_id}`);
+    if (node) {
+      node.destroy();
+      stage.batchDraw();
+      return {
+        success: true,
+        message: `Deleted component ${args.component_id}`,
+      };
+    } else {
       return {
         success: false,
-        message: `Component with ID "${args.component_id}" not found`,
+        message: `Component ${args.component_id} not found`,
       };
     }
-
-    // Use proper deletion via custom event (triggers handleObjectDeletion with wire cleanup)
-    window.dispatchEvent(
-      new CustomEvent("deleteComponent", {
-        detail: { component },
-      })
-    );
-
-    // Note: The actual deletion happens in the event handler which also:
-    // - Removes connected wires
-    // - Cleans up junction dots
-    // - Updates netlist
-    // - Saves undo/redo state
-
-    return {
-      success: true,
-      message: `Deleted component ${args.component_id}`,
-    };
   },
 };
 

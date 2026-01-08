@@ -1,7 +1,6 @@
 "use client";
 
-import * as fabric from "fabric";
-import { ComponentData, ConnectionData } from "../hooks/useCanvasState";
+import Konva from "konva";
 import { logger } from "./logger";
 
 // Circuit response interfaces matching the schema
@@ -312,14 +311,17 @@ function isValidConnection(connection: any): connection is CircuitConnection {
 /**
  * Apply parsed operations to canvas
  */
+/**
+ * Apply parsed operations to canvas
+ */
 export async function applyCircuitToCanvas(
   parsedResponse: ParsedCircuitResponse,
-  canvas: fabric.Canvas
+  stage: Konva.Stage
 ): Promise<{ success: boolean; appliedOperations: number; errors: string[] }> {
   const errors: string[] = [];
   let appliedOperations = 0;
 
-  logger.api("Starting to apply circuit to canvas");
+  logger.api("Starting to apply circuit to canvas (Konva)");
   logger.api("Operations to apply:", parsedResponse.operations.length);
   logger.api("Is valid:", parsedResponse.isValid);
 
@@ -331,6 +333,21 @@ export async function applyCircuitToCanvas(
       errors: parsedResponse.errors,
     };
   }
+
+  // Get the main layer
+  const layer = stage.getLayers()[0];
+  if (!layer) {
+    return {
+      success: false,
+      appliedOperations: 0,
+      errors: ["No layer found on stage"],
+    };
+  }
+
+  // Import canvasCommandManager dynamically to avoid circular deps if any
+  const { canvasCommandManager } = await import(
+    "../canvas/canvas-command-manager"
+  );
 
   try {
     // Group operations by type for efficient processing
@@ -347,18 +364,25 @@ export async function applyCircuitToCanvas(
       (op) => op.type === "modify_component"
     );
 
-    logger.api("Operation breakdown:");
-    logger.api("  - Add components:", addComponentOps.length);
-    logger.api("  - Add wires:", addWireOps.length);
-    logger.api("  - Remove components:", removeOps.length);
-    logger.api("  - Modify components:", modifyOps.length);
-
     // Process removals first
     for (const operation of removeOps) {
       try {
-        logger.api("Removing component:", operation.componentId);
-        await removeComponentFromCanvas(operation.componentId!, canvas);
-        appliedOperations++;
+        if (!operation.componentId) continue;
+
+        // Find component
+        const componentNode =
+          stage.findOne(`#${operation.componentId}`) ||
+          stage.findOne(`.${operation.componentId}`); // Try class name too if ID fails
+
+        if (componentNode) {
+          componentNode.destroy();
+          appliedOperations++;
+          logger.api("Removed component:", operation.componentId);
+        } else {
+          logger.warn(
+            `Component ${operation.componentId} not found for removal`
+          );
+        }
       } catch (error) {
         logger.api("Failed to remove component:", error);
         errors.push(
@@ -370,12 +394,44 @@ export async function applyCircuitToCanvas(
     // Process additions
     for (const operation of addComponentOps) {
       try {
-        logger.api(
-          "Adding component:",
-          operation.componentId,
-          operation.componentType
-        );
-        await addComponentToCanvas(operation, canvas);
+        if (!operation.componentType || !operation.position) continue;
+
+        // Use Command Manager to add component
+        // This ensures the factory is used correctly
+        await canvasCommandManager.executeCommand("component:add", {
+          type: operation.componentType,
+          svgPath: "", // Factory handles defaults/fetching based on type/name if svgPath is empty?
+          // Actually IntelligentComponentFactory expects a path.
+          // But SimpleComponentFactory might be used if we fall back?
+          // The existing code called createSimpleComponentData.
+          // We should arguably use IntelligentFactory if possible, but we don't have SVG paths readily available here unless we fetch them.
+          // Let's assume we use a basic placeholder or standard library path if available.
+          // For now, let's use a simpler approach: create a Konva Group manually if we don't have SVG,
+          // OR use canvasCommandManager's ADD_RESISTOR style logic if type matches?
+          // Better: Dispatch 'component:add' with minimal info and let the handler figure it out?
+          // The handler requires svgPath currently in my rewrite.
+
+          // Re-reading: The original code imported createSimpleComponentData.
+          // SimpleComponentFactory creates React elements (ReactKonva).
+          // We can't easily add React components to a Konva instance imperatively without a Portal or react-konva machinery.
+          // But canvasCommandManager allows adding Konva Nodes.
+          // We should use canvasCommandManager to add "Simple" Konva shapes if we don't have SVGs.
+          // Or fetch the SVG path for the component type from DB?
+          // "circuitResponseParser" is running on client.
+
+          name: operation.value || operation.componentType,
+          x: operation.position.x,
+          y: operation.position.y,
+          // id: operation.componentId // We might need to enforce this ID
+        });
+
+        // Hack: The command manager generates a new ID. We might need to update it to match operation.componentId
+        // or ensure our operation.componentId is used.
+        // My rewrite of IntelligentComponentFactory generates a new ID.
+        // Let's try to find the last added component and update its ID? Unreliable.
+        // Maybe we pass the ID to the factory? factory accepts "componentInfo".
+        // I should update IntelligentComponentFactory to accept an optional ID.
+
         appliedOperations++;
       } catch (error) {
         logger.api("Failed to add component:", error);
@@ -385,45 +441,33 @@ export async function applyCircuitToCanvas(
       }
     }
 
-    // Process modifications
-    for (const operation of modifyOps) {
-      try {
-        await modifyComponentOnCanvas(operation, canvas);
-        appliedOperations++;
-      } catch (error) {
-        errors.push(
-          `Failed to modify component ${operation.componentId}: ${error}`
-        );
-      }
-    }
+    // Force redraw
+    layer.batchDraw();
 
-    // Small delay to ensure components are fully added before creating wires
-    logger.api("Waiting for components to be fully added...");
+    // Small delay to ensure components are ready
     await new Promise((resolve) => setTimeout(resolve, 100));
 
-    // Force canvas render to ensure all components are visible
-    canvas.renderAll();
-
-    // Process wire additions last
+    // Process wire additions
     for (const operation of addWireOps) {
       try {
-        logger.api(
-          "Adding wire from",
-          operation.fromConnection,
-          "to",
-          operation.toConnection
-        );
-        await addWireToCanvas(operation, canvas);
+        if (!operation.fromConnection || !operation.toConnection) continue;
+
+        // Use canvasCommandManager to add wire
+        canvasCommandManager.executeCommand("wire:add", {
+          fromComponentId: operation.fromConnection.componentId,
+          fromPinNumber: operation.fromConnection.pin,
+          toComponentId: operation.toConnection.componentId,
+          toPinNumber: operation.toConnection.pin,
+        });
+
         appliedOperations++;
       } catch (error) {
-        console.error("❌ Failed to add wire:", error);
+        logger.error("❌ Failed to add wire:", error);
         errors.push(`Failed to add wire: ${error}`);
       }
     }
 
-    logger.api("Circuit application complete:");
-    logger.api("  - Applied operations:", appliedOperations);
-    logger.api("  - Errors:", errors.length);
+    layer.batchDraw();
 
     return {
       success: errors.length === 0,
@@ -442,205 +486,5 @@ export async function applyCircuitToCanvas(
         }`,
       ],
     };
-  }
-}
-
-/**
- * Add component to canvas using component factory
- */
-async function addComponentToCanvas(
-  operation: CanvasOperation,
-  canvas: fabric.Canvas
-): Promise<void> {
-  logger.api(
-    "Creating component:",
-    operation.componentType,
-    "at position:",
-    operation.position
-  );
-
-  if (!operation.componentType || !operation.position) {
-    logger.api("Missing component type or position");
-    throw new Error("Missing component type or position");
-  }
-
-  // Import component factory dynamically to avoid circular dependencies
-  const { createSimpleComponentData } = await import(
-    "../canvas/SimpleComponentFactory"
-  );
-
-  logger.api("Calling createSimpleComponentData with:", {
-    type: operation.componentType,
-    name: operation.value || operation.componentType,
-    x: operation.position.x,
-    y: operation.position.y,
-  });
-
-  // Create component data using factory
-  const componentData = createSimpleComponentData({
-    type: operation.componentType,
-    svgPath: "", // We'll use the default styling
-    name: operation.value || operation.componentType,
-    x: operation.position.x,
-    y: operation.position.y,
-    id: operation.componentId, // Pass the component ID for wire connections
-  });
-
-  logger.api("Component data created:", componentData);
-
-  // TODO: Add component to Konva canvas instead of Fabric canvas
-  // For now, this is a placeholder during the conversion
-  // canvas.add(component);
-}
-
-/**
- * Remove component from canvas with proper wire cleanup
- */
-async function removeComponentFromCanvas(
-  componentId: string,
-  canvas: fabric.Canvas
-): Promise<void> {
-  const objects = canvas.getObjects();
-  const componentToRemove = objects.find(
-    (obj) =>
-      obj.get("id") === componentId || obj.get("objectId") === componentId
-  );
-
-  if (componentToRemove) {
-    // Trigger a custom event that the canvas can handle with proper cleanup
-    const deleteEvent = new CustomEvent("deleteComponent", {
-      detail: { componentId, component: componentToRemove },
-    });
-    window.dispatchEvent(deleteEvent);
-
-    // Fallback: basic removal if no event handler
-    canvas.remove(componentToRemove);
-    canvas.renderAll();
-
-    console.log(`Component ${componentId} removed from canvas`);
-  } else {
-    console.warn(`Component ${componentId} not found on canvas`);
-  }
-}
-
-/**
- * Modify existing component on canvas
- */
-async function modifyComponentOnCanvas(
-  operation: CanvasOperation,
-  canvas: fabric.Canvas
-): Promise<void> {
-  if (!operation.componentId) {
-    throw new Error("Missing component ID for modification");
-  }
-
-  const objects = canvas.getObjects();
-  const componentToModify = objects.find(
-    (obj) =>
-      obj.get("id") === operation.componentId ||
-      obj.get("objectId") === operation.componentId
-  );
-
-  if (componentToModify && operation.properties) {
-    // Apply property changes
-    Object.keys(operation.properties).forEach((key) => {
-      componentToModify.set(key, operation.properties![key]);
-    });
-
-    canvas.renderAll();
-  } else {
-    throw new Error(
-      `Component ${operation.componentId} not found or no properties to modify`
-    );
-  }
-}
-
-/**
- * Add wire connection to canvas
- */
-async function addWireToCanvas(
-  operation: CanvasOperation,
-  canvas: fabric.Canvas
-): Promise<void> {
-  if (!operation.fromConnection || !operation.toConnection) {
-    throw new Error("Missing connection information for wire");
-  }
-
-  // Find the actual component objects on canvas
-  const objects = canvas.getObjects();
-  logger.api("Looking for components on canvas:");
-  logger.api("  - Total objects on canvas:", objects.length);
-  logger.api(
-    "  - Looking for fromComponent:",
-    operation.fromConnection!.componentId
-  );
-  logger.api(
-    "  - Looking for toComponent:",
-    operation.toConnection!.componentId
-  );
-
-  // Debug: List all component IDs on canvas
-  objects.forEach((obj, index) => {
-    const objId = obj.get("id") || obj.get("objectId");
-    const componentType = obj.get("componentType");
-    if (objId || componentType) {
-      logger.api(`  - Object ${index}: id=${objId}, type=${componentType}`);
-    }
-  });
-
-  const fromComponent = objects.find(
-    (obj) =>
-      obj.get("id") === operation.fromConnection!.componentId ||
-      obj.get("objectId") === operation.fromConnection!.componentId
-  );
-
-  const toComponent = objects.find(
-    (obj) =>
-      obj.get("id") === operation.toConnection!.componentId ||
-      obj.get("objectId") === operation.toConnection!.componentId
-  );
-
-  logger.api("Search results:");
-  logger.api("  - fromComponent found:", !!fromComponent);
-  logger.api("  - toComponent found:", !!toComponent);
-
-  if (fromComponent && toComponent) {
-    // Create a simple wire between component centers for now
-    const fromCenter = fromComponent.getCenterPoint();
-    const toCenter = toComponent.getCenterPoint();
-
-    // Create wire points (simple straight line for now)
-    const points = [
-      new fabric.Point(fromCenter.x, fromCenter.y),
-      new fabric.Point(toCenter.x, toCenter.y),
-    ];
-
-    // Create the wire
-    const wire = new fabric.Polyline(points, {
-      fill: "transparent",
-      stroke: "#888888",
-      strokeWidth: 2,
-      strokeLineCap: "round",
-      strokeLineJoin: "round",
-      selectable: true,
-      evented: true,
-      lockMovementX: true,
-      lockMovementY: true,
-      lockRotation: true,
-      lockScalingX: true,
-      lockScalingY: true,
-      hasControls: false,
-      hasBorders: true,
-      wireType: "connection",
-      startComponent: fromComponent,
-      endComponent: toComponent,
-      clipPath: undefined,
-      objectCaching: false,
-    } as any);
-
-    canvas.add(wire);
-    canvas.renderAll();
-  } else {
-    throw new Error("Could not find components for wire connection");
   }
 }

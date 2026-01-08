@@ -14,7 +14,7 @@ import { Capability } from "./capabilities";
 import { capabilityHandlers } from "./capability-handlers";
 import { StreamingHandler } from "./StreamingHandler";
 import { LLMOrchestrator } from "./LLMOrchestrator";
-import type * as fabric from "fabric";
+import Konva from "konva";
 
 /**
  * AgentService - Main service for AI agent operations
@@ -51,30 +51,25 @@ export class AgentService {
    * Build canvas context from current canvas state
    */
   private buildCanvasContext(): AgentCanvasContext {
-    const canvas = canvasCommandManager.getCanvas();
+    const canvas = canvasCommandManager.getStage();
 
     return {
       canvas: canvas,
       isCanvasReady: canvas !== null,
       getObjects: () => {
         if (!canvas) return [];
-        return canvas.getObjects();
+        // Return components and wires mainly
+        return canvas.find("*");
       },
       getActiveObjects: () => {
         if (!canvas) return [];
-        const activeSelection = canvas.getActiveObject();
-        if (!activeSelection) return [];
-
-        // Check if it's a selection (multiple objects) or single object
-        if ((activeSelection as any).type === "activeSelection") {
-          return (activeSelection as any)._objects || [];
-        }
-
-        return [activeSelection];
+        // TODO: Implement Konva selection retrieval
+        // This likely requires checking Transformer or app state
+        return [];
       },
       requestRenderAll: () => {
         if (canvas) {
-          canvas.requestRenderAll();
+          canvas.batchDraw();
         }
       },
     };

@@ -369,10 +369,31 @@ export function useKonvaWiringTool({
 
   // Start drawing a wire from a pin
   const startWireFromPin = useCallback(
-    (componentId: string, pinNumber: string, x: number, y: number) => {
+    (
+      componentId: string,
+      pinNumber: string,
+      x: number,
+      y: number,
+      angle?: number
+    ) => {
       if (!isWireMode || !stage) return;
 
-      startPinRef.current = { componentId, pinNumber, x, y };
+      // Attempt to find pin angle if not provided
+      let pinAngle = angle;
+      if (pinAngle === undefined && stage) {
+        // Quick lookup in stage (optional optimization)
+        const pinNode = stage.findOne(`.pin-${pinNumber}`); // Class access?
+        // Actually finding specific pin inside group is harder without reference.
+        // We will rely on caller passing it or default to null.
+      }
+
+      startPinRef.current = {
+        componentId,
+        pinNumber,
+        x,
+        y,
+        angle: pinAngle,
+      } as any;
       bendPointsRef.current = [x, y]; // Start with just the initial point
       setIsDrawing(true);
 
@@ -380,18 +401,23 @@ export function useKonvaWiringTool({
       const layer = stage.findOne("Layer") as Konva.Layer;
       if (layer) {
         const wire = new Konva.Line({
-          points: [x, y, x, y], // Start and end at same point initially
-          stroke: "#00AAFF", // More KiCad-like blue color
+          points: [x, y, x, y],
+          stroke: "#00AAFF",
           strokeWidth: 2,
-          dash: [8, 4], // Longer dashes for better visibility
-          opacity: 0.8, // Slight transparency for better UX
+          dash: [8, 4],
+          opacity: 0.8,
         });
         layer.add(wire);
         currentWireRef.current = wire;
-        // Note: No manual draw() call needed - Konva handles this automatically
       }
 
-      logger.wire("Started wire from pin", { componentId, pinNumber, x, y });
+      logger.wire("Started wire from pin", {
+        componentId,
+        pinNumber,
+        x,
+        y,
+        angle: pinAngle,
+      });
     },
     [isWireMode, stage]
   );
@@ -399,12 +425,23 @@ export function useKonvaWiringTool({
   // Add a bend point by clicking in empty space - ensures 90-degree bends
   const addBendPoint = useCallback(
     (x: number, y: number) => {
-      if (!isDrawing || !startPinRef.current) return;
+      if (!isDrawing || !startPinRef.current || !stage) return;
+
+      const layer = stage.findOne("Layer") as Konva.Layer;
+      if (!layer) return;
+
+      // Transform Click Position to Layer Space
+      const transform = layer.getAbsoluteTransform().copy();
+      transform.invert();
+      const pos = transform.point({ x, y });
+
+      // Use transformed coordinates
+      const clickX = pos.x;
+      const clickY = pos.y;
 
       const startX = startPinRef.current.x;
       const startY = startPinRef.current.y;
 
-      // Calculate the current direction from start to last bend point (or mouse position)
       const lastPointX =
         bendPointsRef.current.length >= 2
           ? bendPointsRef.current[bendPointsRef.current.length - 2]
@@ -414,21 +451,18 @@ export function useKonvaWiringTool({
           ? bendPointsRef.current[bendPointsRef.current.length - 1]
           : startY;
 
-      // Determine if we're currently going horizontal or vertical
-      const deltaX = Math.abs(x - lastPointX);
-      const deltaY = Math.abs(y - lastPointY);
+      const deltaX = Math.abs(clickX - lastPointX);
+      const deltaY = Math.abs(clickY - lastPointY);
 
-      let bendX = x;
-      let bendY = y;
+      let bendX = clickX;
+      let bendY = clickY;
 
-      // If we're going more horizontal than vertical, snap to horizontal line
       if (deltaX > deltaY) {
-        bendY = lastPointY; // Keep same Y, change X
+        bendY = lastPointY;
       } else {
-        bendX = lastPointX; // Keep same X, change Y
+        bendX = lastPointX;
       }
 
-      // Add the bend point
       bendPointsRef.current.push(bendX, bendY);
 
       logger.wire("Added orthogonal bend point", {
@@ -437,32 +471,115 @@ export function useKonvaWiringTool({
         totalPoints: bendPointsRef.current.length,
       });
     },
-    [isDrawing]
+    [isDrawing, stage]
   );
 
-  // Calculate orthogonal (90-degree) wire path between two points
-  const calculateOrthogonalPath = useCallback(
-    (startX: number, startY: number, endX: number, endY: number): number[] => {
-      // Calculate the differences
-      const deltaX = endX - startX;
-      const deltaY = endY - startY;
+  // --- Advanced Wiring Helpers ---
 
-      // Simple orthogonal routing: go horizontal then vertical, or vertical then horizontal
-      // Choose the path that creates fewer bends and looks more natural
+  // Constants
+  const STUB_LENGTH = 20; // Length of the straight wire segment coming out of a pin
+
+  // Helper to get vector for a pin angle (0, 90, 180, 270)
+  const getDirVector = useCallback((angle: number) => {
+    const rad = (angle * Math.PI) / 180;
+    // Round to avoid floating point errors
+    return {
+      x: Math.round(Math.cos(rad)),
+      y: Math.round(Math.sin(rad)),
+    };
+  }, []);
+
+  // Advanced Smart Routing: Calculates a path respecting start/end directions
+  const calculateSmartPath = useCallback(
+    (
+      startX: number,
+      startY: number,
+      startAngle: number | null, // Angle the pin is facing (0=Right, 90=Down, etc.)
+      endX: number,
+      endY: number,
+      endAngle: number | null // Angle the target pin is facing
+    ): number[] => {
       const points: number[] = [startX, startY];
 
-      // If the horizontal distance is greater, go horizontal first
-      if (Math.abs(deltaX) >= Math.abs(deltaY)) {
-        // Horizontal first: start -> horizontal to endX -> vertical to endY
-        points.push(endX, startY, endX, endY);
-      } else {
-        // Vertical first: start -> vertical to endY -> horizontal to endX
-        points.push(startX, endY, endX, endY);
+      // 1. Calculate Start Stub
+      // If no angle provided (e.g. mouse cursor), default to no stub or dynamic
+      let currX = startX;
+      let currY = startY;
+
+      // Directions: 0=Right, 90=Down, 180=Left, 270=Up
+      // If startAngle is defined, we MUST move STUB_LENGTH in that direction first
+      if (startAngle !== null) {
+        const dir = getDirVector(startAngle);
+        currX += dir.x * STUB_LENGTH;
+        currY += dir.y * STUB_LENGTH;
+        points.push(currX, currY);
       }
 
-      return points;
+      // 2. Calculate End Stub (Target point to aim for)
+      let targetX = endX;
+      let targetY = endY;
+
+      // If endAngle is defined, we want to arrive AT the pin FROM that direction.
+      // So the previous point should be 'out' from the pin.
+      if (endAngle !== null) {
+        const dir = getDirVector(endAngle);
+        targetX += dir.x * STUB_LENGTH;
+        targetY += dir.y * STUB_LENGTH;
+      }
+
+      // 3. Route between curr (end of start stub) and target (start of end stub)
+      // We use a mid-point routing strategy (Z-shape or U-shape)
+
+      const dx = targetX - currX;
+      const dy = targetY - currY;
+
+      // Decide whether to move Horizontal or Vertical first based on "preferred" axis
+      // If we are exiting Horizontally, we prefer to continue Horizontally if possible,
+      // OR switch to Vertical if we need to clear an obstacle (basic logic here)
+
+      let goHorizontalFirst = Math.abs(dx) > Math.abs(dy);
+
+      // Override based on current direction if strictly necessary to avoid backtracking
+      // (Simplified logic: just stick to standard Manhattan routing between stubs for now)
+
+      if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
+        if (goHorizontalFirst) {
+          // Move X then Y
+          points.push(targetX, currY);
+          points.push(targetX, targetY);
+        } else {
+          // Move Y then X
+          points.push(currX, targetY);
+          points.push(targetX, targetY);
+        }
+      }
+
+      // 4. Add End Stub if needed
+      if (endAngle !== null) {
+        points.push(endX, endY);
+      } else if (
+        Math.abs(points[points.length - 2] - endX) > 0.1 ||
+        Math.abs(points[points.length - 1] - endY) > 0.1
+      ) {
+        // If we didn't have an end stub but the last routed point isn't the end (rare), add it
+        // Usually step 3 covers this for non-stub cases
+      }
+
+      // Filter out duplicate points (segments with 0 length)
+      const cleanPoints: number[] = [points[0], points[1]];
+      for (let i = 2; i < points.length; i += 2) {
+        const lx = cleanPoints[cleanPoints.length - 2];
+        const ly = cleanPoints[cleanPoints.length - 1];
+        const cx = points[i];
+        const cy = points[i + 1];
+        if (Math.abs(lx - cx) > 1 || Math.abs(ly - cy) > 1) {
+          cleanPoints.push(cx, cy);
+        }
+      }
+
+      return cleanPoints;
     },
-    []
+    [getDirVector]
   );
 
   // Calculate orthogonal path with existing bend points
@@ -511,6 +628,33 @@ export function useKonvaWiringTool({
 
       const startX = startPinRef.current.x;
       const startY = startPinRef.current.y;
+      const startAngle = (startPinRef.current as any).angle ?? null;
+
+      // Get the last point (either start or last bend point)
+      let lastX = startX;
+      let lastY = startY;
+
+      if (bendPointsRef.current.length >= 2) {
+        lastX = bendPointsRef.current[bendPointsRef.current.length - 2];
+        lastY = bendPointsRef.current[bendPointsRef.current.length - 1];
+      }
+
+      // SNAP CURSOR TO 90-DEGREE ANGLES
+      // Force wire to be either horizontal or vertical from the last point
+      let snappedMouseX = mouseX;
+      let snappedMouseY = mouseY;
+
+      const deltaX = Math.abs(mouseX - lastX);
+      const deltaY = Math.abs(mouseY - lastY);
+
+      // Snap to whichever direction is closer
+      if (deltaX > deltaY) {
+        // More horizontal movement - lock Y to create horizontal line
+        snappedMouseY = lastY;
+      } else {
+        // More vertical movement - lock X to create vertical line
+        snappedMouseX = lastX;
+      }
 
       // Create orthogonal wire path with bend points
       const points =
@@ -519,15 +663,21 @@ export function useKonvaWiringTool({
               startX,
               startY,
               bendPointsRef.current,
-              mouseX,
-              mouseY
+              snappedMouseX,
+              snappedMouseY
             )
-          : calculateOrthogonalPath(startX, startY, mouseX, mouseY);
+          : calculateSmartPath(
+              startX,
+              startY,
+              startAngle,
+              snappedMouseX,
+              snappedMouseY,
+              null
+            ); // End angle is null for cursor
 
       currentWireRef.current.points(points);
-      // Note: No manual draw() call needed - Konva handles this automatically
     },
-    [calculateOrthogonalPath, calculateOrthogonalPathWithBends]
+    [calculateSmartPath, calculateOrthogonalPathWithBends]
   );
 
   // Handle stage click (for bend points)
@@ -570,10 +720,16 @@ export function useKonvaWiringTool({
 
   // Complete the wire to a target pin
   const completeWireToPin = useCallback(
-    (componentId: string, pinNumber: string, x: number, y: number) => {
+    (
+      componentId: string,
+      pinNumber: string,
+      x: number,
+      y: number,
+      angle?: number
+    ) => {
       if (!isDrawing || !startPinRef.current || !stage) return;
 
-      const startPin = startPinRef.current;
+      const startPin = startPinRef.current as any;
 
       // Don't connect to the same pin
       if (
@@ -594,7 +750,14 @@ export function useKonvaWiringTool({
               x,
               y
             )
-          : calculateOrthogonalPath(startPin.x, startPin.y, x, y);
+          : calculateSmartPath(
+              startPin.x,
+              startPin.y,
+              startPin.angle ?? null,
+              x,
+              y,
+              angle ?? null
+            );
 
       const connection: WireConnection = {
         id: `wire_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -603,8 +766,8 @@ export function useKonvaWiringTool({
         toComponentId: componentId,
         toPinNumber: pinNumber,
         points: wirePoints,
-        bendPoints: bendPointsRef.current.slice(2), // Exclude start point from bend points
-        isMultiSegment: wirePoints.length > 4, // More than 2 points means bends
+        bendPoints: bendPointsRef.current.slice(2),
+        isMultiSegment: wirePoints.length > 4,
       };
 
       // Update netlist
@@ -728,6 +891,18 @@ export function useKonvaWiringTool({
     [netlist]
   );
 
+  // Helper to get position relative to the layer (handling Zoom/Pan)
+  const getLayerPos = useCallback((node: Konva.Node, layer: Konva.Layer) => {
+    // Basic fallback: if absolutePosition is causing issues, check if we need to inverse transform
+    // The node.absolutePosition() returns screen coords.
+    // The layer.getAbsoluteTransform() maps local->screen.
+    // So to get local, we do inverse(layerAbsTrans).point(screenPos).
+    const transform = layer.getAbsoluteTransform().copy();
+    transform.invert();
+    const pos = node.getAbsolutePosition();
+    return transform.point(pos);
+  }, []);
+
   // Update wire positions when components move - with proper orthogonal rerouting
   const updateWiresForComponent = useCallback(
     (componentId: string) => {
@@ -758,17 +933,37 @@ export function useKonvaWiringTool({
       }
 
       // Get all pins for this component to calculate new wire endpoints
-      const componentPins: Array<{ pinNumber: string; x: number; y: number }> =
-        [];
-      (componentObj as any).children?.forEach((child: any) => {
-        if (child instanceof Konva.Circle && (child as any).data?.pinNumber) {
+      const componentPins: Array<{
+        pinNumber: string;
+        x: number;
+        y: number;
+        angle: number | null;
+      }> = [];
+      // Try recursive find instead of direct children
+      const circles = (componentObj as Konva.Group).find("Circle");
+      logger.wire(
+        `🔍 Found ${circles.length} circles in component ${componentId}`
+      );
+
+      circles.forEach((child: any) => {
+        if ((child as any).data?.pinNumber) {
+          const absPos = child.getAbsolutePosition();
+          const layerPos = getLayerPos(child, layer);
+          logger.wire(
+            `📍 Pin ${(child as any).data.pinNumber}: abs(${absPos.x}, ${
+              absPos.y
+            }) -> layer(${layerPos.x}, ${layerPos.y})`
+          );
           componentPins.push({
             pinNumber: (child as any).data.pinNumber,
-            x: child.absolutePosition().x,
-            y: child.absolutePosition().y,
+            x: layerPos.x,
+            y: layerPos.y,
+            angle: child.attrs.angle ?? null,
           });
         }
       });
+
+      logger.wire(`✅ Extracted ${componentPins.length} pins from component`);
 
       // Find all wires connected to this component
       const connectedConnections = connections.filter(
@@ -791,6 +986,8 @@ export function useKonvaWiringTool({
           startY = 0,
           endX = 0,
           endY = 0;
+        let startAngle: number | null = null;
+        let endAngle: number | null = null;
 
         // Get start pin position
         if (connection.fromComponentId === componentId) {
@@ -800,26 +997,53 @@ export function useKonvaWiringTool({
           if (startPin) {
             startX = startPin.x;
             startY = startPin.y;
+            startAngle = startPin.angle ?? null;
+            logger.wire(
+              `✅ START pin found (self): ${connection.fromPinNumber} at (${startX}, ${startY})`
+            );
+          } else {
+            logger.warn(
+              `❌ Could not find START PIN ${connection.fromPinNumber} on self. Available pins:`,
+              componentPins.map((p) => p.pinNumber)
+            );
           }
         } else {
           // Find the other component's pin position
-          layer.children.forEach((node) => {
-            if (
-              node instanceof Konva.Group &&
-              (node as any).data?.componentId === connection.fromComponentId
-            ) {
-              node.children?.forEach((child) => {
-                if (
-                  child instanceof Konva.Circle &&
-                  (child as any).data?.pinNumber === connection.fromPinNumber
-                ) {
-                  const pos = child.absolutePosition();
-                  startX = pos.x;
-                  startY = pos.y;
-                }
-              });
+          const node = layer.children.find(
+            (n) =>
+              n instanceof Konva.Group &&
+              (n as any).data?.componentId === connection.fromComponentId
+          );
+          if (node) {
+            // Try recursive find
+            const circles = (node as Konva.Group).find("Circle");
+            const pin = circles.find(
+              (c) => (c as any).data?.pinNumber === connection.fromPinNumber
+            );
+
+            if (pin) {
+              const absPos = pin.getAbsolutePosition();
+              const layerPos = getLayerPos(pin, layer);
+              startX = layerPos.x;
+              startY = layerPos.y;
+              startAngle = (pin as any).attrs.angle ?? null;
+              logger.wire(
+                `✅ START pin found (other): ${connection.fromPinNumber} at abs(${absPos.x}, ${absPos.y}) -> layer(${startX}, ${startY})`
+              );
+            } else {
+              const availablePins = circles
+                .map((c) => (c as any).data?.pinNumber)
+                .filter(Boolean);
+              logger.warn(
+                `❌ Found component ${connection.fromComponentId} but NOT pin ${connection.fromPinNumber}. Available:`,
+                availablePins
+              );
             }
-          });
+          } else {
+            logger.warn(
+              `❌ Could not find START COMPONENT ${connection.fromComponentId}`
+            );
+          }
         }
 
         // Get end pin position
@@ -830,30 +1054,71 @@ export function useKonvaWiringTool({
           if (endPin) {
             endX = endPin.x;
             endY = endPin.y;
+            endAngle = endPin.angle ?? null;
+            logger.wire(
+              `✅ END pin found (self): ${connection.toPinNumber} at (${endX}, ${endY})`
+            );
+          } else {
+            logger.warn(
+              `❌ Could not find END PIN ${connection.toPinNumber} on self. Available:`,
+              componentPins.map((p) => p.pinNumber)
+            );
           }
         } else {
           // Find the other component's pin position
-          layer.children.forEach((node) => {
-            if (
-              node instanceof Konva.Group &&
-              (node as any).data?.componentId === connection.toComponentId
-            ) {
-              node.children?.forEach((child) => {
-                if (
-                  child instanceof Konva.Circle &&
-                  (child as any).data?.pinNumber === connection.toPinNumber
-                ) {
-                  const pos = child.absolutePosition();
-                  endX = pos.x;
-                  endY = pos.y;
-                }
-              });
+          const node = layer.children.find(
+            (n) =>
+              n instanceof Konva.Group &&
+              (n as any).data?.componentId === connection.toComponentId
+          );
+          if (node) {
+            // Try recursive find
+            const circles = (node as Konva.Group).find("Circle");
+            const pin = circles.find(
+              (c) => (c as any).data?.pinNumber === connection.toPinNumber
+            );
+
+            if (pin) {
+              const absPos = pin.getAbsolutePosition();
+              const layerPos = getLayerPos(pin, layer);
+              endX = layerPos.x;
+              endY = layerPos.y;
+              endAngle = (pin as any).attrs.angle ?? null;
+              logger.wire(
+                `✅ END pin found (other): ${connection.toPinNumber} at abs(${absPos.x}, ${absPos.y}) -> layer(${endX}, ${endY})`
+              );
+            } else {
+              const availablePins = circles
+                .map((c) => (c as any).data?.pinNumber)
+                .filter(Boolean);
+              logger.warn(
+                `❌ Found component ${connection.toComponentId} but NOT pin ${connection.toPinNumber}. Available:`,
+                availablePins
+              );
             }
-          });
+          } else {
+            logger.warn(
+              `❌ Could not find END COMPONENT ${connection.toComponentId}`
+            );
+          }
         }
 
-        // Recalculate orthogonal path
-        const newPoints = calculateOrthogonalPath(startX, startY, endX, endY);
+        // Log final coordinates before calculating path
+        logger.wire(
+          `🎯 Calculating path: START(${startX}, ${startY}, angle=${startAngle}) -> END(${endX}, ${endY}, angle=${endAngle})`
+        );
+
+        // Recalculate smart path
+        const newPoints = calculateSmartPath(
+          startX,
+          startY,
+          startAngle,
+          endX,
+          endY,
+          endAngle
+        );
+
+        logger.wire(`📐 New wire points:`, newPoints);
         wire.points(newPoints);
 
         // Update connection points
@@ -867,7 +1132,7 @@ export function useKonvaWiringTool({
         "✅ Orthogonal wire rerouting completed for component movement"
       );
     },
-    [stage, connections, calculateOrthogonalPath, refreshAllJunctionDots]
+    [stage, connections, calculateSmartPath, refreshAllJunctionDots]
   );
 
   // Register a wire that was restored from netlist data

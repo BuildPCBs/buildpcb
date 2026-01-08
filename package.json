@@ -35,7 +35,6 @@
     "@supabase/supabase-js": "^2.57.0",
     "clsx": "^2.1.1",
     "dotenv": "^17.2.2",
-    "fabric": "^6.7.1",
     "katex": "^0.16.22",
     "konva": "^10.0.8",
     "lucide-react": "^0.528.0",
@@ -57,7 +56,6 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
-    "@types/fabric": "^5.3.10",
     "@types/node": "^20",
     "@types/nodemailer": "^7.0.2",
     "@types/react": "^19",

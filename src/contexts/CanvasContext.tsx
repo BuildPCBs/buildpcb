@@ -7,7 +7,7 @@ import React, {
   useState,
   useEffect,
 } from "react";
-import * as fabric from "fabric";
+import Konva from "konva";
 
 export interface SelectedComponent {
   id: string;
@@ -18,7 +18,7 @@ export interface SelectedComponent {
 }
 
 interface CanvasContextType {
-  canvas: fabric.Canvas | null;
+  canvas: Konva.Stage | null;
   isCanvasReady: boolean;
   selectedComponents: SelectedComponent[];
 }
@@ -40,7 +40,7 @@ export function useCanvas() {
 
 interface CanvasProviderProps {
   children: ReactNode;
-  canvas: fabric.Canvas | null;
+  canvas: Konva.Stage | null;
   isReady?: boolean;
 }
 
@@ -68,86 +68,74 @@ export function CanvasProvider({
     );
 
     const extractComponentData = (
-      obj: fabric.Object
+      node: Konva.Node
     ): SelectedComponent | null => {
-      const data = (obj as any).data;
-      console.log(
-        "🔍 Extracting component data from object:",
-        obj,
-        "data:",
-        data
-      );
-      if (!data || data.type !== "component") {
-        console.log("❌ Not a component, skipping");
+      // Traverse up to find the component group
+      let current: Konva.Node | null = node;
+      let componentGroup: Konva.Group | null = null;
+
+      while (current) {
+        if ((current as any).data && (current as any).data.componentId) {
+          componentGroup = current as Konva.Group;
+          break;
+        }
+        current = current.getParent();
+      }
+
+      if (!componentGroup) {
         return null;
       }
 
-      // Clean up component name by removing suffixes like _unit1, _unit2, etc.
-      const rawName = data.componentName || data.name || "Unknown Component";
-      const cleanName = rawName.replace(/_unit\d+$/i, "").replace(/_\d+$/i, "");
+      const data = (componentGroup as any).data;
+      // In Konva implementation, we might need to fetch more data or store it on the node
+      // For now, we extract what we can from the node's custom data
+      console.log(
+        "🔍 Extracting component data from node:",
+        componentGroup,
+        "data:",
+        data
+      );
 
-      const component = {
-        id: (obj as any).id || "",
-        name: cleanName,
+      return {
+        id: data.componentId,
+        name: data.componentName || "Unknown Component",
         type: data.componentType || "generic",
-        uid: data.componentMetadata?.uid,
-        pins: data.pins || [],
+        uid: data.uid,
+        pins: [], // function to extract pins if needed
       };
-      console.log("✅ Extracted component:", component);
-      return component;
     };
 
-    const handleSelectionCreated = (e: any) => {
-      console.log("🎯 Selection created event:", e);
-      const selected = e.selected || [];
-      console.log("🎯 Selected objects:", selected);
-      const components = selected
-        .map(extractComponentData)
-        .filter(
-          (comp: SelectedComponent | null): comp is SelectedComponent =>
-            comp !== null
-        );
-      console.log("🎯 Extracted components:", components);
-      setSelectedComponents(components);
+    const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+      // If clicked on empty stage (target is stage or layer), clear selection
+      if (
+        e.target === canvas ||
+        (e.target instanceof Konva.Layer &&
+          e.target === canvas.getLayers()[0]) ||
+        e.target.name() === "grid-background"
+      ) {
+        console.log("🎯 Selection cleared");
+        setSelectedComponents([]);
+        return;
+      }
+
+      // Try to find component
+      const component = extractComponentData(e.target);
+      if (component) {
+        console.log("🎯 Selected component:", component);
+        setSelectedComponents([component]);
+      } else {
+        console.log("🎯 Clicked on non-component object");
+        setSelectedComponents([]);
+      }
     };
 
-    const handleSelectionUpdated = (e: any) => {
-      console.log("🎯 Selection updated event:", e);
-      const selected = e.selected || [];
-      console.log("🎯 Selected objects:", selected);
-      const components = selected
-        .map(extractComponentData)
-        .filter(
-          (comp: SelectedComponent | null): comp is SelectedComponent =>
-            comp !== null
-        );
-      console.log("🎯 Extracted components:", components);
-      setSelectedComponents(components);
-    };
-
-    const handleSelectionCleared = () => {
-      console.log("🎯 Selection cleared");
-      setSelectedComponents([]);
-    };
-
-    canvas.on("selection:created", handleSelectionCreated);
-    canvas.on("selection:updated", handleSelectionUpdated);
-    canvas.on("selection:cleared", handleSelectionCleared);
+    canvas.on("click tap", handleStageClick);
 
     console.log("✅ Selection event listeners registered");
 
-    // Test if events are working by adding a simple mouse:down listener
-    const testMouseDown = () => {
-      console.log("🖱️ Mouse down on canvas");
-    };
-    canvas.on("mouse:down", testMouseDown);
-
     return () => {
       console.log("🧹 Cleaning up selection listeners");
-      canvas.off("selection:created", handleSelectionCreated);
-      canvas.off("selection:updated", handleSelectionUpdated);
-      canvas.off("selection:cleared", handleSelectionCleared);
-      canvas.off("mouse:down", testMouseDown);
+      canvas.off("click tap", handleStageClick);
     };
   }, [canvas]);
 

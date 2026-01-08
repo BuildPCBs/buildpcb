@@ -39,6 +39,10 @@ export interface Component {
   pin_count: number;
   symbol_data: SymbolData;
   footprint_filter: string[];
+  // Optional fields for runtime identification
+  componentName?: string;
+  componentType?: string;
+  type?: string;
 }
 
 export interface SymbolData {

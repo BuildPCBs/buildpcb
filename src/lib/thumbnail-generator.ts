@@ -3,7 +3,7 @@
  * Generates preview images from canvas for dashboard display
  */
 
-import * as fabric from "fabric";
+import Konva from "konva";
 import { supabase } from "./supabase";
 import { logger } from "./logger";
 
@@ -25,81 +25,88 @@ const DEFAULT_OPTIONS: ThumbnailOptions = {
  * Generate thumbnail from canvas
  */
 export async function generateThumbnail(
-  canvas: fabric.Canvas,
+  stage: Konva.Stage,
   options: ThumbnailOptions = {}
 ): Promise<string | null> {
   try {
     const opts = { ...DEFAULT_OPTIONS, ...options };
 
-    // Get current canvas dimensions
-    const currentZoom = canvas.getZoom();
-    const vpt = canvas.viewportTransform || [1, 0, 0, 1, 0, 0];
+    // Get current stage state
+    const currentScale = stage.scale();
+    const currentPos = stage.position();
 
-    // Calculate bounds of all objects
-    const objects = canvas.getObjects();
-    if (objects.length === 0) {
+    // Calculate bounds of all content
+    // We can use the main layer(s)
+    const layer = stage.getLayers()[0];
+    if (!layer || layer.getChildren().length === 0) {
       logger.canvas("No objects on canvas to generate thumbnail");
       return null;
     }
 
-    // Find bounding box of all content
-    let minX = Infinity,
-      minY = Infinity;
-    let maxX = -Infinity,
-      maxY = -Infinity;
-
-    objects.forEach((obj) => {
-      const bounds = obj.getBoundingRect();
-      minX = Math.min(minX, bounds.left);
-      minY = Math.min(minY, bounds.top);
-      maxX = Math.max(maxX, bounds.left + bounds.width);
-      maxY = Math.max(maxY, bounds.top + bounds.height);
+    // Get bounding rectangle of all shapes in the layer
+    const box = layer.getClientRect({
+      skipTransform: false,
+      relativeTo: stage,
     });
+
+    if (!box || box.width === 0 || box.height === 0) {
+      return null;
+    }
 
     // Add padding
     const padding = 20;
-    minX -= padding;
-    minY -= padding;
-    maxX += padding;
-    maxY += padding;
+    const minX = box.x - padding;
+    const minY = box.y - padding;
+    const width = box.width + padding * 2;
+    const height = box.height + padding * 2;
 
-    const contentWidth = maxX - minX;
-    const contentHeight = maxY - minY;
+    // Calculate pixel ratio to fit the target size
+    const scale = Math.min(opts.width! / width, opts.height! / height);
 
-    // Calculate scale to fit thumbnail size
-    const scale = Math.min(
-      opts.width! / contentWidth,
-      opts.height! / contentHeight
-    );
+    // Save current stage settings
+    // We want to export the area defined by minX, minY, width, height
+    // stage.toDataURL allows specifying x, y, width, height (of the source area)
+    // and pixelRatio to control output size.
 
-    // Temporarily reset viewport and zoom to capture clean image
-    canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
-    canvas.setZoom(1);
+    // Create a temporary background rect if we want white background (jpeg default is black/transparent?)
+    // Konva export to jpeg usually has black background if transparent.
+    // If format is png, it preserves transparency.
+    // Ensure we have a white background.
+    let bgRect: Konva.Rect | null = null;
+    if (opts.format === "jpeg") {
+      // jpg requires background
+      bgRect = new Konva.Rect({
+        x: minX,
+        y: minY,
+        width: width,
+        height: height,
+        fill: "white",
+        listening: false,
+      });
+      layer.add(bgRect);
+      bgRect.moveToBottom();
+    }
 
-    // Set white background temporarily for thumbnail
-    const originalBg = canvas.backgroundColor;
-    canvas.backgroundColor = "#FFFFFF";
-    canvas.renderAll();
-
-    // Generate data URL with specific region
-    const dataURL = canvas.toDataURL({
-      format: opts.format,
+    const dataURL = stage.toDataURL({
+      mimeType: opts.format === "png" ? "image/png" : "image/jpeg",
       quality: opts.quality,
-      left: minX,
-      top: minY,
-      width: contentWidth,
-      height: contentHeight,
-      multiplier: scale,
+      x: minX,
+      y: minY,
+      width: width,
+      height: height,
+      pixelRatio: scale,
     });
 
-    // Restore original background
-    canvas.backgroundColor = originalBg;
-    canvas.renderAll();
+    // Cleanup background
+    if (bgRect) {
+      bgRect.destroy();
+    }
 
-    // Restore original viewport
-    canvas.setViewportTransform(vpt);
-    canvas.setZoom(currentZoom);
-    canvas.renderAll();
+    // Note: We didn't mess with stage viewport, so no restore needed for that
+    // unless getClientRect was affected by scale?
+    // getClientRect matches what is visible on screen if relativeTo stage?
+    // Actually getClientRect logic is complex.
+    // To be safe, we rely on Konva's toDataURL logic which takes "x, y, width, height" of the virtual canvas space.
 
     return dataURL;
   } catch (error) {
@@ -154,11 +161,11 @@ export async function uploadThumbnail(
  */
 export async function updateProjectThumbnail(
   projectId: string,
-  canvas: fabric.Canvas
+  stage: Konva.Stage
 ): Promise<string | null> {
   try {
     // Generate thumbnail
-    const dataURL = await generateThumbnail(canvas);
+    const dataURL = await generateThumbnail(stage);
     if (!dataURL) return null;
 
     // Upload to storage
@@ -189,8 +196,8 @@ export async function updateProjectThumbnail(
  */
 export async function generateProjectThumbnailNow(
   projectId: string,
-  canvas: fabric.Canvas
+  stage: Konva.Stage
 ): Promise<string | null> {
   logger.canvas("🖼️ Generating project thumbnail...");
-  return await updateProjectThumbnail(projectId, canvas);
+  return await updateProjectThumbnail(projectId, stage);
 }

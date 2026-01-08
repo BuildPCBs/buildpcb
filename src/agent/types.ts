@@ -1,4 +1,4 @@
-import * as fabric from "fabric";
+import Konva from "konva";
 import { Circuit } from "@/types";
 import { SelectedComponent } from "@/contexts/CanvasContext";
 
@@ -35,15 +35,15 @@ export interface AgentProjectContext {
 
 /**
  * Canvas context for agent operations
- * Provides access to the Fabric.js canvas and command manager
+ * Provides access to the Konva stage and command manager
  */
 export interface AgentCanvasContext {
-  canvas: fabric.Canvas | null;
+  canvas: Konva.Stage | null;
   isCanvasReady: boolean;
   /** Get current canvas objects */
-  getObjects: () => fabric.FabricObject[];
+  getObjects: () => Konva.Node[];
   /** Get selected objects */
-  getActiveObjects: () => fabric.FabricObject[];
+  getActiveObjects: () => Konva.Node[];
   /** Render the canvas */
   requestRenderAll: () => void;
 }

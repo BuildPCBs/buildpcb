@@ -14,6 +14,7 @@ import { useHistoryStack } from "./hooks/useHistoryStack";
 import { useCanvasHotkeys } from "./hooks/useCanvasHotkeys";
 import { useProjectStore } from "@/store/projectStore";
 import { SimpleComponent } from "./SimpleComponentFactory";
+import { canvasCommandManager } from "./canvas-command-manager";
 import { useKonvaWiringTool } from "./hooks/useKonvaWiringTool";
 import { ContextMenu } from "./ui/ContextMenu";
 import { ComponentPickerOverlay } from "./ui/ComponentPickerOverlay";
@@ -40,8 +41,20 @@ export function IDEFabricCanvas({
   const { isPanMode, isDragging } = useCanvasPan(stageRef.current);
   useCanvasZoom(stageRef.current);
   const viewport = useCanvasViewport(stageRef.current);
+
+  // Handle history restoration - update command manager with new layer reference
+  const handleRestore = useCallback((stage: Konva.Stage) => {
+    logger.canvas("Restoring canvas state from history");
+    const layer = stage.findOne("Layer") as Konva.Layer;
+    if (layer) {
+      canvasCommandManager.setStage(stage, layer);
+      // Re-initialize any listeners potentially lost? (Usually listeners go on Stage)
+    }
+  }, []);
+
   const { undo, redo, canUndo, canRedo, saveState } = useHistoryStack({
     stage: stageRef.current,
+    onRestore: handleRestore,
   });
 
   // Konva wiring tool
@@ -105,6 +118,29 @@ export function IDEFabricCanvas({
       logger.canvas("Canvas initialized with Konva Stage");
     }
   }, [onCanvasReady]);
+
+  // Listen for undo/redo events from command manager (triggered by UI/Toolbar)
+  useEffect(() => {
+    const cleanupUndo = canvasCommandManager.on("undo", () => {
+      if (canUndo) {
+        undo();
+        // Also close any open menus
+        setMenuState((prev) => ({ ...prev, visible: false }));
+      }
+    });
+
+    const cleanupRedo = canvasCommandManager.on("redo", () => {
+      if (canRedo) {
+        redo();
+        setMenuState((prev) => ({ ...prev, visible: false }));
+      }
+    });
+
+    return () => {
+      cleanupUndo();
+      cleanupRedo();
+    };
+  }, [undo, redo, canUndo, canRedo]);
 
   // Load project data
   useEffect(() => {
@@ -424,14 +460,21 @@ export function IDEFabricCanvas({
           y: componentY,
         };
 
-        // Add to components
-        setComponents((prev) => [...prev, newComponent]);
+        // CRITICAL FIX: Deep clone existing components to prevent mutation
+        // This prevents existing components from "jumping" when new ones are added
+        setComponents((prev) => {
+          const clonedPrev = prev.map((comp) => ({ ...comp }));
+          return [...clonedPrev, newComponent];
+        });
 
-        // Update circuit in store
+        // Update circuit in store - also clone components
         const updatedCircuit = circuit
           ? {
               ...circuit,
-              components: [...circuit.components, newComponent],
+              components: [
+                ...circuit.components.map((c) => ({ ...c })),
+                newComponent,
+              ],
             }
           : {
               id: `circuit_${Date.now()}`,

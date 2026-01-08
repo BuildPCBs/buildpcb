@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import * as fabric from "fabric";
+import Konva from "konva";
 
 export interface ComponentData {
   id: string;
@@ -35,7 +35,7 @@ export interface CanvasState {
 }
 
 interface UseCanvasStateProps {
-  canvas: fabric.Canvas | null;
+  canvas: Konva.Stage | null;
   enableLiveUpdates?: boolean;
 }
 
@@ -46,97 +46,92 @@ export function useCanvasState({
   const [canvasState, setCanvasState] = useState<CanvasState | null>(null);
   const [lastUpdateTime, setLastUpdateTime] = useState(Date.now());
 
-  // Extract components from fabric objects
+  // Extract components from Konva stage
   const extractComponents = useCallback(
-    (fabricCanvas: fabric.Canvas): ComponentData[] => {
-      if (!fabricCanvas) return [];
+    (stage: Konva.Stage): ComponentData[] => {
+      if (!stage) return [];
 
-      return fabricCanvas
-        .getObjects()
-        .filter((obj) => obj.type === "component" || obj.get("isComponent"))
-        .map((obj) => ({
-          id:
-            obj.get("id") ||
-            obj.get("objectId") ||
-            `obj_${Date.now()}_${Math.random()}`,
-          type: obj.get("componentType") || obj.get("objectType") || "unknown",
-          position: {
-            x: obj.left || 0,
-            y: obj.top || 0,
-          },
-          rotation: obj.angle || 0,
-          properties: {
-            width: obj.width,
-            height: obj.height,
-            scaleX: obj.scaleX,
-            scaleY: obj.scaleY,
-            visible: obj.visible,
-            ...obj.get("componentProperties"),
-            ...obj.get("customProperties"),
-          },
-          connections: obj.get("connections") || [],
-        }));
+      const components: ComponentData[] = [];
+      const layer = stage.getLayers()[0];
+
+      if (!layer) return [];
+
+      // Iterate through direct children of layer (Groups usually)
+      layer.getChildren().forEach((node) => {
+        // Look for groups with componentId in data
+        const data = (node as any).data;
+        if (data && data.componentId) {
+          const group = node as Konva.Group;
+
+          components.push({
+            id: data.componentId,
+            type: data.componentType || "unknown",
+            position: {
+              x: group.x(),
+              y: group.y(),
+            },
+            rotation: group.rotation(),
+            properties: {
+              width: group.width(),
+              height: group.height(),
+              scaleX: group.scaleX(),
+              scaleY: group.scaleY(),
+              visible: group.visible(),
+              ...data,
+            },
+            connections: data.connections || [],
+          });
+        }
+      });
+
+      return components;
     },
     []
   );
 
-  // Extract connections/wires from fabric objects
+  // Extract connections/wires from Konva stage
   const extractConnections = useCallback(
-    (fabricCanvas: fabric.Canvas): ConnectionData[] => {
-      if (!fabricCanvas) return [];
+    (stage: Konva.Stage): ConnectionData[] => {
+      if (!stage) return [];
 
-      return fabricCanvas
-        .getObjects()
-        .filter(
-          (obj) =>
-            obj.type === "wire" ||
-            obj.get("isWire") ||
-            obj.get("objectType") === "wire"
-        )
-        .map((obj) => ({
-          id:
-            obj.get("id") ||
-            obj.get("objectId") ||
-            `wire_${Date.now()}_${Math.random()}`,
-          type: "wire",
-          from: obj.get("fromConnection") || { componentId: "", pin: "" },
-          to: obj.get("toConnection") || { componentId: "", pin: "" },
-          path: obj.get("path") || [],
-        }));
+      // TODO: Implement wire extractions based on how wires are rendered in Konva
+      // Currently assuming wires might be Lines stored in a specific way or data structure
+      // For now, returning empty array as placeholder until wire structure is confirmed
+      return [];
     },
     []
   );
 
   // Extract canvas metadata
-  const extractMetadata = useCallback(
-    (fabricCanvas: fabric.Canvas): CanvasMetadata => {
-      if (!fabricCanvas) {
-        return {
-          zoom: 1,
-          viewportTransform: [1, 0, 0, 1, 0, 0],
-          selectedObjects: [],
-          canvasSize: { width: 0, height: 0 },
-          timestamp: Date.now(),
-        };
-      }
-
-      const activeObjects = fabricCanvas.getActiveObjects();
-
+  const extractMetadata = useCallback((stage: Konva.Stage): CanvasMetadata => {
+    if (!stage) {
       return {
-        zoom: fabricCanvas.getZoom(),
-        viewportTransform: fabricCanvas.viewportTransform || [1, 0, 0, 1, 0, 0],
-        selectedObjects: activeObjects.map(
-          (obj) => obj.get("id") || obj.get("objectId") || ""
-        ),
-        canvasSize: {
-          width: fabricCanvas.width || 0,
-          height: fabricCanvas.height || 0,
-        },
+        zoom: 1,
+        viewportTransform: [1, 0, 0, 1, 0, 0],
+        selectedObjects: [],
+        canvasSize: { width: 0, height: 0 },
         timestamp: Date.now(),
       };
-    },
-    []
-  );
+    }
+
+    return {
+      zoom: stage.scaleX(),
+      viewportTransform: [
+        stage.scaleX(),
+        0,
+        0,
+        stage.scaleY(),
+        stage.x(),
+        stage.y(),
+      ],
+      selectedObjects: [], // TODO: Get from CanvasContext or internal logic
+      canvasSize: {
+        width: stage.width(),
+        height: stage.height(),
+      },
+      timestamp: Date.now(),
+    };
+  }, []);
 
   // Get current canvas state
   const getCurrentState = useCallback((): CanvasState | null => {
@@ -178,29 +173,13 @@ export function useCanvasState({
       setTimeout(updateCanvasState, 100);
     };
 
-    // Set up event listeners with proper typing
-    canvas.on("object:added", handleCanvasChange);
-    canvas.on("object:removed", handleCanvasChange);
-    canvas.on("object:modified", handleCanvasChange);
-    // Removed object:moving to prevent excessive history saves during dragging
-    // canvas.on("object:moving", handleCanvasChange);
-    canvas.on("object:scaling", handleCanvasChange);
-    canvas.on("object:rotating", handleCanvasChange);
-    canvas.on("selection:created", handleCanvasChange);
-    canvas.on("selection:updated", handleCanvasChange);
-    canvas.on("selection:cleared", handleCanvasChange);
+    // Set up event listeners
+    canvas.on("dragend transformend", handleCanvasChange);
+    // You might need more events depending on what changes state (e.g. node additions)
+    // Konva doesn't have a generic "object modified" event for everything, usually
 
     return () => {
-      canvas.off("object:added", handleCanvasChange);
-      canvas.off("object:removed", handleCanvasChange);
-      canvas.off("object:modified", handleCanvasChange);
-      // Removed object:moving cleanup to match removed listener
-      // canvas.off("object:moving", handleCanvasChange);
-      canvas.off("object:scaling", handleCanvasChange);
-      canvas.off("object:rotating", handleCanvasChange);
-      canvas.off("selection:created", handleCanvasChange);
-      canvas.off("selection:updated", handleCanvasChange);
-      canvas.off("selection:cleared", handleCanvasChange);
+      canvas.off("dragend transformend", handleCanvasChange);
     };
   }, [canvas, enableLiveUpdates, updateCanvasState]);
 
@@ -214,14 +193,14 @@ export function useCanvasState({
     extractComponents: () => (canvas ? extractComponents(canvas) : []),
     extractConnections: () => (canvas ? extractConnections(canvas) : []),
     extractMetadata: () => (canvas ? extractMetadata(canvas) : null),
-    // Raw fabric canvas for advanced use cases
-    fabricCanvas: canvas,
+    // Raw Konva stage
+    fabricCanvas: canvas as any, // keeping the property name for compatibility but typing as any/Konva
   };
 }
 
 // Convenience hook for when you just need the state
 export function useCanvasStateSnapshot(
-  canvas: fabric.Canvas | null
+  canvas: Konva.Stage | null
 ): CanvasState | null {
   const { canvasState } = useCanvasState({ canvas, enableLiveUpdates: false });
   return canvasState;

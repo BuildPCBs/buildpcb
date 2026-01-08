@@ -1,306 +1,236 @@
-import * as fabric from "fabric";
+import Konva from "konva";
 import { Circuit, ConnectionModel } from "@/lib/schemas/circuit";
 import { canvasCommandManager } from "../canvas-command-manager";
 import { logger } from "@/lib/logger";
+import { supabase } from "@/lib/supabase";
 
 /**
- * Serialize Fabric.js canvas to Circuit format with proper component handling
+ * Serialize Konva Stage to Circuit format
  */
 export function serializeCanvasToCircuit(
-  canvas: fabric.Canvas | null
+  stage: Konva.Stage | null
 ): Partial<Circuit> | null {
-  if (!canvas) return null;
+  if (!stage) return null;
 
-  const objects = canvas.getObjects();
+  try {
+    const components: any[] = [];
+    const connections: any[] = [];
 
-  // Separate components from other objects (wires, etc.)
-  const componentGroups: fabric.Group[] = [];
-  const otherObjects: fabric.Object[] = [];
+    // 1. Serialize Components (find nodes with name 'component')
+    const componentNodes = stage.find(".component");
 
-  objects.forEach((obj) => {
-    // Check if this is a component sandwich (has component metadata)
-    const objData = (obj as any).data;
-    if (
-      objData &&
-      objData.type === "component" &&
-      objData.isComponentSandwich
-    ) {
-      componentGroups.push(obj as fabric.Group);
-    } else {
-      otherObjects.push(obj);
-    }
-  });
+    componentNodes.forEach((node) => {
+      const attrs = node.attrs;
+      // Check if it has essential data
+      if (!attrs.id) return;
 
-  // Extract components from component groups and map to ComponentModel format
-  const components: any[] = componentGroups.map((group, index) => {
-    const componentData = (group as any).data || {};
-    const dbMetadata =
-      (group as any).componentMetadata || (group as any).databaseComponent;
-
-    // Get the original database ID for proper restoration
-    let componentId = `comp_${index}`; // fallback
-    if (dbMetadata?.uid) {
-      componentId = dbMetadata.uid; // Use database uid
-    } else if (dbMetadata?.id) {
-      componentId = dbMetadata.id; // Fallback to database id
-    } else if (componentData.originalDatabaseId) {
-      componentId = componentData.originalDatabaseId; // If stored in data
-    }
-
-    return {
-      id: componentId,
-      databaseId: componentId, // Store for restoration
-      type:
-        dbMetadata?.type ||
-        componentData.componentType ||
-        componentData.type ||
-        "unknown",
-      value:
-        dbMetadata?.name ||
-        componentData.componentName ||
-        componentData.name ||
-        `Component ${index + 1}`,
-      position: {
-        x: group.left || 0,
-        y: group.top || 0,
-      },
-      explanation:
-        dbMetadata?.description ||
-        componentData.description ||
-        "Component added to circuit",
-      datasheet: dbMetadata?.datasheet,
-      // Store additional metadata for recreation
-      metadata: {
-        category: dbMetadata?.category || componentData.category || "general",
-        specifications:
-          dbMetadata?.specifications || componentData.specifications || {},
-        availability: componentData.availability || "in-stock",
-        properties: componentData.properties || {},
-        pins: dbMetadata?.pinConfiguration?.pins || componentData.pins || [],
-        databaseComponent: dbMetadata,
-        rotation: group.angle || 0,
-      },
-    };
-  });
-
-  // Extract connections from other objects (wires)
-  const connections: ConnectionModel[] = otherObjects
-    .filter(
-      (obj) =>
-        obj.type === "line" || obj.type === "path" || obj.type === "polyline"
-    )
-    .filter((obj) => (obj as any).wireType === "connection")
-    .map((obj, index) => {
-      const wireObj = obj as any;
-      const wireData = wireObj.wireData || wireObj;
-
-      return {
-        from: wireData.from || {
-          componentId: wireObj.startComponentId || "",
-          pin:
-            wireObj.startPinIndex !== undefined
-              ? wireObj.startPinIndex.toString()
-              : "",
+      components.push({
+        id: attrs.id,
+        databaseId: attrs.uid || attrs.dbId, // Assuming we store dbId/uid in attrs
+        name: attrs.name || attrs.componentName, // 'component' is the class name, componentName is the display name
+        type: attrs.componentType || "generic",
+        value: attrs.value || "",
+        explanation: attrs.explanation || "User added component",
+        position: {
+          x: node.x(),
+          y: node.y(),
         },
-        to: wireData.to || {
-          componentId: wireObj.endComponentId || "",
-          pin:
-            wireObj.endPinIndex !== undefined
-              ? wireObj.endPinIndex.toString()
-              : "",
+        rotation: node.rotation(),
+        properties: {
+          ...attrs,
+          // cleanup known internal attrs if needed
+          x: undefined,
+          y: undefined,
+          rotation: undefined,
         },
-      };
+        pinConfiguration: attrs.pinConfiguration,
+      });
     });
 
-  return {
-    mode: "full" as const,
-    components: components as any,
-    connections,
-  };
+    // 2. Serialize Wires (find Lines with connectionData)
+    // We look for all lines, check if they have connectionData
+    const lines = stage.find("Line");
+    lines.forEach((line) => {
+      const connData = line.getAttr("connectionData");
+      if (connData) {
+        connections.push({
+          id: line.id() || `wire_${Date.now()}_${Math.random()}`,
+          from: {
+            componentId: connData.fromComponentId,
+            pin: connData.fromPinNumber,
+          },
+          to: {
+            componentId: connData.toComponentId,
+            pin: connData.toPinNumber,
+          },
+          type: "wire",
+          properties: {
+            netId: connData.netId,
+            points: (line as Konva.Line).points(),
+          },
+        });
+      }
+    });
+
+    // Cast to any to include layout and other non-Circuit fields
+    return {
+      mode: "full",
+      components,
+      connections,
+      layout: {
+        layers: [],
+        dimensions: {
+          width: stage.width(),
+          height: stage.height(),
+        },
+        grid: { size: 10, visible: true },
+        zoom: stage.scaleX(),
+        viewBox: {
+          x: stage.x(),
+          y: stage.y(),
+          width: stage.width(),
+          height: stage.height(),
+        },
+      },
+    } as any;
+  } catch (error) {
+    logger.error("Failed to serialize Konva stage:", error);
+    return null;
+  }
 }
 
 /**
- * Serialize Fabric.js canvas to raw canvas data format with electrical metadata preservation
+ * Serialize Konva Stage to raw canvas data format
  */
 export function serializeCanvasData(
-  canvas: fabric.Canvas | null,
+  stage: Konva.Stage | null,
   netlist?: any[] | (() => any[])
 ): Record<string, any> {
-  if (!canvas) return {};
+  if (!stage) return {};
 
   try {
-    // Get the base canvas data
-    const canvasData = canvas.toJSON();
+    const canvasData = stage.toJSON();
 
-    // Resolve netlist if it's a function
-    const resolvedNetlist = typeof netlist === "function" ? netlist() : netlist;
-
-    // Extract and preserve electrical metadata for wires
-    const electricalMetadata: Record<string, any> = {};
-
-    canvas.getObjects().forEach((obj, index) => {
-      const fabricObj = obj as any;
-
-      // Check if this is a wire with electrical properties
-      if (
-        fabricObj.wireType === "connection" ||
-        fabricObj.wireType === "junction"
-      ) {
-        electricalMetadata[`wire_${index}`] = {
-          // Core wire identification
-          wireType: fabricObj.wireType,
-          id: fabricObj.id,
-
-          // Pin connections
-          startPin: fabricObj.startPin,
-          endPin: fabricObj.endPin,
-          startComponentId: fabricObj.startComponentId,
-          endComponentId: fabricObj.endComponentId,
-          startPinIndex: fabricObj.startPinIndex,
-          endPinIndex: fabricObj.endPinIndex,
-          startComponent: fabricObj.startComponent,
-          endComponent: fabricObj.endComponent,
-
-          // Wire properties
-          netId: fabricObj.netId,
-          wireData: fabricObj.wireData,
-          properties: fabricObj.properties || {},
-
-          // Vertex information for complex wires
-          isWireVertex: fabricObj.isWireVertex,
-          vertexIndex: fabricObj.vertexIndex,
-        };
-      }
-
-      // Preserve component metadata
-      if (fabricObj.data && fabricObj.data.type === "component") {
-        electricalMetadata[`component_${index}`] = {
-          componentType: fabricObj.componentType,
-          id: fabricObj.id,
-          data: fabricObj.data,
-          pins: fabricObj.data.pins || [],
-          objectIndex: index,
-        };
-      }
-    });
-
-    // Add electrical metadata to canvas data
-    const extendedCanvasData = {
-      ...canvasData,
-      electricalMetadata,
-      netlist: resolvedNetlist || null,
+    return {
+      konvaData: canvasData,
+      netlist: typeof netlist === "function" ? netlist() : netlist,
     };
-
-    logger.canvas("Canvas data serialized with electrical metadata", {
-      objectCount: canvas.getObjects().length,
-      electricalMetadataCount: Object.keys(electricalMetadata).length,
-      hasNetlist: !!resolvedNetlist,
-      netlistNetCount: resolvedNetlist?.length || 0,
-    });
-
-    return extendedCanvasData;
   } catch (error) {
     console.error("❌ Failed to serialize canvas data:", error);
     return {};
   }
 }
 
+import { refDesService } from "@/lib/refdes-service";
+
 /**
- * Load canvas from circuit data by recreating components using the component handler
+ * Load canvas from circuit data
  */
 export async function loadCanvasFromCircuit(
-  canvas: fabric.Canvas,
-  circuit: Partial<Circuit>
+  stage: Konva.Stage,
+  circuit: Partial<Circuit>,
+  netlistData?: any[], // retained for compatibility but unused
+  refDesAssignments?: any[]
 ): Promise<void> {
-  return new Promise(async (resolve, reject) => {
+  if (refDesAssignments && Array.isArray(refDesAssignments)) {
+    refDesService.loadAssignments(refDesAssignments);
+    logger.canvas(`Restored ${refDesAssignments.length} RefDes assignments`);
+  }
+
+  if (!circuit.components) {
+    logger.warn("No components to load in circuit");
+    return;
+  }
+
+  // Clear stage
+  const layers = stage.getLayers();
+  layers.forEach((l) => l.destroyChildren());
+  stage.batchDraw();
+
+  logger.canvas(
+    `Loading ${circuit.components.length} components to Konva stage...`
+  );
+
+  // Load components
+  for (const comp of circuit.components as any[]) {
     try {
-      console.log("🔄 Loading canvas from circuit data:", {
-        componentCount: circuit.components?.length || 0,
-        connectionCount: circuit.connections?.length || 0,
-      });
+      // Need to fetch full component data if essential parts are missing?
+      // Or assume circuit.components has enough.
+      // ComponentFactory needs 'svgPath', 'type', 'name' etc.
+      // If the circuit only has 'databaseId', we might need to fetch.
 
-      // Clear existing canvas
-      canvas.clear();
+      let fullCompData = comp;
+      // Support both databaseId and uid
+      const dbId = comp.databaseId || comp.uid;
 
-      // Note: Layout information (dimensions, zoom) should be loaded from canvasData separately
-
-      // Recreate components using the component handler
-      if (circuit.components && circuit.components.length > 0) {
-        console.log(
-          `��️ Recreating ${circuit.components.length} components...`
-        );
-
-        for (const component of circuit.components as any[]) {
-          try {
-            console.log(
-              `🎯 Recreating component: ${component.value} at (${component.position.x}, ${component.position.y})`
-            );
-
-            // Use the canvas command manager to add the component
-            // This will trigger the proper component creation with pins
-            canvasCommandManager.executeCommand("component:add", {
-              id: component.id,
-              type: component.type,
-              name: component.value, // Use value as name
-              category: component.metadata?.category || "general",
-              svgPath: component.metadata?.databaseComponent?.symbol_svg
-                ? `data:image/svg+xml;base64,${btoa(
-                    component.metadata.databaseComponent.symbol_svg
-                  )}`
-                : "", // We'll need to fetch this from database
-              databaseComponent: component.metadata?.databaseComponent,
-              x: component.position.x,
-              y: component.position.y,
-              rotation: component.metadata?.rotation || 0,
-            });
-
-            // Wait a bit for component creation to complete
-            await new Promise((resolve) => setTimeout(resolve, 100));
-          } catch (error) {
-            console.error(
-              `❌ Failed to recreate component ${component.value}:`,
-              error
-            );
-          }
+      if (dbId) {
+        const { data, error } = await supabase
+          .from("components_v2")
+          .select("*")
+          .eq("uid", dbId)
+          .single();
+        if (data) {
+          fullCompData = { ...fullCompData, ...data };
         }
       }
 
-      // TODO: Recreate connections/wires
-      if (circuit.connections && circuit.connections.length > 0) {
-        console.log(
-          `🔗 Would recreate ${circuit.connections.length} connections...`
-        );
-        // This will need to be implemented once wire recreation is working
-      }
-
-      console.log("✅ Canvas loaded from circuit data");
-      canvas.renderAll();
-      resolve();
-    } catch (error) {
-      console.error("❌ Failed to load canvas from circuit:", error);
-      reject(error);
+      await canvasCommandManager.executeCommand("component:add", {
+        id: comp.id,
+        uid: dbId, // pass uid
+        type: fullCompData.type || fullCompData.component_type || "generic",
+        svgPath: fullCompData.symbol_svg || fullCompData.properties?.svgPath,
+        name: fullCompData.name || fullCompData.properties?.name,
+        x: comp.position?.x || 0,
+        y: comp.position?.y || 0,
+        rotation: comp.rotation || 0,
+        pins:
+          fullCompData.pinConfiguration?.pins || fullCompData.properties?.pins,
+        componentMetadata: fullCompData,
+      });
+    } catch (err) {
+      logger.error(`Failed to load component ${comp.id}`, err);
     }
-  });
+  }
+
+  // Load connections
+  if (circuit.connections) {
+    logger.canvas(`Loading ${circuit.connections.length} connections...`);
+    for (const conn of circuit.connections) {
+      try {
+        // @ts-ignore
+        const points = conn.properties?.points;
+        await canvasCommandManager.executeCommand("wire:add", {
+          fromComponentId: conn.from.componentId,
+          fromPinNumber: conn.from.pin,
+          toComponentId: conn.to.componentId,
+          toPinNumber: conn.to.pin,
+          points: points, // optional custom path
+        });
+      } catch (err) {
+        logger.error(`Failed to load connection ${(conn as any).id}`, err);
+      }
+    }
+  }
+
+  stage.batchDraw();
+  logger.canvas("Canvas loaded from circuit.");
 }
 
 /**
  * Create a thumbnail image of the canvas
  */
 export function generateCanvasThumbnail(
-  canvas: fabric.Canvas | null,
+  stage: Konva.Stage | null,
   width = 200,
   height = 150
 ): string | null {
-  if (!canvas) return null;
+  if (!stage) return null;
 
   try {
-    return canvas.toDataURL({
-      format: "jpeg",
+    return stage.toDataURL({
+      mimeType: "image/jpeg",
       quality: 0.8,
-      multiplier: Math.min(
-        width / canvas.getWidth(),
-        height / canvas.getHeight()
-      ),
+      pixelRatio: Math.min(width / stage.width(), height / stage.height()),
     });
   } catch (error) {
     console.error("Failed to generate thumbnail:", error);
