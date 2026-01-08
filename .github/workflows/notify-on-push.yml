@@ -28,6 +28,15 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
+          if [ -z "$TELEGRAM_BOT_TOKEN" ]; then
+            echo "::error::TELEGRAM_BOT_TOKEN is missing or empty."
+            exit 1
+          fi
+          if [ -z "$TELEGRAM_CHAT_ID" ]; then
+            echo "::error::TELEGRAM_CHAT_ID is missing or empty."
+            exit 1
+          fi
+
           # Get commit stats
           FILES_CHANGED=$(git diff-tree --no-commit-id --name-only -r ${{ steps.commit.outputs.sha }} | wc -l | xargs)
           ADDITIONS=$(git show --stat ${{ steps.commit.outputs.sha }} | tail -1 | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo "0")
