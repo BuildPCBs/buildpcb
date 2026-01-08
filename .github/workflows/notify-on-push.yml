@@ -51,7 +51,7 @@ jobs:
             "$DELETIONS")
 
           # Build inline keyboard with buttons
-          KEYBOARD='{"inline_keyboard":[[{"text":"📝 View Commit","url":"https://github.com/BuildPCBc/buildpcb/commit/${{ steps.commit.outputs.sha }}"},{"text":"📂 Repository","url":"https://github.com/BuildPCBc/buildpcb"}]]}'
+          KEYBOARD='{"inline_keyboard":[[{"text":"📝 View Commit","url":"https://github.com/BuildPCBs/buildpcb/commit/${{ steps.commit.outputs.sha }}"},{"text":"📂 Repository","url":"https://github.com/BuildPCBs/buildpcb"}]]}'
 
           # Escape message for JSON
           MESSAGE=$(echo "$MESSAGE" | jq -Rs .)
