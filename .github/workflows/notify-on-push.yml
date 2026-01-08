@@ -1,4 +1,4 @@
-name: Notify on Push
+name: Notify on Push to Telegram community
 
 on:
   push:
