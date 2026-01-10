@@ -24,11 +24,14 @@ export function serializeCanvasToCircuit(
       // Check if it has essential data
       if (!attrs.id) return;
 
+      // CRITICAL FIX: Store the FULL component data including symbol_data
+      // The node renders a component, but the full data might be stored elsewhere
+      // We need to preserve symbol_data, pins, graphics, everything
       components.push({
         id: attrs.id,
-        databaseId: attrs.uid || attrs.dbId, // Assuming we store dbId/uid in attrs
-        name: attrs.name || attrs.componentName, // 'component' is the class name, componentName is the display name
-        type: attrs.componentType || "generic",
+        databaseId: attrs.uid || attrs.dbId,
+        name: attrs.name || attrs.componentName || "Unknown",
+        type: attrs.componentType || attrs.type || "generic",
         value: attrs.value || "",
         explanation: attrs.explanation || "User added component",
         position: {
@@ -36,13 +39,10 @@ export function serializeCanvasToCircuit(
           y: node.y(),
         },
         rotation: node.rotation(),
-        properties: {
-          ...attrs,
-          // cleanup known internal attrs if needed
-          x: undefined,
-          y: undefined,
-          rotation: undefined,
-        },
+        // PRESERVE ALL PROPERTIES including symbol_data
+        ...attrs,
+        // Ensure critical rendering data is preserved
+        symbol_data: attrs.symbol_data,
         pinConfiguration: attrs.pinConfiguration,
       });
     });

@@ -45,7 +45,7 @@ export function TopToolbar({
   const isProjectDirty = useProjectStore((state) => state.isDirty);
 
   // Get canvas instance for save functionality
-  const canvas = canvasCommandManager.getCanvas();
+  const canvas = canvasCommandManager.getStage();
 
   // Track last save time for better status display
   const [lastSaveTime, setLastSaveTime] = useState<Date | null>(null);

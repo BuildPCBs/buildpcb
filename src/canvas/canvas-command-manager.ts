@@ -236,27 +236,41 @@ export const builtInCanvasCommands = {
       layer: Konva.Layer,
       params?: {
         type: string;
-        svgPath: string;
+        svgPath?: string;
+        symbol_data?: any;
         name: string;
         x?: number;
         y?: number;
       }
     ) => {
-      if (!params || !params.svgPath) {
-        logger.error("COMPONENT_ADD: Missing params or svgPath", params);
+      if (!params || (!params.svgPath && !params.symbol_data)) {
+        logger.error(
+          "COMPONENT_ADD: Missing params or (svgPath/symbol_data)",
+          params
+        );
         return;
       }
 
       logger.canvas(
-        `Command manager: Executing "component:add" for ${params?.name} via Konva Factory`
+        `Command manager: Executing "component:add" for ${params?.name}`
       );
 
       try {
-        const { createIntelligentComponent } = await import(
-          "./IntelligentComponentFactory"
-        );
-
-        await createIntelligentComponent(stage, layer, params);
+        if (params.symbol_data) {
+          // Use Symbol Factory for database components
+          logger.canvas("Using SymbolComponentFactory (Data-Driven)");
+          const { createSymbolComponent } = await import(
+            "./SymbolComponentFactory"
+          );
+          await createSymbolComponent(stage, layer, params as any);
+        } else if (params.svgPath) {
+          // Use Intelligent SVG Factory
+          logger.canvas("Using IntelligentComponentFactory (SVG-based)");
+          const { createIntelligentComponent } = await import(
+            "./IntelligentComponentFactory"
+          );
+          await createIntelligentComponent(stage, layer, params as any);
+        }
 
         logger.canvas(
           `Command manager: Component ${params.name} added successfully`

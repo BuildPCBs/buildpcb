@@ -17,22 +17,45 @@ import { logger } from "@/lib/logger";
 import { executeTool, getToolDefinitions } from "./tools";
 
 /**
- * Convert technical tool names to user-friendly messages
+ * Convert technical tool names to user-friendly messages with explanations
  */
-function getUserFriendlyToolMessage(toolName: string, args: any): string {
+function getUserFriendlyToolMessage(toolName: string, args: any): { message: string; explanation: string } {
   switch (toolName) {
     case "component_search":
-      return `🔍 Looking for ${args.query}...`;
+      return {
+        message: `Looking for ${args.query}…`,
+        explanation: `I'm scanning the available component library for a standard ${args.query} that matches your request. This includes checking package type, pin configuration, and availability for placement on the canvas.`
+      };
     case "add_component":
-      return `📦 Adding component to canvas...`;
+      return {
+        message: `Adding component to canvas…`,
+        explanation: `I'm attempting to place the selected component onto your canvas using the component insertion tool. This step ensures correct orientation, default pin labeling, and readiness for wiring.`
+      };
     case "draw_wire":
-      return `🔌 Connecting components...`;
+      return {
+        message: `Connecting components…`,
+        explanation: `I'm creating logical electrical connections between pins based on standard circuit configurations, ensuring the circuit can function correctly.`
+      };
     case "get_canvas_state":
-      return `👀 Checking what's on your canvas...`;
+      return {
+        message: `Checking what's on your canvas…`,
+        explanation: `I'm reviewing all components currently on your canvas to confirm nothing is duplicated, misplaced, or incompatible with the intended circuit.`
+      };
     case "delete_component":
-      return `🗑️ Removing component...`;
+      return {
+        message: `Removing component…`,
+        explanation: `I'm removing the specified component from the canvas and cleaning up any associated connections.`
+      };
+    case "get_component_connections":
+      return {
+        message: `Checking component connections…`,
+        explanation: `I'm examining all wire connections for this specific component to understand its current electrical relationships.`
+      };
     default:
-      return `⚙️ Working on it...`;
+      return {
+        message: `Working on it…`,
+        explanation: `I'm processing your request and coordinating the necessary actions.`
+      };
   }
 }
 
@@ -215,10 +238,9 @@ export class LLMOrchestrator {
 
             logger.debug(`🔧 Tool call: ${toolName}`, toolArgs);
 
-            // Show user-friendly status message
-            context.streamer.status(
-              getUserFriendlyToolMessage(toolName, toolArgs)
-            );
+            // Show user-friendly expandable status message
+            const { message, explanation } = getUserFriendlyToolMessage(toolName, toolArgs);
+            context.streamer.expandableStatus(message, explanation);
 
             // Execute the tool
             const toolResult = await executeTool(toolName, toolArgs, context);
@@ -346,19 +368,21 @@ Available tools:
 
 COMPONENT SEARCH WORKFLOW (CRITICAL):
 1. ALWAYS call component_search FIRST with natural language query
-2. You will receive MULTIPLE component variants (e.g., NE555D vs NE555P, DIP vs SMD)
-3. REVIEW all variants and their descriptions
-4. CHOOSE the most appropriate variant based on context:
-   - Breadboard/hobbyist projects → DIP packages (through-hole)
-   - PCB/professional projects → SMD packages (surface mount)
-   - Consider voltage ratings, current ratings, package size
-5. Use the EXACT UID from search results in add_component
+2. The library uses Manufacturer Part Numbers (e.g., **LM555**, **NA555**, **SE555**, **TLC555**).
+3. Do NOT expect generic names like "NE555". **ACCEPT** the Manufacturer Part Numbers as valid matches.
+   - "NA555D" IS a 555 Timer.
+   - "LM555xM" IS a 555 Timer.
+4. REVIEW all variants and their descriptions
+5. CHOOSE the most appropriate variant based on context:
+   - Breadboard/hobbyist projects → DIP/PDIP/Through-hole packages
+   - PCB/professional projects → SMD/SOIC/Surface-mount packages
+6. Use the EXACT UID from search results in add_component
 
 Example workflow:
 User: "add a 555 timer"
 → component_search(query: "555 timer")
-→ Receives: [NE555P_unit1 (DIP-8), NE555D_unit1 (SOIC-8), TLC555_unit1 (CMOS)]
-→ Choose NE555P_unit1 for breadboard (most common)
+→ Receives: [NA555D (SOIC-8), LM555xM (SOIC-8), TLC555 (DIP-8)]
+→ Choose TLC555 for breadboard (DIP is easier to use)
 → add_component(component_uid: "actual-uid-from-search")
 
 COMPONENT TRACKING (CRITICAL FOR WIRING):

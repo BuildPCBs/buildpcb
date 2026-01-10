@@ -126,7 +126,7 @@ export async function addComponent(
     // Step 5: Place component on canvas
     context.streamer.status(`Placing ${component.name} on canvas...`);
 
-    const canvas = canvasCommandManager.getCanvas();
+    const canvas = canvasCommandManager.getStage();
     if (!canvas) {
       const errorMsg = "Canvas not available. Please try again.";
       context.streamer.error(errorMsg);
@@ -357,26 +357,26 @@ function extractPosition(
   }
 
   // Try to extract relative positions (top, bottom, left, right, center)
-  const canvas = canvasCommandManager.getCanvas();
+  const canvas = canvasCommandManager.getStage();
   if (!canvas) {
     // Default center if no canvas
     return { x: 400, y: 300 };
   }
 
-  const width = canvas.getWidth();
-  const height = canvas.getHeight();
+  const canvasWidth = canvas.width();
+  const canvasHeight = canvas.height();
 
   // Define regions
   const positions = {
-    center: { x: width / 2, y: height / 2 },
-    "top left": { x: width * 0.25, y: height * 0.25 },
-    "top right": { x: width * 0.75, y: height * 0.25 },
-    "bottom left": { x: width * 0.25, y: height * 0.75 },
-    "bottom right": { x: width * 0.75, y: height * 0.75 },
-    top: { x: width / 2, y: height * 0.25 },
-    bottom: { x: width / 2, y: height * 0.75 },
-    left: { x: width * 0.25, y: height / 2 },
-    right: { x: width * 0.75, y: height / 2 },
+    center: { x: canvasWidth / 2, y: canvasHeight / 2 },
+    "top left": { x: canvasWidth * 0.25, y: canvasHeight * 0.25 },
+    "top right": { x: canvasWidth * 0.75, y: canvasHeight * 0.25 },
+    "bottom left": { x: canvasWidth * 0.25, y: canvasHeight * 0.75 },
+    "bottom right": { x: canvasWidth * 0.75, y: canvasHeight * 0.75 },
+    top: { x: canvasWidth / 2, y: canvasHeight * 0.25 },
+    bottom: { x: canvasWidth / 2, y: canvasHeight * 0.75 },
+    left: { x: canvasWidth * 0.25, y: canvasHeight / 2 },
+    right: { x: canvasWidth * 0.75, y: canvasHeight / 2 },
   };
 
   // Check for position keywords
@@ -390,7 +390,7 @@ function extractPosition(
   // Auto-placement: Use center with slight random offset to avoid overlap
   const randomOffset = () => (Math.random() - 0.5) * 100;
   return {
-    x: width / 2 + randomOffset(),
-    y: height / 2 + randomOffset(),
+    x: canvasWidth / 2 + randomOffset(),
+    y: canvasHeight / 2 + randomOffset(),
   };
 }

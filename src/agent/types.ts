@@ -9,6 +9,8 @@ import { SelectedComponent } from "@/contexts/CanvasContext";
 export interface AgentStreamer {
   /** Send a status update message to the user */
   status: (message: string) => void;
+  /** Send an expandable status message with explanation */
+  expandableStatus: (message: string, explanation: string) => void;
   /** Stream thinking/reasoning steps */
   think: (message: string) => void;
   /** Report progress for long-running operations */

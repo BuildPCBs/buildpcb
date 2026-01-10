@@ -22,6 +22,10 @@ export interface StreamMessage {
     total: number;
   };
   error?: Error;
+  expandable?: {
+    title: string;
+    content: string;
+  };
 }
 
 /**
@@ -110,6 +114,18 @@ export class StreamingHandler implements AgentStreamer {
    */
   status(message: string): void {
     this.emit("status", message);
+  }
+
+  /**
+   * Send an expandable status message with explanation
+   */
+  expandableStatus(message: string, explanation: string): void {
+    this.emit("status", message, {
+      expandable: {
+        title: "▸ What's happening",
+        content: explanation,
+      },
+    });
   }
 
   /**

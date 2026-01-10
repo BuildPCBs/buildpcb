@@ -25,6 +25,7 @@ export interface ChatMessage {
   isEditing?: boolean;
   isStreaming?: boolean; // NEW: indicates active streaming
   streamingStatus?: string; // NEW: current status message while streaming
+  thinkingSteps?: any[]; // NEW: store thinking/status steps separately
   selectedComponents?: SelectedComponent[]; // Components that were selected when this message was sent
 }
 
@@ -385,13 +386,13 @@ export function AIChatProvider({
 
       const streamingHandler = agentService.getStreamingHandler();
 
-      // Track accumulated status messages for building the narrative
+      // Track thinking steps separately
       let accumulatedContent = "";
+      let thinkingSteps: any[] = [];
 
       // Subscribe to streaming status updates and append them to content
       const unsubscribe = streamingHandler.subscribe((message) => {
-        // Append ALL messages to the content to show agent's thought process
-        // This creates a "growing message" like GitHub Copilot
+        // DO NOT append to content. Store in thinkingSteps instead.
         if (
           message.type === "status" ||
           message.type === "think" ||
@@ -400,17 +401,20 @@ export function AIChatProvider({
           message.type === "error" ||
           message.type === "warn"
         ) {
-          // Format the message with emoji based on type
-          const formattedMessage = formatStreamMessage(message);
-          accumulatedContent += formattedMessage + "\n\n";
+          // Append new step and de-duplicate by id to preserve full sequence
+          const nextSteps = [...thinkingSteps, message].filter(
+            (step, idx, arr) => arr.findIndex((s) => s.id === step.id) === idx
+          );
+          thinkingSteps = nextSteps;
 
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === aiMessageId
                 ? {
                     ...msg,
-                    content: accumulatedContent,
-                    streamingStatus: message.message, // Also update status bar
+                    content: accumulatedContent, // Keep content clean (only LLM text)
+                    thinkingSteps: nextSteps, // Preserve full streamed sequence
+                    streamingStatus: message.message,
                     isStreaming: true,
                   }
                 : msg
@@ -424,16 +428,14 @@ export function AIChatProvider({
         history: conversationHistory,
         selectedComponents: selectedComponents || [],
         onContentUpdate: (content: string) => {
-          // The final LLM response gets appended to the accumulated status messages
-          // This way we preserve both the agent's thought process AND the final response
-          const fullContent = accumulatedContent + content;
+          accumulatedContent = content; // Update the main text body
 
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === aiMessageId
                 ? {
                     ...msg,
-                    content: fullContent,
+                    content: accumulatedContent,
                     isStreaming: true,
                     status: "complete",
                   }
@@ -446,13 +448,15 @@ export function AIChatProvider({
       // Unsubscribe from streaming handler
       unsubscribe();
 
+      const trimmedResult = result.message?.trim();
       const finalContent =
-        (result.message && result.message.trim().length > 0
-          ? accumulatedContent + result.message.trim() // Include all accumulated status messages + final response
+        accumulatedContent && accumulatedContent.trim().length > 0
+          ? accumulatedContent
+          : trimmedResult && trimmedResult.length > 0
+          ? trimmedResult
           : result.status === "success"
-          ? accumulatedContent + "Done."
-          : accumulatedContent + "The agent could not complete the request.") ||
-        "";
+          ? "Done."
+          : "The agent could not complete the request.";
 
       // Mark streaming as complete
       setMessages((prev) =>
@@ -464,6 +468,7 @@ export function AIChatProvider({
                 status: result.status === "success" ? "complete" : "error",
                 isStreaming: false, // Stop streaming indicator
                 streamingStatus: undefined,
+                thinkingSteps,
               }
             : msg
         )

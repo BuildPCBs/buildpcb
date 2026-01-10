@@ -13,6 +13,10 @@ export function ThinkingIndicator({
 }: ThinkingIndicatorProps) {
   if (!isVisible) return null;
 
+  // Commented out as requested to remove "blue stuff" thinking indicator
+  return null;
+
+  /*
   return (
     <div
       className={`absolute flex items-center ${className}`}
@@ -34,7 +38,6 @@ export function ThinkingIndicator({
         paddingRight: responsive(12),
       }}
     >
-      {/* Animated Three-Dot Loader */}
       <div className="flex items-center space-x-1 mr-2">
         <div
           className="w-1 h-1 bg-yellow-600 rounded-full animate-pulse"
@@ -50,7 +53,6 @@ export function ThinkingIndicator({
         />
       </div>
 
-      {/* Thinking Text */}
       <span
         className="text-yellow-700"
         style={{
@@ -62,4 +64,5 @@ export function ThinkingIndicator({
       </span>
     </div>
   );
+  */
 }

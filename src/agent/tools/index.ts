@@ -38,6 +38,8 @@ function transformComponentQuery(userQuery: string): string {
     "light emitting diode": "LED",
 
     // Resistors
+    ne555: "555",
+    lm555: "555",
     resistor: "R",
     resistance: "R",
 
@@ -102,7 +104,7 @@ export interface Tool {
 export const componentSearchTool: Tool = {
   name: "component_search",
   description:
-    "Search for electronic components in the library. Returns MULTIPLE matching variants (e.g., DIP vs SMD packages, different models) with descriptions, keywords, and specifications. The LLM should review all variants and choose the most appropriate one based on the user's context (e.g., breadboard = DIP, PCB = SMD). Use this first before adding components.",
+    "Search for electronic components in the library. Returns MULTIPLE matching variants. NOTE: The library uses specific Manufacturer Part Numbers (e.g., 'LM555', 'NA555', 'SN74HC00') rather than generic names. You MUST accept these specific part numbers as valid matches for generic requests (e.g., accept 'NA555D' or 'LM555xM' when looking for a '555 timer').",
   parameters: {
     type: "object",
     properties: {
@@ -139,14 +141,12 @@ export const componentSearchTool: Tool = {
       ...new Set([...originalKeywords, ...transformedKeywords]),
     ];
 
-    // Search components_index (has rich metadata: descriptions, keywords, categories)
-    const { data: indexData } = await (
+    // Search components table (correct table name!)
+    const { data: indexData, error: queryError } = await (
       await import("@/lib/supabase")
     ).supabaseAdmin
-      .from("components_index")
-      .select(
-        "uid, name, description, keywords, category, subcategory, pin_count, component_type"
-      )
+      .from("component_summary")
+      .select("id, name, description, keywords, library, pin_count")
       .or(
         allKeywords
           .map(
@@ -157,27 +157,62 @@ export const componentSearchTool: Tool = {
       )
       .limit(limit * 2); // Get more results for better scoring
 
+    // CRITICAL: Log the query details and any errors
+    logger.info("🔍 Component search query details", {
+      originalQuery: args.query,
+      transformedQuery,
+      allKeywords,
+      hasError: !!queryError,
+      errorMessage: queryError?.message,
+      hasData: !!indexData,
+      dataLength: indexData?.length || 0,
+    });
+
     if (!indexData || indexData.length === 0) {
+      logger.warn("❌ Component search returned no results", {
+        query: args.query,
+        transformed: transformedQuery,
+        keywords: allKeywords,
+      });
       return {
         success: false,
         message: `No components found matching "${args.query}". Try different keywords like: component type, part number, or function (e.g., "555 timer", "voltage regulator", "LED").`,
       };
     }
 
-    // Score and rank results
+    // Score and rank results with improved algorithm
     const scored = indexData.map((comp: any) => {
-      const nameMatches = allKeywords.filter((kw) =>
-        comp.name.toLowerCase().includes(kw)
-      ).length;
-      const descMatches = allKeywords.filter((kw) =>
-        comp.description?.toLowerCase().includes(kw)
-      ).length;
-      const keywordMatches = allKeywords.filter((kw) =>
-        comp.keywords?.toLowerCase().includes(kw)
-      ).length;
+      const lowerName = comp.name.toLowerCase();
+      const lowerDesc = comp.description?.toLowerCase() || "";
+      const lowerKeywords = comp.keywords?.toLowerCase() || "";
+      const lowerLibrary = comp.library?.toLowerCase() || "";
+
+      let score = 0;
+
+      // Better scoring: prioritize exact matches and word boundaries
+      for (const kw of allKeywords) {
+        const kwLower = kw.toLowerCase();
+
+        // Exact name match (highest priority)
+        if (lowerName === kwLower) score += 100;
+        // Name starts with keyword
+        else if (lowerName.startsWith(kwLower)) score += 50;
+        // Name contains keyword
+        else if (lowerName.includes(kwLower)) score += 10;
+
+        // Library match (e.g., "timer" matching library="Timer")
+        if (lowerLibrary.includes(kwLower)) score += 20;
+
+        // Keywords match
+        if (lowerKeywords.includes(kwLower)) score += 15;
+
+        // Description match (lowest priority)
+        if (lowerDesc.includes(kwLower)) score += 5;
+      }
+
       return {
         ...comp,
-        score: nameMatches * 3 + descMatches * 2 + keywordMatches,
+        score,
       };
     });
 
@@ -206,26 +241,56 @@ export const componentSearchTool: Tool = {
       context.streamer.status(`✅ Found ${topResults.length} options`);
     }
 
+    // Map summary rows to canonical component UUIDs by id (uuid-to-uuid)
+    const idList = topResults.map((comp) => comp.id);
+
+    const supabase = (await import("@/lib/supabase")).supabaseAdmin;
+
+    const { data: byId, error: byIdError } = await supabase
+      .from("components")
+      .select("id")
+      .in("id", idList);
+
+    if (byIdError) {
+      logger.warn("⚠️ Failed to map component ids to UUIDs", { byIdError });
+    }
+
+    const uuidById = new Map<string, string>();
+
+    byId?.forEach((row: { id: string }) => {
+      uuidById.set(row.id, row.id);
+    });
+
     // Return multiple variants for LLM to choose from
-    return {
-      success: true,
-      message: `Found ${topResults.length} matching components. Review the variants below and choose the most appropriate one based on the user's needs (e.g., DIP for breadboard, SMD for PCB).`,
-      components: topResults.map((comp: any) => ({
-        uid: comp.uid,
+    const mappedComponents = topResults
+      .filter((comp: any) => uuidById.has(comp.id))
+      .map((comp: any) => ({
+        uid: uuidById.get(comp.id)!,
         name: comp.name,
         description: comp.description || "No description available",
         keywords: comp.keywords || "",
-        category: comp.category || "Uncategorized",
-        subcategory: comp.subcategory || "",
+        library: comp.library || "Unknown",
         pin_count: comp.pin_count || 0,
-        type: comp.component_type || "Unknown",
         match_score: comp.score,
-      })),
+      }));
+
+    if (mappedComponents.length === 0) {
+      logger.warn("❌ No components mapped by UUID", { idList });
+      return {
+        success: false,
+        message: "No components could be mapped to canonical UUIDs.",
+      };
+    }
+
+    return {
+      success: true,
+      message: `Found ${mappedComponents.length} matching components. Review the variants below and choose the most appropriate one based on the user's needs (e.g., DIP for breadboard, SMD for PCB).`,
+      components: mappedComponents,
       // Include search metadata for LLM context
       search_info: {
         original_query: args.query,
         transformed_query: transformedQuery,
-        total_found: topResults.length,
+        total_found: mappedComponents.length,
       },
     };
   },
@@ -234,19 +299,19 @@ export const componentSearchTool: Tool = {
 /**
  * Tool 2: Add Component to Canvas
  * Place a component on the canvas at specified position.
- * MUST use exact component UID from component_search results.
+ * MUST use exact component ID from component_search results.
  */
 export const addComponentTool: Tool = {
   name: "add_component",
   description:
-    "Add a specific component variant to the canvas. IMPORTANT: You MUST first call component_search to get available variants, then choose the most appropriate component UID based on the user's context (e.g., breadboard = DIP package, PCB = SMD package, hobbyist = through-hole). Use the exact UID from the search results.",
+    "Add a specific component variant to the canvas. IMPORTANT: You MUST first call component_search to get available variants, then choose the most appropriate component ID based on the user's context (e.g., breadboard = DIP package, PCB = SMD package, hobbyist = through-hole). Use the exact ID from the search results.",
   parameters: {
     type: "object",
     properties: {
       component_uid: {
         type: "string",
         description:
-          "The exact UID of the chosen component variant from component_search results. Do NOT make up UIDs.",
+          "The exact ID of the chosen component variant from component_search results. Do NOT make up IDs.",
       },
       x: {
         type: "number",
@@ -269,58 +334,49 @@ export const addComponentTool: Tool = {
     args: { component_uid: string; x?: number; y?: number; rotation?: number }
   ) => {
     logger.debug("🔧 Tool: add_component", args);
-    context.streamer.status(`Placing component...`);
+    context.streamer.status(`Adding component to canvas…`);
 
-    // Fetch component details by UID first, then fallback to name
+    // Validate ID is a UUID to avoid invalid queries
+    const uuidPattern =
+      /^(?:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12})$/;
+    if (!uuidPattern.test(args.component_uid)) {
+      logger.error("❌ Invalid component id (not a UUID)", {
+        id: args.component_uid,
+      });
+      context.streamer.error(
+        `Component id is not a valid UUID: "${args.component_uid}"`
+      );
+      return {
+        success: false,
+        message: `Component id is not a valid UUID: "${args.component_uid}"`,
+      };
+    }
+
+    // Fetch component details by ID
     let component = null;
-    const { data: componentByUid } = await (
+    const { data: componentByUid, error: fetchError } = await (
       await import("@/lib/supabase")
     ).supabaseAdmin
-      .from("components_v2")
+      .from("components")
       .select("*")
-      .eq("uid", args.component_uid)
+      .eq("id", args.component_uid)
       .single();
 
     component = componentByUid;
 
-    // If not found by UID, try by name (components_index uses different UIDs)
     if (!component) {
-      logger.debug("Component not found by UID, trying by name...", {
-        uid: args.component_uid,
+      logger.error("❌ Component not found", {
+        id: args.component_uid,
+        fetchError,
       });
 
-      // Get name from components_index
-      const { data: indexComponent } = await (
-        await import("@/lib/supabase")
-      ).supabaseAdmin
-        .from("components_index")
-        .select("name")
-        .eq("uid", args.component_uid)
-        .single();
+      context.streamer.error(
+        `Component not found for id "${args.component_uid}"`
+      );
 
-      if (indexComponent?.name) {
-        const { data: componentByName } = await (
-          await import("@/lib/supabase")
-        ).supabaseAdmin
-          .from("components_v2")
-          .select("*")
-          .eq("name", indexComponent.name)
-          .single();
-
-        component = componentByName;
-
-        if (component) {
-          logger.debug("✅ Found component by name from index", {
-            name: indexComponent.name,
-          });
-        }
-      }
-    }
-
-    if (!component) {
       return {
         success: false,
-        message: `Component with uid "${args.component_uid}" not found in components_v2`,
+        message: `Component with id "${args.component_uid}" not found in database`,
       };
     }
 
@@ -352,16 +408,16 @@ export const addComponentTool: Tool = {
 
     const componentParams = {
       id: instanceId,
-      type: component.component_type || "generic",
-      svgPath: component.symbol_svg,
+      type: "generic", // Components table doesn't have component_type
       name: component.name,
-      uid: component.uid,
+      // No SVG path - components use symbol_data with graphics instead
+      symbol_data: component.symbol_data,
       pins: pins,
       x: position.x,
       y: position.y,
       rotation: args.rotation || 0,
       componentMetadata: {
-        uid: component.uid,
+        uid: component.id,
         name: component.name,
         component_type: component.component_type,
         category: component.category,

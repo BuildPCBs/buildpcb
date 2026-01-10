@@ -5,12 +5,11 @@ import { useAIChat } from "../../contexts/AIChatContext";
 import { useCanvas } from "../../contexts/CanvasContext";
 import { useCanvasStateSnapshot } from "../../hooks/useCanvasState";
 import type { ChatMessage } from "../../contexts/AIChatContext";
+import { ChevronRight } from "lucide-react";
 import { BRAND_COLORS } from "@/lib/constants";
 import { responsive } from "@/lib/responsive";
 import { logger } from "@/lib/logger";
-import { AgentStreamDisplay } from "../agent/AgentStreamDisplay";
 import { agentService } from "@/agent/AgentService";
-import { StreamMessage } from "@/agent/StreamingHandler";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
@@ -66,7 +65,7 @@ export function AIChatInterface({
         targetElement.scrollIntoView({
           behavior: "smooth",
           block: "center",
-          inline: "nearest"
+          inline: "nearest",
         });
       }
     }
@@ -129,43 +128,6 @@ export function AIChatInterface({
     }
   };
 
-  const [streamMessages, setStreamMessages] = useState<StreamMessage[]>([]);
-
-  useEffect(() => {
-    const streamingHandler = agentService.getStreamingHandler();
-    const unsubscribe = streamingHandler.subscribe((message) => {
-      setStreamMessages((prev) => {
-        const updated = [...prev, message];
-        if (updated.length > 1) {
-          return updated.slice(-1);
-        }
-        return updated;
-      });
-
-      if (message.type === "success" || message.type === "error") {
-        setTimeout(() => {
-          setStreamMessages((prev) => prev.filter((m) => m.id !== message.id));
-        }, 2000);
-      }
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (messages.length === 0) return;
-    const lastMessage = messages[messages.length - 1];
-    if (lastMessage.type === "assistant" && lastMessage.status === "complete") {
-      // Don't clear stream messages immediately - let them fade out naturally
-      // This allows users to see the full thought process
-      setTimeout(() => {
-        setStreamMessages([]);
-      }, 3000); // Keep visible for 3 seconds after completion
-    }
-  }, [messages]);
-
   return (
     <div className="relative w-full h-full">
       {/* Dot Navigation */}
@@ -193,9 +155,9 @@ export function AIChatInterface({
         ref={chatContainerRef}
         className="relative border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm w-full"
         style={{
-          height: 'auto',
+          height: "auto",
           maxHeight: responsive(500),
-          minHeight: responsive(300)
+          minHeight: responsive(300),
         }}
       >
         {/* Messages Area */}
@@ -205,12 +167,12 @@ export function AIChatInterface({
           style={{
             maxHeight: responsive(450),
             minHeight: responsive(250),
-            overflowY: 'auto',
-            overflowX: 'hidden',
-            scrollBehavior: 'smooth'
+            overflowY: "auto",
+            overflowX: "hidden",
+            scrollBehavior: "smooth",
           }}
         >
-          {messages.length === 0 && streamMessages.length === 0 ? (
+          {messages.length === 0 ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
                 <div className="text-gray-400 text-sm mb-2">💬</div>
@@ -475,6 +437,46 @@ export function AIChatInterface({
                       /* AI Response - Full Width Text Block */
                       <div className="w-full">
                         <div className="w-full p-2.5 bg-gray-50 rounded-lg border border-gray-100">
+                          {/* Agent Stream Display - status/explanations FIRST inside bubble */}
+                          {message.type === "assistant" &&
+                            message.thinkingSteps &&
+                            message.thinkingSteps.length > 0 && (
+                              <div className="mb-1.5 space-y-1">
+                                {message.thinkingSteps.map((step: any, stepIdx: number) => (
+                                  <div key={`stream-step-${stepIdx}`} className="flex flex-col">
+                                    <div className="flex items-center text-[11px] leading-tight text-gray-600 font-mono">
+                                      <span className="mr-2">{getEmojiIcon(step)}</span>
+                                      <span>{step.message}</span>
+                                    </div>
+                                    {step.expandable && (
+                                      <>
+                                        <button
+                                          onClick={() => {
+                                            const element = document.getElementById(
+                                              `expandable-${message.id}-${stepIdx}`
+                                            );
+                                            if (element) {
+                                              element.classList.toggle("hidden");
+                                            }
+                                          }}
+                                          className="ml-6 mt-1 text-gray-500 hover:text-gray-700 transition-colors inline-flex items-center gap-1 text-[11px]"
+                                        >
+                                          <ChevronRight className="w-3 h-3" strokeWidth={2} />
+                                          {step.expandable.title}
+                                        </button>
+                                        <div
+                                          id={`expandable-${message.id}-${stepIdx}`}
+                                          className="hidden ml-8 mt-1 p-1.5 bg-gray-50 rounded text-[11px] leading-snug text-gray-700 border-l-2 border-gray-200"
+                                        >
+                                          {step.expandable.content}
+                                        </div>
+                                      </>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
                           {/* Response Content */}
                           {message.content && (
                             <div
@@ -551,19 +553,12 @@ export function AIChatInterface({
                               >
                                 {message.content}
                               </ReactMarkdown>
-                              {/* Streaming cursor at the end of content */}
-                              {message.isStreaming && (
-                                <span
-                                  className="inline-block ml-1 w-1.5 h-4 bg-blue-600 animate-pulse"
-                                  style={{ verticalAlign: "middle" }}
-                                />
-                              )}
                             </div>
                           )}
 
                           {/* Feedback Buttons - Only for completed AI responses */}
                           {message.status === "complete" && (
-                            <div className="flex items-center gap-1 pt-1.5 border-t border-gray-100">
+                            <div className="flex items-center gap-1 pt-1.5 border-t border-gray-100 mt-2">
                               <button
                                 onClick={() => handleRegenerate(message.id)}
                                 className="p-1 text-gray-500 hover:bg-gray-100 rounded transition-colors"
@@ -633,7 +628,7 @@ export function AIChatInterface({
                                 </svg>
                               </button>
                               <button
-                                onClick={() => handleCopy(message.content)}
+                                onClick={() => handleCopy(buildCopyText(message))}
                                 className="p-1 text-gray-500 hover:bg-gray-100 rounded transition-colors"
                                 onMouseEnter={(e) =>
                                   (e.currentTarget.style.color =
@@ -661,15 +656,6 @@ export function AIChatInterface({
                             </div>
                           )}
                         </div>
-
-                        {/* Agent Stream Display - Shows after streaming assistant messages */}
-                        {message.type === "assistant" &&
-                          message.isStreaming &&
-                          streamMessages.length > 0 && (
-                            <div className="mt-2">
-                              <AgentStreamDisplay messages={streamMessages} />
-                            </div>
-                          )}
                       </div>
                     )}
                   </div>
@@ -681,4 +667,52 @@ export function AIChatInterface({
       </div>
     </div>
   );
+}
+
+/**
+ * Get emoji icon based on message content
+ */
+function getEmojiIcon(message: any) {
+  const content = message.message.toLowerCase();
+
+  if (content.includes("looking for") || content.includes("searching")) {
+    return "🔍";
+  } else if (content.includes("adding component")) {
+    return "📦";
+  } else if (content.includes("connecting") || content.includes("wiring")) {
+    return "🔌";
+  } else if (content.includes("checking") || content.includes("reviewing")) {
+    return "👀";
+  } else if (content.includes("removing") || content.includes("deleting")) {
+    return "🗑️";
+  } else if (message.type === "success") {
+    return "✅";
+  } else if (message.type === "error") {
+    return "❌";
+  } else if (message.type === "warn") {
+    return "⚠️";
+  } else if (message.type === "think") {
+    return "💭";
+  } else if (message.type === "progress") {
+    return "⏳";
+  }
+
+  return "🔹";
+}
+
+/**
+ * Build copyable text that includes status/explanations + final content
+ */
+function buildCopyText(message: any): string {
+  const steps = (message.thinkingSteps || [])
+    .filter((s: any) => s.expandable)
+    .map((s: any) => {
+      const parts = [s.message];
+      if (s.expandable?.title) parts.push(s.expandable.title);
+      if (s.expandable?.content) parts.push(s.expandable.content);
+      return parts.join("\n").trim();
+    })
+    .filter(Boolean);
+
+  return [...steps, message.content || ""].join("\n\n").trim();
 }
