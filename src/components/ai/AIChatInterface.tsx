@@ -442,38 +442,51 @@ export function AIChatInterface({
                             message.thinkingSteps &&
                             message.thinkingSteps.length > 0 && (
                               <div className="mb-1.5 space-y-1">
-                                {message.thinkingSteps.map((step: any, stepIdx: number) => (
-                                  <div key={`stream-step-${stepIdx}`} className="flex flex-col">
-                                    <div className="flex items-center text-[11px] leading-tight text-gray-600 font-mono">
-                                      <span className="mr-2">{getEmojiIcon(step)}</span>
-                                      <span>{step.message}</span>
+                                {message.thinkingSteps.map(
+                                  (step: any, stepIdx: number) => (
+                                    <div
+                                      key={`stream-step-${stepIdx}`}
+                                      className="flex flex-col"
+                                    >
+                                      <div className="flex items-center text-[11px] leading-tight text-gray-600 font-mono">
+                                        <span className="mr-2">
+                                          {getEmojiIcon(step)}
+                                        </span>
+                                        <span>{step.message}</span>
+                                      </div>
+                                      {step.expandable && (
+                                        <>
+                                          <button
+                                            onClick={() => {
+                                              const element =
+                                                document.getElementById(
+                                                  `expandable-${message.id}-${stepIdx}`
+                                                );
+                                              if (element) {
+                                                element.classList.toggle(
+                                                  "hidden"
+                                                );
+                                              }
+                                            }}
+                                            className="ml-6 mt-1 text-gray-500 hover:text-gray-700 transition-colors inline-flex items-center gap-1 text-[11px]"
+                                          >
+                                            <ChevronRight
+                                              className="w-3 h-3"
+                                              strokeWidth={2}
+                                            />
+                                            {step.expandable.title}
+                                          </button>
+                                          <div
+                                            id={`expandable-${message.id}-${stepIdx}`}
+                                            className="hidden ml-8 mt-1 p-1.5 bg-gray-50 rounded text-[11px] leading-snug text-gray-700 border-l-2 border-gray-200"
+                                          >
+                                            {step.expandable.content}
+                                          </div>
+                                        </>
+                                      )}
                                     </div>
-                                    {step.expandable && (
-                                      <>
-                                        <button
-                                          onClick={() => {
-                                            const element = document.getElementById(
-                                              `expandable-${message.id}-${stepIdx}`
-                                            );
-                                            if (element) {
-                                              element.classList.toggle("hidden");
-                                            }
-                                          }}
-                                          className="ml-6 mt-1 text-gray-500 hover:text-gray-700 transition-colors inline-flex items-center gap-1 text-[11px]"
-                                        >
-                                          <ChevronRight className="w-3 h-3" strokeWidth={2} />
-                                          {step.expandable.title}
-                                        </button>
-                                        <div
-                                          id={`expandable-${message.id}-${stepIdx}`}
-                                          className="hidden ml-8 mt-1 p-1.5 bg-gray-50 rounded text-[11px] leading-snug text-gray-700 border-l-2 border-gray-200"
-                                        >
-                                          {step.expandable.content}
-                                        </div>
-                                      </>
-                                    )}
-                                  </div>
-                                ))}
+                                  )
+                                )}
                               </div>
                             )}
 
@@ -628,7 +641,9 @@ export function AIChatInterface({
                                 </svg>
                               </button>
                               <button
-                                onClick={() => handleCopy(buildCopyText(message))}
+                                onClick={() =>
+                                  handleCopy(buildCopyText(message))
+                                }
                                 className="p-1 text-gray-500 hover:bg-gray-100 rounded transition-colors"
                                 onMouseEnter={(e) =>
                                   (e.currentTarget.style.color =

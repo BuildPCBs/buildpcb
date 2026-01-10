@@ -19,42 +19,45 @@ import { executeTool, getToolDefinitions } from "./tools";
 /**
  * Convert technical tool names to user-friendly messages with explanations
  */
-function getUserFriendlyToolMessage(toolName: string, args: any): { message: string; explanation: string } {
+function getUserFriendlyToolMessage(
+  toolName: string,
+  args: any
+): { message: string; explanation: string } {
   switch (toolName) {
     case "component_search":
       return {
         message: `Looking for ${args.query}…`,
-        explanation: `I'm scanning the available component library for a standard ${args.query} that matches your request. This includes checking package type, pin configuration, and availability for placement on the canvas.`
+        explanation: `I'm scanning the available component library for a standard ${args.query} that matches your request. This includes checking package type, pin configuration, and availability for placement on the canvas.`,
       };
     case "add_component":
       return {
         message: `Adding component to canvas…`,
-        explanation: `I'm attempting to place the selected component onto your canvas using the component insertion tool. This step ensures correct orientation, default pin labeling, and readiness for wiring.`
+        explanation: `I'm attempting to place the selected component onto your canvas using the component insertion tool. This step ensures correct orientation, default pin labeling, and readiness for wiring.`,
       };
     case "draw_wire":
       return {
         message: `Connecting components…`,
-        explanation: `I'm creating logical electrical connections between pins based on standard circuit configurations, ensuring the circuit can function correctly.`
+        explanation: `I'm creating logical electrical connections between pins based on standard circuit configurations, ensuring the circuit can function correctly.`,
       };
     case "get_canvas_state":
       return {
         message: `Checking what's on your canvas…`,
-        explanation: `I'm reviewing all components currently on your canvas to confirm nothing is duplicated, misplaced, or incompatible with the intended circuit.`
+        explanation: `I'm reviewing all components currently on your canvas to confirm nothing is duplicated, misplaced, or incompatible with the intended circuit.`,
       };
     case "delete_component":
       return {
         message: `Removing component…`,
-        explanation: `I'm removing the specified component from the canvas and cleaning up any associated connections.`
+        explanation: `I'm removing the specified component from the canvas and cleaning up any associated connections.`,
       };
     case "get_component_connections":
       return {
         message: `Checking component connections…`,
-        explanation: `I'm examining all wire connections for this specific component to understand its current electrical relationships.`
+        explanation: `I'm examining all wire connections for this specific component to understand its current electrical relationships.`,
       };
     default:
       return {
         message: `Working on it…`,
-        explanation: `I'm processing your request and coordinating the necessary actions.`
+        explanation: `I'm processing your request and coordinating the necessary actions.`,
       };
   }
 }
@@ -239,7 +242,10 @@ export class LLMOrchestrator {
             logger.debug(`🔧 Tool call: ${toolName}`, toolArgs);
 
             // Show user-friendly expandable status message
-            const { message, explanation } = getUserFriendlyToolMessage(toolName, toolArgs);
+            const { message, explanation } = getUserFriendlyToolMessage(
+              toolName,
+              toolArgs
+            );
             context.streamer.expandableStatus(message, explanation);
 
             // Execute the tool
